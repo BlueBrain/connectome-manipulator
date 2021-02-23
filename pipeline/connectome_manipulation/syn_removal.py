@@ -9,7 +9,7 @@
 import logging
 import numpy as np
 
-""" Remove percentage of randomly selected synapses according to certain cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn) and keeping sum of Gsyns per connection constant (unless there is no synapse per connection left) """
+""" Remove percentage of randomly selected synapses according to certain cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn) and keeping sum of g_syns per connection constant (unless there is no synapse per connection left) """
 def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, keep_conns=False, keep_gsyn=False):
     
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
@@ -23,7 +23,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, kee
         src_offset = min(gids_src)
         dest_offset = min(gids_dest)
         
-        # Determine connection strength (#syn/conn and sum of Gsyn per connection) BEFORE synapse removal
+        # Determine connection strength (#syn/conn and sum of g_syns per connection) BEFORE synapse removal
         def conn_strength(e_tbl):
             nsyn_table = np.full((max(gids_src) - src_offset + 1, max(gids_dest) - dest_offset + 1), 0)
             gsyn_table = np.full((max(gids_src) - src_offset + 1, max(gids_dest) - dest_offset + 1), 0.0)
@@ -55,15 +55,15 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, kee
     edges_table_manip = edges_table[~syn_sel_idx]
     
     if keep_gsyn:
-        # Determine connection strength (#syn/conn and sum of Gsyn per connection) AFTER synapse removal
+        # Determine connection strength (#syn/conn and sum of g_syns per connection) AFTER synapse removal
         nsyn_table_manip, gsyn_table_manip = conn_strength(edges_table_manip)
         
-        # ... and adjust Gsyn so that the sum of Gsyns per connections BEFORE and AFTER manipulation is kept the same (unless there is no synapse per connection left)
+        # ... and adjust g_syn so that the sum of g_syns per connections BEFORE and AFTER manipulation is kept the same (unless there is no synapse per connection left)
         for idx in np.nonzero(np.logical_and(np.isin(edges_table_manip['@source_node'], gids_src), np.isin(edges_table_manip['@target_node'], gids_dest)))[0]:
             tab_idx = edges_table_manip.index[idx]
             sidx = edges_table_manip.loc[tab_idx, '@source_node'].astype(int) - src_offset
             didx = edges_table_manip.loc[tab_idx, '@target_node'].astype(int) - dest_offset
             if nsyn_table_manip[sidx, didx] > 0 and nsyn_table_manip[sidx, didx] != nsyn_table[sidx, didx]:
-                edges_table_manip.at[tab_idx, 'conductance'] = (gsyn_table[sidx, didx] - gsyn_table_manip[sidx, didx]) / nsyn_table_manip[sidx, didx] # Equally distribute Gsyn difference among remaining synapses
+                edges_table_manip.at[tab_idx, 'conductance'] += (gsyn_table[sidx, didx] - gsyn_table_manip[sidx, didx]) / nsyn_table_manip[sidx, didx] # Equally distribute g_syn difference among remaining synapses
     
     return edges_table_manip

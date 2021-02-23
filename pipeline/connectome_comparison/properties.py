@@ -17,8 +17,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
-""" Compute mean values of all synapse properties grouped by given cell property """
-def compute(circuit, group_by=None, nrn_filter=None, **_):
+""" Compute mean/std/... values of all synapse properties grouped by given cell property """
+def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, **_):
     
     if group_by is None:
         group_values = ['Overall']
@@ -41,15 +41,19 @@ def compute(circuit, group_by=None, nrn_filter=None, **_):
     edge_props = sorted(edges.property_names)
     print(f'INFO: Available synapse properties: \n{edge_props}', flush=True)
     
+    prop_fct = eval(fct)
     prop_tables = np.full((len(group_sel), len(group_sel), len(edge_props)), np.nan)
     pbar = progressbar.ProgressBar()
     for idx_pre in pbar(range(len(group_sel))):
         sel_pre = group_sel[idx_pre]
         for idx_post in range(len(group_values)):
             sel_post = group_sel[idx_post]
-            prop_tables[idx_pre, idx_post, :] = edges.pathway_edges(sel_pre, sel_post, edge_props).mean().to_numpy()
+            e_sel = edges.pathway_edges(sel_pre, sel_post, edge_props)
+            if e_sel.size > 0:
+                prop_tables[idx_pre, idx_post, :] = prop_fct(e_sel.to_numpy(), axis=0)
     
-    res_dict = {edge_props[idx]: {'data': prop_tables[:, :, idx], 'name': edge_props[idx], 'unit': ''} for idx in range(len(edge_props))}
+    fname = prop_fct.__name__[0].upper() + prop_fct.__name__[1:]
+    res_dict = {edge_props[idx]: {'data': prop_tables[:, :, idx], 'name': f'"{edge_props[idx]}" property', 'unit': f'{fname} {edge_props[idx]}'} for idx in range(len(edge_props))}
     res_dict['common'] = {'group_values': group_values}
     
     return res_dict
