@@ -41,7 +41,6 @@ def compute(circuit, nrn_filter=None, **_):
         pre_gid = node_ids[pre_idx]
         conns = np.array(list(circuit.edges['default'].iter_connections(pre_gid, return_edge_count=True)))
         if len(conns) > 0:
-            gid_to_idx(conns[:, 1])
             idx = gid_to_idx(conns[:, 1])
             count_matrix[gid_to_idx(pre_gid), idx[idx >= 0]] = conns[idx >= 0, 2] # Filter selected gids here [faster than selecting post GIDs within iter_connections]
     
