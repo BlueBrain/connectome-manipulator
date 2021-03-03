@@ -6,12 +6,18 @@
 #   - storing the data and model to disk (to be used by the manipulation pipeline)
 #   - visualizing and comparing data and model
 
+import numpy as np
 from bluepysnap.circuit import Circuit
 import os.path
+import pickle
+import sys
+import importlib
 import matplotlib.pyplot as plt
 
 """ Main entry point for connectome model building """
 def main(model_config, show_fig=False, force_recomp=False):
+    
+    np.random.seed(model_config.get('seed', 123456))
     
     # Load circuit
     circuit_config = model_config['circuit_config']
@@ -36,19 +42,45 @@ def main(model_config, show_fig=False, force_recomp=False):
     import_root = os.path.split(__file__)[0]
     sys.path.insert(0, import_root)
 
-    comp_source = model_config['fct']['source']
-    comp_kwargs = model_config['fct']['kwargs']
+    comp_source = model_config['model']['fct']['source']
+    comp_kwargs = model_config['model']['fct']['kwargs']
 
     comp_module = importlib.import_module(comp_source)
     
-    # Extract data
-    data_dict = comp_module.extract(circuit, data_dir, model_build_name, force_recomp, **comp_kwargs)
+    # Extract data (or load from file)
+    data_file = os.path.join(data_dir, model_build_name + '.pickle')
+    if os.path.exists(data_file) and not force_recomp:
+        # Load from file
+        print(f'INFO: Loading data from {data_file}')
+        with open(data_file, 'rb') as f:
+            data_dict = pickle.load(f)
+    else:
+        # Compute & save to file
+        data_dict = comp_module.extract(circuit, **comp_kwargs)
+        print(f'INFO: Writing data to {data_file}')
+        if not os.path.exists(os.path.split(data_file)[0]):
+            os.makedirs(os.path.split(data_file)[0])
+        with open(data_file, 'wb') as f:
+            pickle.dump(data_dict, f)
     
-    # Build model
-    model_dict = comp_module.build(data_dict, model_dir, model_build_name, force_recomp, **comp_kwargs)
+    # Build model (or load from file)
+    model_file = os.path.join(model_dir, model_build_name + '.pickle')
+    if os.path.exists(model_file) and not force_recomp:
+        # Load from file
+        print(f'INFO: Loading model from {model_file}')
+        with open(model_file, 'rb') as f:
+            model_dict = pickle.load(f)
+    else:
+        # Compute & save to file
+        model_dict = comp_module.build(**data_dict, **comp_kwargs)
+        print(f'INFO: Writing model to {model_file}')
+        if not os.path.exists(os.path.split(model_file)[0]):
+            os.makedirs(os.path.split(model_file)[0])
+        with open(model_file, 'wb') as f:
+            pickle.dump(model_dict, f)
     
     # Visualize data vs. model
-    vis_dict = comp_module.plot(data_dict, model_dict, out_dir, **comp_kwargs)
+    comp_module.plot(**data_dict, **model_dict, **comp_kwargs, out_dir=out_dir)
     
     if show_fig:
         plt.show()
