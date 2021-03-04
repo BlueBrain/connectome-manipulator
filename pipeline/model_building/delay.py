@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-""" Extract distance-dependent delays from a sample of pairs of neurons """
+""" Extract distance-dependent synaptic delays from a sample of pairs of neurons """
 def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
     
     # Extract distance/delay values
@@ -24,7 +24,7 @@ def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
     edges = circuit.edges['default']
     edges_table = edges.pathway_edges(source=node_ids_sel, target=node_ids_sel, properties=['@source_node', 'delay', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z'])
     
-    print(f'INFO: Extracting delays from {edges_table.shape[0]} connections between {sample_size} neurons')
+    print(f'INFO: Extracting delays from {edges_table.shape[0]} synapses between {sample_size} neurons')
     
     src_pos = nodes.positions(edges_table['@source_node'].to_numpy()).to_numpy() # Soma position of pre-synaptic neuron
     tgt_pos = edges_table[['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
@@ -40,7 +40,7 @@ def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
     dist_delays_std = np.full(num_bins, np.nan)
     dist_count = np.zeros(num_bins).astype(int)
 
-    print('Extracting distance-dependent delays...', flush=True)
+    print('Extracting distance-dependent synaptic delays...', flush=True)
     pbar = progressbar.ProgressBar()
     for idx in pbar(range(num_bins)):
         d_sel = np.logical_and(src_tgt_dist >= dist_bins[idx], (src_tgt_dist < dist_bins[idx + 1]) if idx < num_bins - 1 else (src_tgt_dist <= dist_bins[idx + 1])) # Including last edge
@@ -52,7 +52,7 @@ def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
     return {'dist_bins': dist_bins, 'dist_delays_mean': dist_delays_mean, 'dist_delays_std': dist_delays_std, 'dist_count': dist_count}
 
 
-""" Build distance-dependent delay model (linear model for delay mean, const model for delay std) """
+""" Build distance-dependent synaptic delay model (linear model for delay mean, const model for delay std) """
 def build(dist_bins, dist_delays_mean, dist_delays_std, bin_size_um, **_):
     
     assert (np.diff(dist_bins[:2])[0] - bin_size_um) < 1e-12, 'ERROR: Bin size mismatch!'
@@ -84,14 +84,14 @@ def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, dist
     
     # Draw figure
     plt.figure(figsize=(8, 4), dpi=300)
-    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_mean, width=0.95 * bin_width, facecolor='tab:blue', label=f'Data mean: N = {np.sum(dist_count)}')
-    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_std, width=0.5 * bin_width, facecolor='tab:red', label=f'Data std: N = {np.sum(dist_count)}')
+    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_mean, width=0.95 * bin_width, facecolor='tab:blue', label=f'Data mean: N = {np.sum(dist_count)} synapses')
+    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_std, width=0.5 * bin_width, facecolor='tab:red', label=f'Data std: N = {np.sum(dist_count)} synapses')
     plt.plot(dist_bins, dist_delays_mean_model.predict(np.array(dist_bins, ndmin=2).T), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
     plt.plot(dist_bins, dist_delays_std_model.predict(np.array(dist_bins, ndmin=2).T), '--', color='tab:olive', label='Model std: ' + std_model_str)
     plt.xlim((dist_bins[0], dist_bins[-1]))
     plt.xlabel('Distance [um]')
     plt.ylabel('Delay [ms]')
-    plt.title(f'Distance-dependent delays', fontweight='bold')
+    plt.title(f'Distance-dependent synaptic delays', fontweight='bold')
     plt.legend(loc='upper left', bbox_to_anchor=(1.1, 1.0))
     
     # Add second axis with bin counts
