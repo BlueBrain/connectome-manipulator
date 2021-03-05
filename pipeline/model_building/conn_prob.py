@@ -5,12 +5,14 @@
 # (2) build(...): building a data-based model
 # (3) plot(...): visualizing data vs. model
 
+from model_building import model_building
 import os.path
 import progressbar
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from scipy.spatial import distance_matrix
+from scipy.sparse import csr_matrix
 
 """ Extract connection probability from a sample of pairs of neurons """
 def extract(circuit, order, sample_size=None, **kwargs):
@@ -74,22 +76,23 @@ def extract_1st_order(nodes, edges, src_node_ids, tgt_node_ids, **_):
 """ Build 1st order model (Erdos-Renyi, capturing average conn. prob.) """
 def build_1st_order(p_conn, **_):
     
-    p_conn_model = LinearRegression().fit([[0]], [p_conn])
+    p_conn_model = p_conn # Constant model
 
-    print(f'MODEL FIT: p_conn_model(x)  = {p_conn_model.intercept_:.3f}')
+    print(f'MODEL FIT: p_conn_model()  = {p_conn_model:.3f}')
     
-    return {'p_conn_model': p_conn_model}
+    return {'model': 'p', 'model_inputs': [], 'model_params': {'p': p_conn_model}}
 
 
 """ Visualize data vs. model (1st order) """
-def plot_1st_order(out_dir, p_conn, p_conn_model, src_cell_count, tgt_cell_count, **_):
+def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
     
-    model_str = f'f(x) = {p_conn_model.intercept_:.3f}'
+    model_str = f'f(x) = {model_params["p"]:.3f}'
+    model_fct = model_building.get_model(model, model_inputs, model_params)
     
     # Draw figure
     plt.figure(figsize=(6, 4), dpi=300)
     plt.bar(0.5, p_conn, width=1, facecolor='tab:blue', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
-    plt.plot([-0.5, 1.5], p_conn_model.predict([[0], [0]]), '--', color='tab:red', label=f'Model: ' + model_str)
+    plt.plot([-0.5, 1.5], np.ones(2) * model_fct(), '--', color='tab:red', label=f'Model: ' + model_str)
     plt.text(0.5, 0.99 * p_conn, f'p = {p_conn:.3f}', color='k', ha='center', va='top')
     plt.xticks([])
     plt.ylabel('Conn. prob.')
@@ -103,26 +106,46 @@ def plot_1st_order(out_dir, p_conn, p_conn_model, src_cell_count, tgt_cell_count
     
     return
 
-# # *** 2nd order (distance-dependent) ***
-# """ Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons """
-# def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
+# *** 2nd order (distance-dependent) ***
+""" Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons """
+def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
-#     # Compute distance matrix
-#     src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-#     tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
-#     dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-#     
-# 
-# 
-# # Compute distance-dependent connection probability (2nd order model from [Gal et al. 2020])
-# num_bins = 50
-# hist_count_all = np.full(num_bins, -1) # Count of all pairs of neurons within given distance
-# hist_count_conn = np.full(num_bins, -1) # Count of connected pairs of neurons withing given distance
-# dist_bins = np.linspace(0, np.nanmax(dist_mat), num_bins + 1)
-# print('Computing distance-dependent connection histograms...', flush=True)
-# pbar = progressbar.ProgressBar()
-# for idx in pbar(range(num_bins)):
-#     d_sel = np.logical_and(dist_mat >= dist_bins[idx], (dist_mat < dist_bins[idx + 1]) if idx < num_bins - 1 else (dist_mat <= dist_bins[idx + 1])) # Including last edge
-#     hist_count_all[idx] = np.sum(d_sel)
-#     hist_count_conn[idx] = np.sum(adj_mat[d_sel])
-# p_conn_dist = hist_count_conn / hist_count_all
+    # Compute distance matrix
+    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
+    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+    
+    # Extract adjacency
+    conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids)))
+    adj_mat = csr_matrix((np.full(conns.shape[0], True), conns.T.tolist()))
+    assert not np.any(adj_mat.diagonal()), 'ERROR: Autaptic connection(s) found!'
+    
+    # Extract distance-dependent connection probabilities
+    if max_range_um is None:
+        max_range_um = np.max(dist_mat)
+    num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
+    dist_bins = np.arange(0, num_bins + 1) * bin_size_um
+    dist_count_all = np.full(num_bins, -1) # Count of all pairs of neurons within given distance
+    dist_count_conn = np.full(num_bins, -1) # Count of connected pairs of neurons withing given distance
+    
+    print('Extracting distance-dependent connection probabilities...', flush=True)
+    pbar = progressbar.ProgressBar()
+    for idx in pbar(range(num_bins)):
+        d_sel = np.logical_and(dist_mat >= dist_bins[idx], (dist_mat < dist_bins[idx + 1]) if idx < num_bins - 1 else (dist_mat <= dist_bins[idx + 1])) # Including last edge
+        sidx, tidx = np.where(d_sel)
+        dist_count_all[idx] = np.sum(d_sel)
+        dist_count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
+    p_conn_dist = dist_count_conn / dist_count_all
+    
+    return {'p_conn': p_conn_dist, 'dist_bins': dist_bins, 'dist_count_conn': dist_count_conn, 'dist_count_all': dist_count_all}
+
+
+""" Build 2nd order model (exponential distance-dependent conn. prob.) """
+def build_2nd_order(p_conn_dist, dist_bins, **_):
+    return
+
+
+""" Visualize data vs. model (2nd order) """
+def plot_2nd_order(out_dir, p_conn_dist, p_conn_dist_model, dist_bins, **_):
+    return

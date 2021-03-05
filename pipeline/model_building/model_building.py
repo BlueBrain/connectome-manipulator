@@ -14,6 +14,23 @@ import sys
 import importlib
 import matplotlib.pyplot as plt
 
+""" Returns model function from string representation [so any model function can be saved to file] """
+def get_model(model, model_inputs, model_params):
+    
+    input_str = ','.join(model_inputs + ['model_params=model_params']) # String representation of input variables
+    input_param_str = ','.join(model_inputs + list(model_params.keys())) # String representation of input variables and model parameters
+    model_param_str = ','.join(model_inputs + ['**model_params']) # String representation propagating model parameters
+    
+    inner_model_str = f'lambda {input_param_str}: {model}'
+    full_model_str = f'lambda {input_str}: ({inner_model_str})({model_param_str})' # Use nested lambdas to bind local variables
+    
+    model_fct = eval(full_model_str) # Build function
+    
+    # print(f'INFO: Model function: {inner_model_str}')
+    
+    return model_fct
+
+
 """ Main entry point for connectome model building """
 def main(model_config, show_fig=False, force_recomp=False):
     
