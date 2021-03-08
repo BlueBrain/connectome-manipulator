@@ -5,6 +5,7 @@
 # (2) build(...): building a data-based model
 # (3) plot(...): visualizing data vs. model
 
+from model_building import model_building
 import os.path
 import progressbar
 import numpy as np
@@ -12,7 +13,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 """ Extract distance-dependent synaptic delays from a sample of pairs of neurons """
-def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
+def extract(circuit, bin_size_um, max_range_um=None, sample_size=None, **_):
     
     # Extract distance/delay values
     nodes = circuit.nodes['All']
@@ -55,7 +56,7 @@ def extract(circuit, bin_size_um=100, max_range_um=None, sample_size=None, **_):
 """ Build distance-dependent synaptic delay model (linear model for delay mean, const model for delay std) """
 def build(dist_bins, dist_delays_mean, dist_delays_std, bin_size_um, **_):
     
-    assert (np.diff(dist_bins[:2])[0] - bin_size_um) < 1e-12, 'ERROR: Bin size mismatch!'
+    assert np.all((np.diff(dist_bins) - bin_size_um) < 1e-12), 'ERROR: Bin size mismatch!'
     bin_offset = 0.5 * bin_size_um
     
     # Mean delay model (linear)
@@ -64,30 +65,31 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, bin_size_um, **_):
     dist_delays_mean_model = LinearRegression().fit(X, y)
     
     # Std delay model (const)
-    X = np.array(dist_bins[:-1] + bin_offset, ndmin=2).T
-    y = np.full(X.shape[0], np.nanmean(dist_delays_std))
-    dist_delays_std_model = LinearRegression().fit(X, y)
-
-    print(f'MODEL FIT: dist_delays_mean_model(x) = {dist_delays_mean_model.coef_[0]:.3f} * x + {dist_delays_mean_model.intercept_:.3f}')
-    print(f'           dist_delays_std_model(x)  = {dist_delays_std_model.intercept_:.3f}')
+    dist_delays_std_model = np.mean(dist_delays_std)
     
-    return {'dist_delays_mean_model': dist_delays_mean_model, 'dist_delays_std_model': dist_delays_std_model}
+    print(f'MODEL FIT: dist_delays_mean_model(x) = {dist_delays_mean_model.coef_[0]:.3f} * x + {dist_delays_mean_model.intercept_:.3f}')
+    print(f'           dist_delays_std_model(x)  = {dist_delays_std_model:.3f}')
+    
+    return {'model': 'dist_delays_mean_model.predict(d) if type=="mean" else (np.full_like(d, dist_delays_std_model, dtype=np.double) if type=="std" else None)',
+            'model_inputs': ['d', 'type'],
+            'model_params': {'dist_delays_mean_model': dist_delays_mean_model, 'dist_delays_std_model': dist_delays_std_model}}
 
 
 """ Visualize data vs. model """
-def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, dist_delays_mean_model, dist_delays_std_model, **_):
+def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, model, model_inputs, model_params, **_):
     
     bin_width = np.diff(dist_bins[:2])[0]
     
-    mean_model_str = f'f(x) = {dist_delays_mean_model.coef_[0]:.3f} * x + {dist_delays_mean_model.intercept_:.3f}'
-    std_model_str = f'f(x) = {dist_delays_std_model.intercept_:.3f}'
+    mean_model_str = f'f(x) = {model_params["dist_delays_mean_model"].coef_[0]:.3f} * x + {model_params["dist_delays_mean_model"].intercept_:.3f}'
+    std_model_str = f'f(x) = {model_params["dist_delays_std_model"]:.3f}'
+    model_fct = model_building.get_model(model, model_inputs, model_params)
     
     # Draw figure
     plt.figure(figsize=(8, 4), dpi=300)
     plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_mean, width=0.95 * bin_width, facecolor='tab:blue', label=f'Data mean: N = {np.sum(dist_count)} synapses')
     plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_std, width=0.5 * bin_width, facecolor='tab:red', label=f'Data std: N = {np.sum(dist_count)} synapses')
-    plt.plot(dist_bins, dist_delays_mean_model.predict(np.array(dist_bins, ndmin=2).T), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
-    plt.plot(dist_bins, dist_delays_std_model.predict(np.array(dist_bins, ndmin=2).T), '--', color='tab:olive', label='Model std: ' + std_model_str)
+    plt.plot(dist_bins, model_fct(np.array(dist_bins, ndmin=2).T, 'mean'), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
+    plt.plot(dist_bins, model_fct(np.array(dist_bins, ndmin=2).T, 'std'), '--', color='tab:olive', label='Model std: ' + std_model_str)
     plt.xlim((dist_bins[0], dist_bins[-1]))
     plt.xlabel('Distance [um]')
     plt.ylabel('Delay [ms]')
