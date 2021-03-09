@@ -80,7 +80,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     
     # Extract adjacency
     conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids)))
-    adj_mat = csr_matrix((np.full(conns.shape[0], True), conns.T.tolist()))
+    adj_mat = csr_matrix((np.full(conns.shape[0], True), conns.T.tolist()), shape=(max(src_node_ids) + 1, max(tgt_node_ids) + 1))
     if np.any(adj_mat.diagonal()):
         print('WARNING: Autaptic connection(s) found!')
     
@@ -98,7 +98,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
             lower = dep_bins[dim][idx[dim]]
             upper = dep_bins[dim][idx[dim] + 1]
             dep_sel = np.logical_and(dep_sel, np.logical_and(dep_matrices[dim] >= lower, (dep_matrices[dim] < upper) if idx[dim] < num_bins[dim] - 1 else (dep_matrices[dim] <= upper))) # Including last edge
-        sidx, tidx = np.where(dep_sel)
+        sidx, tidx = np.nonzero(dep_sel)
         count_all[idx] = np.sum(dep_sel)
         count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
     p_conn = count_conn / count_all
@@ -106,8 +106,11 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     return p_conn, count_conn, count_all
 
 
-# Generative models for circuit connectivity from [Gal et al. 2020]
-# *** 1st order model (Erdos-Renyi) ***
+###################################################################################################
+# Generative models for circuit connectivity from [Gal et al. 2020]:
+#   1st order model (Erdos-Renyi)
+###################################################################################################
+
 """ Extract average connection probability (1st order) from a sample of pairs of neurons """
 def extract_1st_order(nodes, edges, src_node_ids, tgt_node_ids, **_):
     
@@ -155,7 +158,12 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model
     
     return
 
-# *** 2nd order (distance-dependent) ***
+
+###################################################################################################
+# Generative models for circuit connectivity from [Gal et al. 2020]:
+#   2nd order (distance-dependent)
+###################################################################################################
+
 """ Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons """
 def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
@@ -203,7 +211,7 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     model_fct = model_building.get_model(model, model_inputs, model_params)
     
     plt.figure(figsize=(12, 4), dpi=300)
-
+    
     # Data vs. model
     plt.subplot(1, 2, 1)
     plt.plot(dist_bins[:-1] + bin_offset, p_conn_dist, '.-', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
@@ -213,13 +221,13 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     plt.ylabel('Conn. prob.')
     plt.title(f'Dist-dep. conn. prob. (2nd order)')
     plt.legend()
-
+    
     # 2D connection probability (model)
     plt.subplot(1, 2, 2)
     plot_range = 500 # (um)
     r_markers = [200, 400] # (um)
     dx = np.linspace(-plot_range, plot_range, 201)
-    dz = np.linspace(-plot_range, plot_range, 201)
+    dz = np.linspace(plot_range, -plot_range, 201)
     xv, zv = np.meshgrid(dx, dz)
     vdist = np.sqrt(xv**2 + zv**2)
     pdist = model_fct(vdist)
@@ -233,7 +241,7 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     plt.ylabel('$\Delta$z')
     plt.title('2D conn. prob. (2nd order model)')
     plt.colorbar(label='Conn. prob.')
-
+    
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
     print(f'INFO: Saving {out_fn}...')
@@ -242,7 +250,11 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     return
 
 
-# *** 3rd order (bipolar distance-dependent) ***
+###################################################################################################
+# Generative models for circuit connectivity from [Gal et al. 2020]:
+#   3rd order (bipolar distance-dependent)
+###################################################################################################
+
 """ Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons """
 def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
@@ -258,8 +270,8 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
         max_range_um = np.nanmax(dist_mat)
-    num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
-    dist_bins = np.arange(0, num_bins + 1) * bin_size_um
+    num_dist_bins = np.ceil(max_range_um / bin_size_um).astype(int)
+    dist_bins = np.arange(0, num_dist_bins + 1) * bin_size_um
     bip_bins = [np.min(bip_mat), 0, np.max(bip_mat)]
     
     p_conn_dist_bip, dist_bip_count_conn, dist_bip_count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat, bip_mat], [dist_bins, bip_bins])
@@ -276,36 +288,68 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, bip_bins, **_):
     y = p_conn_dist_bip[np.all(np.isfinite(p_conn_dist_bip), 1), :]
     
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
-    opt_params = [curve_fit(exp_model, X, y[:, bip], p0=[0.0, 0.0]) for bip in range()] # TODO
+    (aN_opt, bN_opt), _ = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
+    (aP_opt, bP_opt), _ = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
+    opt_model = lambda d, dz: np.select([np.array(dz) < 0, np.array(dz) > 0, np.array(dz) == 0], [aN_opt * np.exp(-bN_opt * np.array(d)), aP_opt * np.exp(-bP_opt * np.array(d)), 0.5 * (aN_opt * np.exp(-bN_opt * np.array(d)) + aP_opt * np.exp(-bP_opt * np.array(d)))])
     
+    print(f'BIPOLAR MODEL FIT: f(x, dz) = {aN_opt:.3f} * exp(-{bN_opt:.3f} * x) if dz < 0')
+    print(f'                              {aP_opt:.3f} * exp(-{bP_opt:.3f} * x) if dz > 0')
+    print(f'                              AVERAGE OF BOTH MODELS  if dz == 0')
     
-#     (a2_opt, b2_opt), _ = curve_fit(exp_model, dist_bins[1:], p_conn_dist_bip[1], p0=[0.0, 0.0])
-#     opt_model_bip = lambda x, sgn: np.select([np.array(sgn) < 0, np.array(sgn) > 0, np.array(sgn) == 0], [exp_model(x, a1_opt, b1_opt), exp_model(x, a2_opt, b2_opt), 0.5 * (exp_model(x, a1_opt, b1_opt) + exp_model(x, a2_opt, b2_opt))])
-
-
-#     print(f'BIPOLAR MODEL FIT: f(x, sgn) = {a1_opt:.3f} * exp(-{b1_opt:.3f} * x) if sgn < 0')
-#     print(f'                               {a2_opt:.3f} * exp(-{b2_opt:.3f} * x) if sgn > 0')
-#     print(f'                               AVERAGE OF BOTH MODELS  otherwise')
-    
-    
-    
-    
-    return
-    
-#     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
-#     X = dist_bins[:-1][np.isfinite(p_conn_dist)] + bin_offset
-#     y = p_conn_dist[np.isfinite(p_conn_dist)]
-#     (a_opt, b_opt), _ = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
-    
-#     print(f'MODEL FIT: f(x) = {a_opt:.3f} * exp(-{b_opt:.3f} * x)')
-    
-#     return {'model': 'a_opt * np.exp(-b_opt * np.array(d))',
-#             'model_inputs': ['d'],
-#             'model_params': {'a_opt': a_opt, 'b_opt': b_opt}}
+    return {'model': 'np.select([np.array(dz) < 0, np.array(dz) > 0, np.array(dz) == 0], [aN_opt * np.exp(-bN_opt * np.array(d)), aP_opt * np.exp(-bP_opt * np.array(d)), 0.5 * (aN_opt * np.exp(-bN_opt * np.array(d)) + aP_opt * np.exp(-bP_opt * np.array(d)))])',
+            'model_inputs': ['d, dz'],
+            'model_params': {'aN_opt': aN_opt, 'bN_opt': bN_opt, 'aP_opt': aP_opt, 'bP_opt': bP_opt}}
 
 
 """ Visualize data vs. model (3rd order) """
-def plot_3rd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
-    # TODO
+def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+    
+    bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
+    dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
+    
+    model_strN = f'{model_params["aN_opt"]:.3f} * exp(-{model_params["bN_opt"]:.3f} * x)'
+    model_strP = f'{model_params["aP_opt"]:.3f} * exp(-{model_params["bP_opt"]:.3f} * x)'
+    model_fct = model_building.get_model(model, model_inputs, model_params)
+    
+    plt.figure(figsize=(12, 4), dpi=300)
+    
+    # Data vs. model
+    plt.subplot(1, 2, 1)
+    bip_dist = np.concatenate((-dist_bins[:-1][::-1] - bin_offset, [0.0], dist_bins[:-1] + bin_offset))
+    bip_data = np.concatenate((p_conn_dist_bip[::-1, 0], [np.nan], p_conn_dist_bip[:, 1]))
+    plt.plot(bip_dist, bip_data, '.-', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
+    plt.plot(-dist_model, model_fct(dist_model, np.sign(-dist_model)), '--', label='Model: ' + model_strN)
+    plt.plot(dist_model, model_fct(dist_model, np.sign(dist_model)), '--', label='Model: ' + model_strP)
+    plt.grid()
+    plt.xlabel('sign($\Delta$z) * Distance [um]')
+    plt.ylabel('Conn. prob.')
+    plt.title(f'Bipolar dist-dep. conn. prob. (3rd order)')
+    plt.legend(loc='upper left')
+    
+    # 2D connection probability (model)
+    plt.subplot(1, 2, 2)
+    plot_range = 500 # (um)
+    r_markers = [200, 400] # (um)
+    dx = np.linspace(-plot_range, plot_range, 201)
+    dz = np.linspace(plot_range, -plot_range, 201)
+    xv, zv = np.meshgrid(dx, dz)
+    vdist = np.sqrt(xv**2 + zv**2)
+    pdist = model_fct(vdist, np.sign(zv))
+    plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    for r in r_markers:
+        plt.gca().add_patch(plt.Circle((0, 0), r, edgecolor='w', linestyle='--', fill=False))
+        plt.text(0, r, f'{r} $\mu$m', color='w', ha='center', va='bottom')
+    plt.xticks([])
+    plt.yticks([])
+    plt.xlabel('$\Delta$x')
+    plt.ylabel('$\Delta$z')
+    plt.title('2D conn. prob. (3rd order model)')
+    plt.colorbar(label='Conn. prob.')
+    
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
     
     return
