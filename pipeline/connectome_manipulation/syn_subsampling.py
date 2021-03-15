@@ -21,6 +21,6 @@ def apply(edges_table, nodes, aux_dict, keep_pct=100.0):
     logging.info(f'Synapse subsampling, keeping {num_keep} ({keep_pct}%) of {num_syn} synapses')
     
     syn_sel_idx = np.random.permutation([True] * num_keep + [False] * (num_syn - num_keep))
-    edges_table = edges_table[syn_sel_idx]
+    edges_table_manip = edges_table[syn_sel_idx].copy()
     
-    return edges_table
+    return edges_table_manip

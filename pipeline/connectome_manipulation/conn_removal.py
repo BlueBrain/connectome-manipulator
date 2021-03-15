@@ -49,6 +49,6 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, min
     logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_conn} connections {syn_per_conn_info}from {sel_src} to {sel_dest} neurons ({np.sum(syn_idx_remove)} synapses)')
     
     syn_sel_idx[syn_sel_idx == True] = syn_idx_remove # Set actual indices of connections to be removed
-    edges_table_manip = edges_table[~syn_sel_idx]
+    edges_table_manip = edges_table[~syn_sel_idx].copy()
     
     return edges_table_manip

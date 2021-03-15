@@ -52,7 +52,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, kee
     
     sel_remove = np.random.permutation([True] * num_remove + [False] * (num_syn - num_remove))
     syn_sel_idx[syn_sel_idx == True] = sel_remove # Set actual indices of synapses to be removed
-    edges_table_manip = edges_table[~syn_sel_idx]
+    edges_table_manip = edges_table[~syn_sel_idx].copy()
     
     if keep_gsyn:
         # Determine connection strength (#syn/conn and sum of g_syns per connection) AFTER synapse removal
