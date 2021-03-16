@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from scipy.spatial import distance_matrix
 from scipy.sparse import csr_matrix
 from scipy.optimize import curve_fit
@@ -20,6 +21,7 @@ from scipy.optimize import curve_fit
 def extract(circuit, order, sample_size=None, **kwargs):
     
     #TODO: Add cell selection criteria (layers, mtypes, ...)
+    #      Add coordinate system mapping (flatspace)
     
     print(f'INFO: Running order-{order} data extraction...')
     
@@ -37,6 +39,8 @@ def extract(circuit, order, sample_size=None, **kwargs):
         return extract_2nd_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
     elif order == 3:
         return extract_3rd_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
+    elif order == 4:
+        return extract_4th_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
     else:
         assert False, f'ERROR: Order-{order} data extraction not supported!'
 
@@ -52,6 +56,8 @@ def build(order, **kwargs):
         return build_2nd_order(**kwargs)
     elif order == 3:
         return build_3rd_order(**kwargs)
+    elif order == 4:
+        return build_4th_order(**kwargs)
     else:
         assert False, f'ERROR: Order-{order} model building not supported!'
 
@@ -67,6 +73,8 @@ def plot(order, **kwargs):
         return plot_2nd_order(**kwargs)
     elif order == 3:
         return plot_3rd_order(**kwargs)
+    elif order == 4:
+        return plot_4th_order(**kwargs)
     else:
         assert False, f'ERROR: Order-{order} data/model visualization not supported!'
 
@@ -102,6 +110,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
         count_all[idx] = np.sum(dep_sel)
         count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
     p_conn = count_conn / count_all
+    p_conn[np.isnan(p_conn)] = 0.0
     
     return p_conn, count_conn, count_all
 
@@ -349,6 +358,217 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
     
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
+    
+    return
+
+
+###################################################################################################
+# Generative models for circuit connectivity from [Gal et al. 2020]:
+#   4th order (offset-dependent)
+###################################################################################################
+
+""" Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons """
+def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
+    
+    # Compute dx/dy/dz offset matrices
+    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    
+    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
+    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
+    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
+    
+    # Extract offset-dependent connection probabilities
+    if max_range_um is None:
+        dx_range = [np.nanmin(dx_mat), np.nanmax(dx_mat)]
+        dy_range = [np.nanmin(dy_mat), np.nanmax(dy_mat)]
+        dz_range = [np.nanmin(dz_mat), np.nanmax(dz_mat)]
+    elif isinstance(max_range_um, tuple) or isinstance(max_range_um, list) or isinstance(max_range_um, np.ndarray):
+        assert len(max_range_um) == 3, 'ERROR: Maximum range in x/y/z dimension expected!'
+        assert np.all([r > 0.0 for r in max_range_um]), 'ERROR: Maximum range must be larger than 0um!'
+        dx_range = [-max_range_um[0], max_range_um[0]]
+        dy_range = [-max_range_um[1], max_range_um[1]]
+        dz_range = [-max_range_um[2], max_range_um[2]]
+    else: # Assume single scalar range value to be used for all dimensions
+        assert max_range_um > 0.0, 'ERROR: Maximum range must be larger than 0um!'
+        dx_range = [-max_range_um, max_range_um]
+        dy_range = [-max_range_um, max_range_um]
+        dz_range = [-max_range_um, max_range_um]
+    
+    if isinstance(bin_size_um, tuple) or isinstance(bin_size_um, list) or isinstance(bin_size_um, np.ndarray):
+        assert len(bin_size_um) == 3, 'ERROR: Bin sizes in x/y/z dimension expected!'
+        assert np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Bin size must be larger than 0um!'
+        bin_size_x = bin_size_um[0]
+        bin_size_y = bin_size_um[1]
+        bin_size_z = bin_size_um[2]
+    else: # Assume single scalar size value to be used for all dimensions
+        assert bin_size_um > 0.0, 'ERROR: Bin size must be larger than 0um!'
+        bin_size_x = bin_size_um
+        bin_size_y = bin_size_um
+        bin_size_z = bin_size_um
+    
+    num_bins_x = np.ceil((dx_range[1] - dx_range[0]) / bin_size_x).astype(int)
+    num_bins_y = np.ceil((dy_range[1] - dy_range[0]) / bin_size_y).astype(int)
+    num_bins_z = np.ceil((dz_range[1] - dz_range[0]) / bin_size_z).astype(int)
+    
+    dx_bins = np.arange(0, num_bins_x + 1) * bin_size_x + dx_range[0]
+    dy_bins = np.arange(0, num_bins_y + 1) * bin_size_y + dy_range[0]
+    dz_bins = np.arange(0, num_bins_z + 1) * bin_size_z + dz_range[0]
+    
+    p_conn_offset, dist_offset_count_conn, dist_offset_count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dx_mat, dy_mat, dz_mat], [dx_bins, dy_bins, dz_bins])
+    
+    return {'p_conn_offset': p_conn_offset, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'dist_offset_count_conn': dist_offset_count_conn, 'dist_offset_count_all': dist_offset_count_all, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+
+
+""" Build 4th order model (random forest regression model for offset-dependent conn. prob.) """
+def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, n_estimators=500, max_depth=None, **_):
+    
+    x_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
+    y_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
+    z_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    
+    xv, yv, zv = np.meshgrid(dx_bins[:-1] + x_bin_offset, dy_bins[:-1] + y_bin_offset, dz_bins[:-1] + z_bin_offset, indexing='ij')
+    data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten()]).T
+    data_val = p_conn_offset.flatten()
+    
+    offset_regr_model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=0)
+    offset_regr_model.fit(data_pos, data_val)
+    
+    print(f'OFFSET MODEL FIT: f(dx, dy, dz) ~ {str(offset_regr_model)}')
+    print(offset_regr_model.get_params())
+    
+    return {'model': 'offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T)',
+            'model_inputs': ['dx', 'dy', 'dz'],
+            'model_params': {'offset_regr_model': offset_regr_model}}
+
+
+""" Visualize data vs. model (4th order) """
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+    
+    model_fct = model_building.get_model(model, model_inputs, model_params)
+    
+    x_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
+    y_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
+    z_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    
+    model_ovsampl = 2 # Model oversampling factor (per dimension)
+    dx_pos_model = np.linspace(dx_bins[0], dx_bins[-1], len(dx_bins) * model_ovsampl)
+    dy_pos_model = np.linspace(dy_bins[0], dy_bins[-1], len(dy_bins) * model_ovsampl)
+    dz_pos_model = np.linspace(dz_bins[0], dz_bins[-1], len(dz_bins) * model_ovsampl)
+    xv, yv, zv = np.meshgrid(dx_pos_model, dy_pos_model, dz_pos_model, indexing='ij')
+    model_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten()]).T # Regular grid
+    # model_pos = np.random.uniform(low=[dx_bins[0], dy_bins[0], dz_bins[0]], high=[dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
+    model_val = model_fct(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
+    model_val_xyz = model_val.reshape([len(dx_pos_model), len(dy_pos_model), len(dz_pos_model)])
+    
+    # 3D connection probability (data vs. model)    
+    num_p_bins = 100
+    p_bins = np.linspace(0, max(np.max(p_conn_offset), np.max(model_val)), num_p_bins + 1)
+    p_color_map = plt.cm.ScalarMappable(cmap=plt.cm.jet, norm=plt.Normalize(vmin=p_bins[0], vmax=p_bins[-1]))
+    p_colors = p_color_map.to_rgba(np.linspace(p_bins[0], p_bins[-1], num_p_bins))
+    
+    fig = plt.figure(figsize=(16, 6), dpi=300)    
+    # (Data)
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    for pidx in range(num_p_bins):
+        p_sel_idx = np.where(np.logical_and(p_conn_offset > p_bins[pidx], p_conn_offset <= p_bins[pidx + 1]))
+        plt.plot(dx_bins[p_sel_idx[0]] + x_bin_offset, dy_bins[p_sel_idx[1]] + y_bin_offset, dz_bins[p_sel_idx[2]] + z_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1)/num_p_bins, markeredgecolor='none')
+    ax.view_init(30, 60)
+    ax.set_xlim((dx_bins[0], dx_bins[-1]))
+    ax.set_ylim((dy_bins[0], dy_bins[-1]))
+    ax.set_zlim((dz_bins[0], dz_bins[-1]))
+    ax.set_xlabel('$\Delta$x [um]')
+    ax.set_ylabel('$\Delta$y [um]')
+    ax.set_zlabel('$\Delta$z [um]')
+    plt.colorbar(p_color_map, label='Conn. prob.')
+    plt.title(f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
+    
+    # (Model)
+    ax = fig.add_subplot(1, 2, 2, projection='3d')
+    for pidx in range(num_p_bins):
+        p_sel_idx = np.logical_and(model_val > p_bins[pidx], model_val <= p_bins[pidx + 1])
+        plt.plot(model_pos[p_sel_idx, 0], model_pos[p_sel_idx, 1], model_pos[p_sel_idx, 2], '.', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1)/num_p_bins, markeredgecolor='none')
+    ax.view_init(30, 60)
+    ax.set_xlim((dx_bins[0], dx_bins[-1]))
+    ax.set_ylim((dy_bins[0], dy_bins[-1]))
+    ax.set_zlim((dz_bins[0], dz_bins[-1]))
+    ax.set_xlabel('$\Delta$x [um]')
+    ax.set_ylabel('$\Delta$y [um]')
+    ax.set_zlabel('$\Delta$z [um]')
+    plt.colorbar(p_color_map, label='Conn. prob.')
+    plt.title(f'Model: {str(model_params["offset_regr_model"]).split("(")[0]}')
+    
+    plt.suptitle('Offset-dependent connection probability')
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_3d.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
+    
+    # Max. intensity projection (data vs. model)
+    plt.figure(figsize=(12, 6), dpi=300)
+    # (Data)
+    plt.subplot(2, 3, 1)
+    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$x')
+    plt.ylabel('$\Delta$z')
+    plt.colorbar(label='Max. conn. prob.')
+
+    plt.subplot(2, 3, 2)
+    plt.imshow(np.max(p_conn_offset, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$y')
+    plt.ylabel('$\Delta$z')
+    plt.colorbar(label='Max. conn. prob.')
+    plt.title('Data')
+
+    plt.subplot(2, 3, 3)
+    plt.imshow(np.max(p_conn_offset, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$x')
+    plt.ylabel('$\Delta$y')
+    plt.colorbar(label='Max. conn. prob.')
+
+    # (Model)
+    plt.subplot(2, 3, 4)
+    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$x')
+    plt.ylabel('Model\n$\Delta$z')
+    plt.colorbar(label='Max. conn. prob.')
+
+    plt.subplot(2, 3, 5)
+    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$y')
+    plt.ylabel('$\Delta$z')
+    plt.colorbar(label='Max. conn. prob.')
+    plt.title('Model')
+
+    plt.subplot(2, 3, 6)
+    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot)
+    plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
+    plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\Delta$x')
+    plt.ylabel('$\Delta$y')
+    plt.colorbar(label='Max. conn. prob.')
+
+    plt.suptitle('Offset-dependent connection probability')
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_2d.png'))
     print(f'INFO: Saving {out_fn}...')
     plt.savefig(out_fn)
     

@@ -11,6 +11,7 @@ from bluepysnap.circuit import Circuit
 import os.path
 import pickle
 import sys
+import time
 import importlib
 import matplotlib.pyplot as plt
 
@@ -35,6 +36,14 @@ def get_model(model, model_inputs, model_params):
 def main(model_config, show_fig=False, force_recomp=False):
     
     np.random.seed(model_config.get('seed', 123456))
+    
+    if isinstance(force_recomp, tuple) or isinstance(force_recomp, list):
+        assert len(force_recomp) == 2, 'ERROR: Two "force_recomp" entries expected!'
+        force_reextract = force_recomp[0]
+        force_rebuild = force_recomp[1]
+    else:
+        force_reextract = force_recomp
+        force_rebuild = force_recomp
     
     # Load circuit
     circuit_config = model_config['circuit_config']
@@ -66,14 +75,16 @@ def main(model_config, show_fig=False, force_recomp=False):
     
     # Extract data (or load from file)
     data_file = os.path.join(data_dir, model_build_name + '.pickle')
-    if os.path.exists(data_file) and not force_recomp:
+    if os.path.exists(data_file) and not force_reextract:
         # Load from file
         print(f'INFO: Loading data from {data_file}')
         with open(data_file, 'rb') as f:
             data_dict = pickle.load(f)
     else:
         # Compute & save to file
+        t_start = time.time()
         data_dict = comp_module.extract(circuit, **comp_kwargs)
+        print(f'<TIME ELAPSED (data extraction): {time.time() - t_start:.1f}s>')
         print(f'INFO: Writing data to {data_file}')
         if not os.path.exists(os.path.split(data_file)[0]):
             os.makedirs(os.path.split(data_file)[0])
@@ -82,14 +93,16 @@ def main(model_config, show_fig=False, force_recomp=False):
     
     # Build model (or load from file)
     model_file = os.path.join(model_dir, model_build_name + '.pickle')
-    if os.path.exists(model_file) and not force_recomp:
+    if os.path.exists(model_file) and not force_rebuild:
         # Load from file
         print(f'INFO: Loading model from {model_file}')
         with open(model_file, 'rb') as f:
             model_dict = pickle.load(f)
     else:
         # Compute & save to file
+        t_start = time.time()
         model_dict = comp_module.build(**data_dict, **comp_kwargs)
+        print(f'<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>')
         print(f'INFO: Writing model to {model_file}')
         if not os.path.exists(os.path.split(model_file)[0]):
             os.makedirs(os.path.split(model_file)[0])
