@@ -79,6 +79,42 @@ def plot(order, **kwargs):
         assert False, f'ERROR: Order-{order} data/model visualization not supported!'
 
 
+""" Computes dx/dy/dz offset matrices between pairs of neurons """
+def compute_offset_matrices(nodes, src_node_ids, tgt_node_ids):
+    
+    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    
+    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
+    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
+    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
+    
+    return dx_mat, dy_mat, dz_mat
+
+
+""" Computes bipolar matrix between pairs of neurons (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron) """
+def compute_bip_matrix(nodes, src_node_ids, tgt_node_ids):
+    
+    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    
+    bip_mat = np.sign(np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0))) # Bipolar distinction based on difference in z coordinate
+    
+    return bip_mat
+
+
+""" Computes distance matrix between pairs of neurons """
+def compute_dist_matrix(nodes, src_node_ids, tgt_node_ids):
+    
+    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    
+    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
+    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+    
+    return dist_mat
+
+
 """ Extract D-dimensional conn. prob. dependent on D property matrices between source-target pairs of neurons within given range of bins """
 def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins):
     
@@ -177,10 +213,7 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model
 def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
     # Compute distance matrix
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
-    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+    dist_mat = compute_dist_matrix(nodes, src_node_ids, tgt_node_ids)
     
     # Extract distance-dependent connection probabilities
     if max_range_um is None:
@@ -268,13 +301,10 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
 def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
     # Compute distance matrix
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
-    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+    dist_mat = get_dist_matrix(nodes, src_node_ids, tgt_node_ids)
     
     # Compute bipolar matrix (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
-    bip_mat = np.sign(np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0))) # Bipolar distinction based on difference in z coordinate
+    bip_mat = compute_bip_matrix(nodes, src_node_ids, tgt_node_ids)
     
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
@@ -373,12 +403,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
 def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
     
     # Compute dx/dy/dz offset matrices
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
-    
-    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
-    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
-    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
+    dx_mat, dy_mat, dz_mat = compute_offset_matrices(nodes, src_node_ids, tgt_node_ids)
     
     # Extract offset-dependent connection probabilities
     if max_range_um is None:
