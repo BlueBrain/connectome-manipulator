@@ -70,7 +70,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, bin_size_um, **_):
     print(f'MODEL FIT: dist_delays_mean_model(x) = {dist_delays_mean_model.coef_[0]:.3f} * x + {dist_delays_mean_model.intercept_:.3f}')
     print(f'           dist_delays_std_model(x)  = {dist_delays_std_model:.3f}')
     
-    return {'model': 'dist_delays_mean_model.predict(d) if type=="mean" else (np.full_like(d, dist_delays_std_model, dtype=np.double) if type=="std" else None)',
+    return {'model': 'dist_delays_mean_model.predict(np.array(d, ndmin=2).T) if type=="mean" else (np.full_like(d, dist_delays_std_model, dtype=np.double) if type=="std" else None)',
             'model_inputs': ['d', 'type'],
             'model_params': {'dist_delays_mean_model': dist_delays_mean_model, 'dist_delays_std_model': dist_delays_std_model}}
 
@@ -88,8 +88,8 @@ def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, mode
     plt.figure(figsize=(8, 4), dpi=300)
     plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_mean, width=0.95 * bin_width, facecolor='tab:blue', label=f'Data mean: N = {np.sum(dist_count)} synapses')
     plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_std, width=0.5 * bin_width, facecolor='tab:red', label=f'Data std: N = {np.sum(dist_count)} synapses')
-    plt.plot(dist_bins, model_fct(np.array(dist_bins, ndmin=2).T, 'mean'), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
-    plt.plot(dist_bins, model_fct(np.array(dist_bins, ndmin=2).T, 'std'), '--', color='tab:olive', label='Model std: ' + std_model_str)
+    plt.plot(dist_bins, model_fct(dist_bins, 'mean'), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
+    plt.plot(dist_bins, model_fct(dist_bins, 'std'), '--', color='tab:olive', label='Model std: ' + std_model_str)
     plt.xlim((dist_bins[0], dist_bins[-1]))
     plt.xlabel('Distance [um]')
     plt.ylabel('Delay [ms]')

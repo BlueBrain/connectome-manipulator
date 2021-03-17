@@ -20,12 +20,12 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, min
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest)) # All potential synapses to be removed
     conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_table[syn_sel_idx][['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
     conn_sel = np.ones(conns.shape[0]).astype(bool)
-
+    
     # Apply syn/conn filters (optional)
     if not min_syn_per_conn is None:
         logging.log_assert(min_syn_per_conn >= 1, 'min_syn_per_conn out of range!')
         conn_sel = np.logical_and(conn_sel, num_syn_per_conn >= min_syn_per_conn)
-
+    
     if not max_syn_per_conn is None:
         logging.log_assert(max_syn_per_conn >= 1, 'max_syn_per_conn out of range!')
         conn_sel = np.logical_and(conn_sel, num_syn_per_conn <= max_syn_per_conn)

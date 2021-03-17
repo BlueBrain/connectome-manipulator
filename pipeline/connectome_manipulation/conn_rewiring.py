@@ -11,99 +11,77 @@ from model_building import conn_prob
 import logging
 import numpy as np
 import os.path
-from scipy.spatial import distance_matrix
+import pickle
 
-""" Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses) """
-def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, model_file, model_order, amount_pct=100.0):
-    assert False, 'NYI!!'
+""" Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses & number of ingoing connections) """
+def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_file, delay_model_file=None):
     
-    logging.log_assert(os.path.exists(model_file), 'Model file not found!')
-    logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
+    # Load connection probability model
+    logging.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
+    logging.info(f'INFO: Loading conn. prob. model from {prob_model_file}')
+    with open(prob_model_file, 'rb') as f:
+        prob_model_dict = pickle.load(f)
+    p_model = model_building.get_model(prob_model_dict['model'], prob_model_dict['model_inputs'], prob_model_dict['model_params'])
     
-    logging.info(f'INFO: Loading model from {model_file}')
-    with open(model_file, 'rb') as f:
-        model_dict = pickle.load(f)
-    model_fct = model_building.get_model(model_dict['model'], model_dict['model_inputs'], ['model_params'])
-    
-    if model_order == 1:
-        logging.log_assert(len(model_dict['model_inputs']) == 0, f'Model file not compatible with model order {model_order}!')
-    elif model_order == 2:
-        logging.log_assert(len(model_dict['model_inputs']) == 1, f'Model file not compatible with model order {model_order}!')
+    # Determine model order
+    if len(prob_model_dict['model_inputs']) == 0:
+        model_order = 1 # Constant conn. prob. (no inputs)
+    elif len(prob_model_dict['model_inputs']) == 1:
+        model_order = 2 # Distance-dependent conn. prob. (1 input: distance)
     else:
-        logging.log_assert(False, f'Model order {model_order} not supported!')
+        logging.log_assert(False, 'Model order could not be determined!')
     
-    # TODO...
+    # Load delay model (optional)
+    if not delay_model_file is None:
+        logging.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
+        logging.info(f'INFO: Loading delay model from {delay_model_file}')
+        with open(delay_model_file, 'rb') as f:
+            delay_model_dict = pickle.load(f)
+        d_model = model_building.get_model(delay_model_dict['model'], delay_model_dict['model_inputs'], delay_model_dict['model_params'])
+        logging.log_assert(len(delay_model_dict['model_inputs']) == 2, 'Distance-dependent delay model with two inputs (d, type) expected!')
+    else:
+        d_model = None
     
-    pair_gids = aux_dict.get('pair_gids', None) # Load GID mapping from earlier split iteration, if existing
-    if pair_gids is None:
-        logging.info('Sampling pairs of neurons for connection rewiring...')
+    # Run connection rewiring
+    src_node_ids = nodes.ids(src_node_sel)
+    tgt_node_ids = nodes.ids(tgt_node_sel)
+    logging.info('Sampling neurons for connection rewiring...')
+    for tgt in tgt_node_ids:
+        syn_sel_idx = np.isin(edges_table['@target_node'], tgt)
+        if not np.any(syn_sel_idx):
+            continue # Nothing to rewire (no synapses on target node)
         
-        gids1 = nodes.ids(sel_grp1)
-        gids2 = nodes.ids(sel_grp2)
-        logging.log_assert(len(np.intersect1d(gids1, gids2)) == 0, 'Overlapping groups of neurons not supported!')
+        src, src_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)
+        num_src = len(src) # Number of currently existing sources for given target node
         
-        sclass1 = nodes.get(gids1, properties='synapse_class').unique()
-        sclass2 = nodes.get(gids2, properties='synapse_class').unique()
-        logging.log_assert((len(sclass1) == len(sclass2) == 1) and (sclass1[0] == sclass2[0]), 'Synapse class mismatch!')
+        # TODO: Check that synapse classes of src neurons are the same as the ones from src_node_ids!
+        #       (EXC (INH) synapses on tgt must be connected to EXC (INH) pre-synaptic neurons!!)
         
-        # Compute distance matrix
-        nrn_pos1 = nodes.positions(gids1)
-        nrn_pos2 = nodes.positions(gids2)
-        dist_mat = distance_matrix(nrn_pos1.to_numpy(), nrn_pos2.to_numpy())
-        
-        logging.info(f'Upper limit of possible pairs: {np.min(dist_mat.shape)} (|grp1|={len(gids1)}, |grp2|={len(gids2)})')
-        
-        # Thresholded distance matrix
-        dist_mat_R = np.ones_like(dist_mat).astype(bool)
-        dist_mat_R[dist_mat > R] = False
-        del dist_mat
-        
-        # Remove cells that cannot be rewired (no potential neighbors in vicinity)
-        sel_idx1 = np.sum(dist_mat_R, 1) > 0
-        sel_idx2 = np.sum(dist_mat_R, 0) > 0
-        
-        dist_mat_R = dist_mat_R[sel_idx1, :]
-        dist_mat_R = dist_mat_R[:, sel_idx2]
-        
-        logging.info(f'Radius-dependent upper limit: {np.min(dist_mat_R.shape)} (R={R}um)')
-        
-        # Assure that first dimension is always the lower one (= the one used to run pair selection)
-        if dist_mat_R.shape[0] > dist_mat_R.shape[1]:
-            dist_mat_R = dist_mat_R.T
-            gids = [gids2[sel_idx2], gids1[sel_idx1]]
+        # Sample new num_src presynaptic neurons from full list of source nodes according to conn. prob.
+        # (keeping the same number of ingoing connections)
+        if model_order == 1: # Constant conn. prob. (no inputs)
+            p_src = np.full(len(src_node_ids), p_model())
+        elif model_order == 2: # Distance-dependent conn. prob. (1 input: distance)
+            d = conn_prob.compute_dist_matrix(nodes, src_node_ids, [tgt])
+            p_src = p_model(d).flatten()
+            p_src[np.isnan(p_src)] = 0.0
         else:
-            gids = [gids1[sel_idx1], gids2[sel_idx2]]
-        del gids1, gids2
+            logging.log_assert(False, f'Model order {model_order} not supported!')
         
-        # Sample pairs n1-n2 of neurons to interchange axons
-        dist_mat_R_choices = np.copy(dist_mat_R) # To keep track of possible choices in each step
-        target_count = np.round(dist_mat_R.shape[0] * amount_pct / 100).astype(int)
-        pair_samples = []
-        for n1 in np.random.permutation(dist_mat_R.shape[0]):
-            if len(pair_samples) == target_count: # Target count reached...FINISHING [Note: due to random sampling, it is possible that target count won't be reached exactly]
-                break
-            n2_all = np.nonzero(dist_mat_R_choices[n1, :])[0]
-            if len(n2_all) == 0: # No choices available for n1...SKIPPING
-                continue
-            n2 = np.random.choice(n2_all) # Randomly select one of the choices...
-            pair_samples.append([n1, n2]) # ...and add to list of selected pairs
-            dist_mat_R_choices[:, n2] = False # n2 already taken, don't reuse!!
+        src_new = np.random.choice(src_node_ids, num_src, replace=False, p=p_src/np.sum(p_src))
         
-        pair_samples = np.array(pair_samples)
-        if pair_samples.size > 0:
-            pair_gids = np.array([gids[0][pair_samples[:, 0]], gids[1][pair_samples[:, 1]]]).T
-        else:
-            pair_gids = np.array([])
-        logging.log_assert(len(np.unique(pair_gids)) == pair_gids.size, 'Duplicates in gid pairs found!')
-        aux_dict.update({'pair_gids': pair_gids}) # Save GID mapping, to be reused in subsequent split iterations
+        # Assign new source nodes = rewiring
+        edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_idx]
         
-        logging.info(f'Actually selected GID pairs: {pair_gids.shape[0]} (amount={amount_pct}%)')
-    
-    # Rewire axons (interchange source ids in edges table)
-    for id1, id2 in pair_gids:
-        src_idx1 = edges_table['@source_node'] == id1
-        src_idx2 = edges_table['@source_node'] == id2
-        edges_table.loc[src_idx1, '@source_node'] = id2
-        edges_table.loc[src_idx2, '@source_node'] = id1
+        # Assign new distance-dependent delay (optional)
+        if not d_model is None:
+            # Determine distance from source neuron (soma) to synapse on target neuron
+            src_new_pos = nodes.positions(src_new).to_numpy()
+            syn_pos = edges_table.loc[syn_sel_idx, ['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
+            syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_idx, :])**2, 1))
+            delay_new = np.random.normal(d_model(syn_dist, 'mean'), d_model(syn_dist, 'std'))
+            assert np.all(delay_new > 0.0), 'ERROR: Delay must be larger than 0ms!'
+            
+            edges_table.loc[syn_sel_idx, 'delay'] = delay_new
     
     return edges_table
