@@ -14,7 +14,9 @@ import os.path
 import pickle
 
 """ Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses & number of ingoing connections) """
-def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_file, delay_model_file=None):
+def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_file, delay_model_file=None, syn_class='EXC'):
+    
+    logging.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     
     # Load connection probability model
     logging.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
@@ -42,20 +44,32 @@ def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_f
     else:
         d_model = None
     
-    # Run connection rewiring
-    src_node_ids = nodes.ids(src_node_sel)
+    # Determine source/target nodes for rewiring
+    src_class = nodes.get(src_node_sel, properties='synapse_class')
+    src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
+    logging.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
+    
     tgt_node_ids = nodes.ids(tgt_node_sel)
+    
+    # Run connection rewiring
     logging.info('Sampling neurons for connection rewiring...')
     for tgt in tgt_node_ids:
-        syn_sel_idx = np.isin(edges_table['@target_node'], tgt)
+        syn_sel_idx = np.isin(edges_table['@target_node'], tgt)        
+        
+        # Rewire only synapses of given class (EXC/INH)
+        if syn_class == 'EXC':
+            syn_sel_idx = np.logical_and(syn_sel_idx, edges_table['syn_type_id'] >= 100)
+        elif syn_class == 'INH':
+            syn_sel_idx = np.logical_and(syn_sel_idx, edges_table['syn_type_id'] < 100)
+        else:
+            logging.log_assert(False, f'Synapse class {syn_class} not supported!')
+        
         if not np.any(syn_sel_idx):
             continue # Nothing to rewire (no synapses on target node)
         
         src, src_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)
         num_src = len(src) # Number of currently existing sources for given target node
-        
-        # TODO: Check that synapse classes of src neurons are the same as the ones from src_node_ids!
-        #       (EXC (INH) synapses on tgt must be connected to EXC (INH) pre-synaptic neurons!!)
+        logging.log_assert(len(src_node_ids) >= num_src, f'Not enough source neurons for target neuron {tgt} available for rewiring!')
         
         # Sample new num_src presynaptic neurons from full list of source nodes according to conn. prob.
         # (keeping the same number of ingoing connections)
@@ -68,6 +82,7 @@ def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_f
         else:
             logging.log_assert(False, f'Model order {model_order} not supported!')
         
+        p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
         src_new = np.random.choice(src_node_ids, num_src, replace=False, p=p_src/np.sum(p_src))
         
         # Assign new source nodes = rewiring
