@@ -12,15 +12,17 @@ import logging
 import numpy as np
 import os.path
 import pickle
+from scipy.stats import truncnorm
 
 """ Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses & number of ingoing connections) """
-def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_file, delay_model_file=None, syn_class='EXC'):
+def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, amount_pct=100.0):
     
     logging.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
+    logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
     
     # Load connection probability model
     logging.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
-    logging.info(f'INFO: Loading conn. prob. model from {prob_model_file}')
+    logging.info(f'Loading conn. prob. model from {prob_model_file}')
     with open(prob_model_file, 'rb') as f:
         prob_model_dict = pickle.load(f)
     p_model = model_building.get_model(prob_model_dict['model'], prob_model_dict['model_inputs'], prob_model_dict['model_params'])
@@ -36,23 +38,28 @@ def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_f
     # Load delay model (optional)
     if not delay_model_file is None:
         logging.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
-        logging.info(f'INFO: Loading delay model from {delay_model_file}')
+        logging.info(f'Loading delay model from {delay_model_file}')
         with open(delay_model_file, 'rb') as f:
             delay_model_dict = pickle.load(f)
         d_model = model_building.get_model(delay_model_dict['model'], delay_model_dict['model_inputs'], delay_model_dict['model_params'])
         logging.log_assert(len(delay_model_dict['model_inputs']) == 2, 'Distance-dependent delay model with two inputs (d, type) expected!')
     else:
         d_model = None
+        logging.info(f'No delay model provided')
     
     # Determine source/target nodes for rewiring
-    src_class = nodes.get(src_node_sel, properties='synapse_class')
+    src_class = nodes.get(sel_src, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
     logging.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
     
-    tgt_node_ids = nodes.ids(tgt_node_sel)
+    tgt_node_ids = nodes.ids(sel_dest)
+    num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
+    tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
+    tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
+    
+    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons, selected from {sel_src} to {sel_dest} neurons')
     
     # Run connection rewiring
-    logging.info('Sampling neurons for connection rewiring...')
     for tgt in tgt_node_ids:
         syn_sel_idx = np.isin(edges_table['@target_node'], tgt)        
         
@@ -88,15 +95,17 @@ def apply(edges_table, nodes, aux_dict, src_node_sel, tgt_node_sel, prob_model_f
         # Assign new source nodes = rewiring
         edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_idx]
         
-        # Assign new distance-dependent delay (optional)
+        # Assign new distance-dependent delay, drawn from truncated normal distribution (optional)
         if not d_model is None:
             # Determine distance from source neuron (soma) to synapse on target neuron
             src_new_pos = nodes.positions(src_new).to_numpy()
             syn_pos = edges_table.loc[syn_sel_idx, ['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
             syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_idx, :])**2, 1))
-            delay_new = np.random.normal(d_model(syn_dist, 'mean'), d_model(syn_dist, 'std'))
-            assert np.all(delay_new > 0.0), 'ERROR: Delay must be larger than 0ms!'
             
+            d_mean = d_model(syn_dist, 'mean')
+            d_std = d_model(syn_dist, 'std')
+            d_min = d_model(syn_dist, 'min')
+            delay_new = truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()            
             edges_table.loc[syn_sel_idx, 'delay'] = delay_new
     
     return edges_table

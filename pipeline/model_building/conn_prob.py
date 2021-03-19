@@ -273,7 +273,7 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     xv, zv = np.meshgrid(dx, dz)
     vdist = np.sqrt(xv**2 + zv**2)
     pdist = model_fct(vdist)
-    plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=plt.cm.hot)
+    plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=plt.cm.hot, vmin=0.0)
     for r in r_markers:
         plt.gca().add_patch(plt.Circle((0, 0), r, edgecolor='w', linestyle='--', fill=False))
         plt.text(0, r, f'{r} $\mu$m', color='w', ha='center', va='bottom')
@@ -374,7 +374,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
     xv, zv = np.meshgrid(dx, dz)
     vdist = np.sqrt(xv**2 + zv**2)
     pdist = model_fct(vdist, np.sign(zv))
-    plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=plt.cm.hot)
+    plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     for r in r_markers:
         plt.gca().add_patch(plt.Circle((0, 0), r, edgecolor='w', linestyle='--', fill=False))
@@ -535,7 +535,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.figure(figsize=(12, 6), dpi=300)
     # (Data)
     plt.subplot(2, 3, 1)
-    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -544,7 +544,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 2)
-    plt.imshow(np.max(p_conn_offset, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(p_conn_offset, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -554,7 +554,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.title('Data')
 
     plt.subplot(2, 3, 3)
-    plt.imshow(np.max(p_conn_offset, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(p_conn_offset, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -564,7 +564,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 
     # (Model)
     plt.subplot(2, 3, 4)
-    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -573,7 +573,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 5)
-    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -583,7 +583,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.title('Model')
 
     plt.subplot(2, 3, 6)
-    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot)
+    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()

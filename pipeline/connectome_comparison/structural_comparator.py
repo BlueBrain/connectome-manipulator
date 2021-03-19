@@ -72,7 +72,7 @@ def main(structcomp_config, show_fig=False, force_recomp=False):
     assert len(circuit_ids) == 2, 'ERROR: Exactly two circuits required for comparison!'
     circuit_configs = [structcomp_config['circuits'][c]['circuit_config'] for c in circuit_ids]
     circuit_names = [structcomp_config['circuits'][c]['circuit_name'] for c in circuit_ids]
-
+    
     circuits = [Circuit(cc) for cc in circuit_configs]
     print(f'INFO: {len(circuits)} circuits loaded:')
     for cc in circuit_configs:
@@ -84,6 +84,11 @@ def main(structcomp_config, show_fig=False, force_recomp=False):
         os.makedirs(out_dir)
     
     # Computation & plotting
+    if isinstance(force_recomp, tuple) or isinstance(force_recomp, list):
+        assert len(force_recomp) == len(circuit_ids), f'ERROR: {len(circuit_ids)} "force_recomp" entries expected!'
+    else:
+        force_recomp = [force_recomp] * len(circuit_ids)
+    
     for plot_dict in structcomp_config['plot_types']:
         print(f'INFO: Preparing "{plot_dict["name"]}" plot(s)...')
         
@@ -91,7 +96,7 @@ def main(structcomp_config, show_fig=False, force_recomp=False):
         res_dicts = []
         for cidx in range(len(circuit_ids)):
             res_file = os.path.join(structcomp_config['working_dir'], 'data', circuit_names[cidx] + '_' + plot_dict['name'] + '.pickle')
-            if os.path.exists(res_file) and not force_recomp:
+            if os.path.exists(res_file) and not force_recomp[cidx]:
                 # Load from file
                 print(f'INFO: Loading results from {res_file}')
                 with open(res_file, 'rb') as f:
