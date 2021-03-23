@@ -14,8 +14,8 @@ import os.path
 import pickle
 from scipy.stats import truncnorm
 
-""" Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses & number of ingoing connections) """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, amount_pct=100.0):
+""" Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses and optionally, number of ingoing connections) """
+def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, keep_indegree=True, amount_pct=100.0):
     
     logging.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
@@ -57,11 +57,12 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
     
-    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons, selected from {sel_src} to {sel_dest} neurons')
+    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons, selected from {sel_src} to {sel_dest} neurons (keep_indegree={keep_indegree})')
     
     # Run connection rewiring
+    warning_syn_count_diff = [] # Keep track of synapse count mismatch to provide a warning
     for tgt in tgt_node_ids:
-        syn_sel_idx = np.isin(edges_table['@target_node'], tgt)        
+        syn_sel_idx = edges_table['@target_node'] == tgt
         
         # Rewire only synapses of given class (EXC/INH)
         if syn_class == 'EXC':
@@ -71,15 +72,12 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         else:
             logging.log_assert(False, f'Synapse class {syn_class} not supported!')
         
-        if not np.any(syn_sel_idx):
+        num_syn = np.sum(syn_sel_idx)
+        if num_syn == 0:
+            warning_syn_count_diff.append(num_syn)
             continue # Nothing to rewire (no synapses on target node)
         
-        src, src_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)
-        num_src = len(src) # Number of currently existing sources for given target node
-        logging.log_assert(len(src_node_ids) >= num_src, f'Not enough source neurons for target neuron {tgt} available for rewiring!')
-        
-        # Sample new num_src presynaptic neurons from full list of source nodes according to conn. prob.
-        # (keeping the same number of ingoing connections)
+        # Determine conn. prob. of all source nodes to be connected with target node
         if model_order == 1: # Constant conn. prob. (no inputs)
             p_src = np.full(len(src_node_ids), p_model())
         elif model_order == 2: # Distance-dependent conn. prob. (1 input: distance)
@@ -90,22 +88,56 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
             logging.log_assert(False, f'Model order {model_order} not supported!')
         
         p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
-        src_new = np.random.choice(src_node_ids, num_src, replace=False, p=p_src/np.sum(p_src))
         
+        # Sample new presynaptic neurons from list of source nodes according to conn. prob.
+        if keep_indegree: # Keep the same number of ingoing connections (and #synapses/connection)
+            src, src_syn_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)
+            num_src = len(src) # Number of currently existing sources for given target node
+            logging.log_assert(len(src_node_ids) >= num_src, f'Not enough source neurons for target neuron {tgt} available for rewiring!')
+            
+            src_new = np.random.choice(src_node_ids, size=num_src, replace=False, p=p_src/np.sum(p_src)) # New source node IDs per connection
+        else: # Number of ingoing connections (and #synapses/connection) NOT kept the same
+            src_new_sel = np.random.rand(len(src_node_ids)) < p_src
+            src_new = src_node_ids[src_new_sel] # New source node IDs per connection
+            
+            if len(src_new) == 0: # No connections to assign existing synapses to
+                warning_syn_count_diff.append(len(src_new) - num_syn)
+                
+                # At least one connection required to assign synapses to => Select one source node (randomly, taking p_src into account)
+                src_new = np.random.choice(src_node_ids, size=1, replace=False, p=p_src/np.sum(p_src))
+                src_syn_idx = np.zeros(num_syn, dtype=int)
+            elif num_syn < len(src_new): # Too many connections to be realized with existing synapses
+                warning_syn_count_diff.append(len(src_new) - num_syn)
+                
+                # Reduce to num_syn connections with 1 syn/conn (random subsample, taking p_src into account)
+                sub_sel = np.sort(np.random.choice(len(src_new), size=num_syn, replace=False, p=p_src[src_new_sel]/np.sum(p_src[src_new_sel])))
+                src_new = src_new[sub_sel]
+                src_syn_idx = np.arange(num_syn)
+            else: # Connections can be realized with existing synapses => Assign synapses to connections
+                num_syn_per_conn = num_syn / len(src_new) # Distribute equally
+                src_syn_idx = np.floor(np.arange(num_syn) / num_syn_per_conn).astype(int)
+                
         # Assign new source nodes = rewiring
-        edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_idx]
+        edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_syn_idx] # Source node IDs per connection expanded to synapses
         
         # Assign new distance-dependent delay, drawn from truncated normal distribution (optional)
         if not d_model is None:
             # Determine distance from source neuron (soma) to synapse on target neuron
             src_new_pos = nodes.positions(src_new).to_numpy()
             syn_pos = edges_table.loc[syn_sel_idx, ['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
-            syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_idx, :])**2, 1))
+            syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_syn_idx, :])**2, 1))
             
             d_mean = d_model(syn_dist, 'mean')
             d_std = d_model(syn_dist, 'std')
             d_min = d_model(syn_dist, 'min')
             delay_new = truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()            
             edges_table.loc[syn_sel_idx, 'delay'] = delay_new
+    
+    if len(warning_syn_count_diff) > 0:
+        warning_syn_count_diff = np.array(warning_syn_count_diff)
+        cnt_str1 = f'{np.sum(warning_syn_count_diff==0)}x: Nothing to rewire, since no synapses' if np.sum(warning_syn_count_diff==0) > 0 else ''
+        cnt_str2 = f'{np.sum(warning_syn_count_diff<0)}x: Increased #conn to 1 instead of 0' if np.sum(warning_syn_count_diff<0) > 0 else ''
+        cnt_str3 = f'{np.sum(warning_syn_count_diff>0)}x: Decreased #conn by {np.mean(warning_syn_count_diff[warning_syn_count_diff>0]):.1f} on avg)' if np.sum(warning_syn_count_diff>0) > 0 else ''
+        logging.warning(f'Wrong number of {syn_class} synapses to realize intended connections at {len(warning_syn_count_diff)} of {len(tgt_node_ids)} target neurons!\n({"; ".join(filter(None, [cnt_str1, cnt_str2, cnt_str3]))})')
     
     return edges_table
