@@ -12,5 +12,5 @@ import logging
 def apply(edges_table, nodes, aux_dict):
     
     logging.info('Nothing to do')
-    
+        
     return edges_table

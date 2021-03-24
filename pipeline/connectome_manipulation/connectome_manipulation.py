@@ -214,7 +214,7 @@ def main(manip_config, do_profiling=False):
         # Apply connectome manipulation
         aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
         edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
-#         logging.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'ERROR: Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
+        logging.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'ERROR: Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
         N_syn_out.append(edges_table_manip.shape[0])
         resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}')
         
