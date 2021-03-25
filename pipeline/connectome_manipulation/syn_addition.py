@@ -8,6 +8,7 @@
 
 import logging
 import numpy as np
+from helper_functions import get_gsyn_sum_per_conn, rescale_gsyn_per_conn
 
 """ Add certain amount of synapses to existing connections, optionally keeping sum of g_syns per connection constant """
 def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, amount, rescale_gsyn=False, method='duplicate'):
@@ -25,22 +26,26 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, amount, re
     #         [NYI] randomize ... Fully randomized parameterization, based on model-based distributions
     #         [NYI] load ... Load from external connectome, e.g. structural connectome
     
-    # Select number of synapses to be added
+    # Determine number of synapses to be added
     gids_src = nodes.ids(sel_src)
     gids_dest = nodes.ids(sel_dest)
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest))
     num_syn = np.sum(syn_sel_idx)
     
     if amount['type'] == 'pct': # Overall increase by percentage of total number of existing synapses between src and dest
-        logging.log_assert(amount['value'] >= 0.0 and amount['value'] <= 100.0, f'Amount value for type "{amount["type"]}" out of range!')
+        logging.log_assert(amount['value'] >= 0.0, f'Amount value for type "{amount["type"]}" out of range!')
         num_add = np.round(amount['value'] * num_syn / 100).astype(int)
     else:
         logging.log_assert(False, f'Amount type "{amount["type"]}" not supported!')
     
     logging.info(f'Adding {num_add} {syn_class} synapses to {edges_table.shape[0]} total synapses from {sel_src} to {sel_dest} neurons (amount type={amount["type"]}, amount value={amount["value"]}, method={method}, rescale_gsyn={rescale_gsyn})')
-    
+        
+    # Add num_add EXC/INH synapses between src and dest nodes
     if num_add > 0:
-        # Create num_add EXC/INH synapses between src and dest nodes to be added
+        if rescale_gsyn:
+            # Determine connection strength (sum of g_syns per connection) BEFORE adding synapses
+            gsyn_table = get_gsyn_sum_per_conn(edges_table, gids_src, gids_dest)
+        
         if method == 'duplicate':
             # Duplicate only synapses of given class (EXC/INH)
             if syn_class == 'EXC':
@@ -59,6 +64,13 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, amount, re
         edges_table = edges_table.append(new_edges)
         edges_table.sort_values(['@target_node', '@source_node'], inplace=True)    
         edges_table.reset_index(inplace=True, drop=True) # [No index offset required in block-based processing]
+        
+        if rescale_gsyn:
+            # Determine connection strength (sum of g_syns per connection) AFTER adding synapses ...
+            gsyn_table_manip = get_gsyn_sum_per_conn(edges_table, gids_src, gids_dest)
+            
+            # ... and rescale g_syn so that the sum of g_syns per connections BEFORE and AFTER the manipulation is kept the same
+            rescale_gsyn_per_conn(edges_table, gids_src, gids_dest, gsyn_table, gsyn_table_manip)        
     else:
         logging.warning(f'Nothing to add!')
     

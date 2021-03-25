@@ -43,7 +43,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, kee
     edges_table_manip = edges_table[~syn_sel_idx].copy()
     
     if rescale_gsyn:
-        # Determine connection strength (sum of g_syns per connection) AFTER synapse removal
+        # Determine connection strength (sum of g_syns per connection) AFTER synapse removal ...
         gsyn_table_manip = get_gsyn_sum_per_conn(edges_table_manip, gids_src, gids_dest)
         
         # ... and rescale g_syn so that the sum of g_syns per connections BEFORE and AFTER manipulation is kept the same (unless there is no synapse per connection left)

@@ -14,11 +14,12 @@
 
 import progressbar
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
 """ Compute mean/std/... values of all synapse properties grouped by given cell property """
-def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, **_):
+def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, per_conn=False, **_):
     
     if group_by is None:
         group_values = ['Overall']
@@ -35,7 +36,7 @@ def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, **_):
             for idx in range(len(group_sel)):
                 group_sel[idx].update(nrn_filter)
     
-    print(f'INFO: Extracting synapse properties (group_by={group_by}, nrn_filter={nrn_filter}, N={len(group_values)})', flush=True)
+    print(f'INFO: Extracting synapse properties (group_by={group_by}, nrn_filter={nrn_filter}, N={len(group_values)}, per_conn={per_conn})', flush=True)
     
     edges = circuit.edges['default']
     edge_props = sorted(edges.property_names)
@@ -50,10 +51,18 @@ def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, **_):
             sel_post = group_sel[idx_post]
             e_sel = edges.pathway_edges(sel_pre, sel_post, edge_props)
             if e_sel.size > 0:
-                prop_tables[idx_pre, idx_post, :] = prop_fct(e_sel.to_numpy(), axis=0)
+                if per_conn: # Apply prop_fct to average value per connection
+                    conn, conn_idx = np.unique(e_sel[['@source_node', '@target_node']], axis=0, return_inverse=True)
+                    c_sel = pd.DataFrame(index=range(conn.shape[0]), columns=edge_props)
+                    for cidx in range(conn.shape[0]):
+                        c_sel.loc[cidx, :] = np.mean(e_sel[conn_idx == cidx], axis=0)
+                    prop_tables[idx_pre, idx_post, :] = prop_fct(c_sel.to_numpy(), axis=0)
+                else:
+                    prop_tables[idx_pre, idx_post, :] = prop_fct(e_sel.to_numpy(), axis=0)
     
     fname = prop_fct.__name__[0].upper() + prop_fct.__name__[1:]
-    res_dict = {edge_props[idx]: {'data': prop_tables[:, :, idx], 'name': f'"{edge_props[idx]}" property', 'unit': f'{fname} {edge_props[idx]}'} for idx in range(len(edge_props))}
+    cname = ' (per conn)' if per_conn else ''
+    res_dict = {edge_props[idx]: {'data': prop_tables[:, :, idx], 'name': f'"{edge_props[idx]}" property', 'unit': f'{fname} {edge_props[idx]}{cname}'} for idx in range(len(edge_props))}
     res_dict['common'] = {'group_values': group_values}
     
     return res_dict
