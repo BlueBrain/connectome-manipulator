@@ -89,19 +89,19 @@ def create_new_file_from_template(new_file, template_file, replacements_dict):
         file.write(content)
 
 
-def resource_profiling(enabled=False, description=''):
+def resource_profiling(enabled=False, description='', reset=False):
     
     if not enabled:
         return
-
+    
     mem_curr = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
-    if not hasattr(resource_profiling, 'mem_before'):
+    if not hasattr(resource_profiling, 'mem_before') or reset:
         mem_diff = None
     else:
         mem_diff = mem_curr - resource_profiling.mem_before
     resource_profiling.mem_before = mem_curr
 
-    if not hasattr(resource_profiling, 't_init'):
+    if not hasattr(resource_profiling, 't_init') or reset:
         resource_profiling.t_init = time.time()
         resource_profiling.t_start = resource_profiling.t_init
         t_tot = None
@@ -181,7 +181,7 @@ def main(manip_config, do_profiling=False):
     logging_init(manip_config['circuit_path'])
     
     # Initialize profiler
-    resource_profiling(do_profiling, 'initial')
+    resource_profiling(do_profiling, 'initial', reset=True)
 
     # Load circuit
     circuit_name = os.path.split(manip_config['circuit_path'])[-1]
