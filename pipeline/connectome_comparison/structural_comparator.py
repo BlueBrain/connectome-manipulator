@@ -84,10 +84,10 @@ def main(structcomp_config, show_fig=False, force_recomp=False):
         os.makedirs(out_dir)
     
     # Computation & plotting
-    if isinstance(force_recomp, tuple) or isinstance(force_recomp, list):
-        assert len(force_recomp) == len(circuit_ids), f'ERROR: {len(circuit_ids)} "force_recomp" entries expected!'
-    else:
+    if np.isscalar(force_recomp):
         force_recomp = [force_recomp] * len(circuit_ids)
+    else:
+        assert len(force_recomp) == len(circuit_ids), f'ERROR: {len(circuit_ids)} "force_recomp" entries expected!'
     
     for plot_dict in structcomp_config['plot_types']:
         print(f'INFO: Preparing "{plot_dict["name"]}" plot(s)...')

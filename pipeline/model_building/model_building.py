@@ -37,13 +37,13 @@ def main(model_config, show_fig=False, force_recomp=False):
     
     np.random.seed(model_config.get('seed', 123456))
     
-    if isinstance(force_recomp, tuple) or isinstance(force_recomp, list):
+    if np.isscalar(force_recomp):
+        force_reextract = force_recomp
+        force_rebuild = force_recomp
+    else:
         assert len(force_recomp) == 2, 'ERROR: Two "force_recomp" entries expected!'
         force_reextract = force_recomp[0]
         force_rebuild = force_recomp[1]
-    else:
-        force_reextract = force_recomp
-        force_rebuild = force_recomp
     
     # Load circuit
     circuit_config = model_config['circuit_config']

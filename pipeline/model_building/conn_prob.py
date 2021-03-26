@@ -410,29 +410,29 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
         dx_range = [np.nanmin(dx_mat), np.nanmax(dx_mat)]
         dy_range = [np.nanmin(dy_mat), np.nanmax(dy_mat)]
         dz_range = [np.nanmin(dz_mat), np.nanmax(dz_mat)]
-    elif isinstance(max_range_um, tuple) or isinstance(max_range_um, list) or isinstance(max_range_um, np.ndarray):
+    elif np.isscalar(max_range_um): # Assume single scalar range value to be used for all dimensions
+        assert max_range_um > 0.0, 'ERROR: Maximum range must be larger than 0um!'
+        dx_range = [-max_range_um, max_range_um]
+        dy_range = [-max_range_um, max_range_um]
+        dz_range = [-max_range_um, max_range_um]
+    else:
         assert len(max_range_um) == 3, 'ERROR: Maximum range in x/y/z dimension expected!'
         assert np.all([r > 0.0 for r in max_range_um]), 'ERROR: Maximum range must be larger than 0um!'
         dx_range = [-max_range_um[0], max_range_um[0]]
         dy_range = [-max_range_um[1], max_range_um[1]]
         dz_range = [-max_range_um[2], max_range_um[2]]
-    else: # Assume single scalar range value to be used for all dimensions
-        assert max_range_um > 0.0, 'ERROR: Maximum range must be larger than 0um!'
-        dx_range = [-max_range_um, max_range_um]
-        dy_range = [-max_range_um, max_range_um]
-        dz_range = [-max_range_um, max_range_um]
     
-    if isinstance(bin_size_um, tuple) or isinstance(bin_size_um, list) or isinstance(bin_size_um, np.ndarray):
+    if np.isscalar(bin_size_um): # Assume single scalar size value to be used for all dimensions
+        assert bin_size_um > 0.0, 'ERROR: Bin size must be larger than 0um!'
+        bin_size_x = bin_size_um
+        bin_size_y = bin_size_um
+        bin_size_z = bin_size_um
+    else:
         assert len(bin_size_um) == 3, 'ERROR: Bin sizes in x/y/z dimension expected!'
         assert np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Bin size must be larger than 0um!'
         bin_size_x = bin_size_um[0]
         bin_size_y = bin_size_um[1]
         bin_size_z = bin_size_um[2]
-    else: # Assume single scalar size value to be used for all dimensions
-        assert bin_size_um > 0.0, 'ERROR: Bin size must be larger than 0um!'
-        bin_size_x = bin_size_um
-        bin_size_y = bin_size_um
-        bin_size_z = bin_size_um
     
     num_bins_x = np.ceil((dx_range[1] - dx_range[0]) / bin_size_x).astype(int)
     num_bins_y = np.ceil((dy_range[1] - dy_range[0]) / bin_size_y).astype(int)
