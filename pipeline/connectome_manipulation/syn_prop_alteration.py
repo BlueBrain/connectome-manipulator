@@ -14,7 +14,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_prop, new_value, 
     
     # Input checks
     available_properties = np.setdiff1d(edges_table.columns, ['@source_node', '@target_node']).tolist() # Source/target nodes excluded
-    available_modes = ['setval', 'scale', 'shuffle', 'random'] # Supported modes for generating new values
+    available_modes = ['setval', 'scale', 'shuffle', 'randval', 'randscale', 'randadd'] # Supported modes for generating new values
     logging.log_assert(syn_prop in edges_table.columns, f'syn_prop "{syn_prop}" not available! Must be one of: {edges_table.columns.to_list()}')
     logging.log_assert(np.all(np.isin(list(syn_filter.keys()), available_properties)), 'One or more filter properties not available!')
     logging.log_assert('mode' in new_value.keys(), 'Value "mode" must be specified!')
@@ -50,9 +50,15 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_prop, new_value, 
     elif new_value['mode'] == 'shuffle': # Shuffle across synapses
         logging.log_assert(aux_dict['N_split'] == 1, f'"{new_value["mode"]}" mode not supported in block-based processing! Reduce number of splits to 1!')
         edges_table.loc[syn_sel_idx, syn_prop] = edges_table.loc[syn_sel_idx, syn_prop].values[np.random.permutation(np.sum(syn_sel_idx))]
-    elif new_value['mode'] == 'random': # Generate random values from given distribution
+    elif new_value['mode'] == 'randval': # Set random values from given distribution
         rng = eval('np.random.' + new_value['rng'])
         edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
+    elif new_value['mode'] == 'randscale': # Scale by random factors from given distribution
+        rng = eval('np.random.' + new_value['rng'])
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(edges_table.loc[syn_sel_idx, syn_prop] * rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
+    elif new_value['mode'] == 'randadd': # Add random values from given distribution
+        rng = eval('np.random.' + new_value['rng'])
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(edges_table.loc[syn_sel_idx, syn_prop] + rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
     else:
         logging.log_assert(False, f'Value mode "{new_value["mode"]}" not implemented!')
     

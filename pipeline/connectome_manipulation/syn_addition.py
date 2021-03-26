@@ -15,9 +15,10 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
     
     # Input checks
     logging.log_assert(isinstance(amount, dict) and 'type' in amount.keys() and 'value' in amount.keys(), 'Amount must be specified as dict with "type"/"value" entries!')
-    logging.log_assert(amount['type'] in ['pct', 'pct_per_conn', 'minval_per_conn'], f'Synapse amount type "{amount["type"]}" not supported (must be "pct", "pct_per_conn", or "minval_per_conn")!')
+    logging.log_assert(amount['type'] in ['pct', 'pct_per_conn', 'rnd_per_conn', 'minval_per_conn'], f'Synapse amount type "{amount["type"]}" not supported (must be "pct", "pct_per_conn", "rnd_per_conn", or "minval_per_conn")!')
     # amount: pct ... Overall increase by percentage of total number of existing synapses
-    #         pct_per_conn ... Increase by percentage of existing synapses per connection
+    #         pct_per_conn ... Increase each connection by percentage of existing synapses
+    #         rnd_per_conn ... Increase each connection by random number of synapses within given range
     #         minval_per_conn ... Increase until minimum target value of synapses per connection is reached
     logging.log_assert(method in ['duplicate'], f'Synapse addition method "{method}" not supported (must be "duplicate")!')
     # method: duplicate ... Duplicate existing synapses
@@ -34,14 +35,23 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
     if amount['type'] == 'pct': # Overall increase by percentage of total number of existing synapses between src and dest
         logging.log_assert(amount['value'] >= 0.0, f'Amount value for type "{amount["type"]}" out of range!')
         num_add = np.round(amount['value'] * num_syn / 100).astype(int)
-    elif amount['type'] == 'pct_per_conn': # Increase by percentage of existing synapses per connection
+        
+    elif amount['type'] == 'pct_per_conn': # Increase each connection by percentage of existing synapses
         logging.log_assert(amount['value'] >= 0.0, f'Amount value for type "{amount["type"]}" out of range!')
         conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_table[syn_sel_idx][['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
         num_add = np.round(amount['value'] * num_syn_per_conn / 100).astype(int)
+        
+    elif amount['type'] == 'rnd_per_conn': # Increase each connection by random number of synapses within given range
+        logging.log_assert(not np.isscalar(amount['value']) and len(amount['value']) == 2, f'Amount value for type "{amount["type"]}" needs to be a range with two elements!')
+        logging.log_assert(amount['value'][0] >= 0 and amount['value'][1] >= amount['value'][0], f'Amount value range for type "{amount["type"]}" out of range!')
+        conns, syn_conn_idx = np.unique(edges_table[syn_sel_idx][['@source_node', '@target_node']], axis=0, return_inverse=True)
+        num_add = np.random.randint(low=np.round(amount['value'][0]).astype(int), high=np.round(amount['value'][1]).astype(int)+1, size=conns.shape[0])
+        
     elif amount['type'] == 'minval_per_conn': # Increase until minimum target value of synapses per connection is reached
         logging.log_assert(amount['value'] >= 0, f'Amount value for type "{amount["type"]}" out of range!')
         conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_table[syn_sel_idx][['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
         num_add = np.maximum(np.round(amount['value']).astype(int) - num_syn_per_conn, 0)
+        
     else:
         logging.log_assert(False, f'Amount type "{amount["type"]}" not supported!')
     
@@ -56,7 +66,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
         if method == 'duplicate': # Duplicate existing synapses
             if np.isscalar(num_add): # Overall number of synapses to add
                 sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_add) # Random sampling from existing synapses with replacement
-            else: # Number of synapses per connection to add
+            else: # Number of synapses per connection to add [requires syn_conn_idx for mapping between connections and synapses]
                 sel_dupl = np.full(np.sum(num_add), -1) # Empty selection
                 dupl_idx = np.hstack((0, np.cumsum(num_add))) # Index vector where to save selected indices
                 for cidx, num in enumerate(num_add):
