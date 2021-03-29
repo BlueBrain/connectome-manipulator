@@ -42,23 +42,26 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_prop, new_value, 
         sel_alter = np.random.permutation([True] * num_alter + [False] * (num_syn - num_alter))
         syn_sel_idx[syn_sel_idx == True] = sel_alter # Set actual indices of synapses to be altered
     
+    val_range = new_value.get('range', [-np.inf, np.inf])
+    
     prop_dtype = edges_table.dtypes[syn_prop].type # Property data type to cast new values to, so that data type is not changed!!
     if new_value['mode'] == 'setval': # Set to a fixed given value
+        logging.log_assert(new_value['value'] >= val_range[0] and new_value['value'] <= val_range[1], 'Property value out of range!')
         edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(new_value['value'])
     elif new_value['mode'] == 'scale': # Scale by a given factor
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(edges_table.loc[syn_sel_idx, syn_prop] * new_value['factor'])
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(np.minimum(np.maximum(edges_table.loc[syn_sel_idx, syn_prop] * new_value['factor'], val_range[0]), val_range[1]))
     elif new_value['mode'] == 'shuffle': # Shuffle across synapses
         logging.log_assert(aux_dict['N_split'] == 1, f'"{new_value["mode"]}" mode not supported in block-based processing! Reduce number of splits to 1!')
         edges_table.loc[syn_sel_idx, syn_prop] = edges_table.loc[syn_sel_idx, syn_prop].values[np.random.permutation(np.sum(syn_sel_idx))]
     elif new_value['mode'] == 'randval': # Set random values from given distribution
         rng = eval('np.random.' + new_value['rng'])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(np.minimum(np.maximum(rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)), val_range[0]), val_range[1]))
     elif new_value['mode'] == 'randscale': # Scale by random factors from given distribution
         rng = eval('np.random.' + new_value['rng'])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(edges_table.loc[syn_sel_idx, syn_prop] * rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(np.minimum(np.maximum(edges_table.loc[syn_sel_idx, syn_prop] * rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)), val_range[0]), val_range[1]))
     elif new_value['mode'] == 'randadd': # Add random values from given distribution
         rng = eval('np.random.' + new_value['rng'])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(edges_table.loc[syn_sel_idx, syn_prop] + rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)))
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(np.minimum(np.maximum(edges_table.loc[syn_sel_idx, syn_prop] + rng(**new_value['kwargs'], size=np.sum(syn_sel_idx)), val_range[0]), val_range[1]))
     else:
         logging.log_assert(False, f'Value mode "{new_value["mode"]}" not implemented!')
     
