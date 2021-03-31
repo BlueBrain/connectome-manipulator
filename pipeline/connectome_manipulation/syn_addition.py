@@ -20,9 +20,9 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
     #         pct_per_conn ... Increase each connection by percentage of existing synapses
     #         rnd_per_conn ... Increase each connection by random number of synapses within given range
     #         minval_per_conn ... Increase until minimum target value of synapses per connection is reached
-    logging.log_assert(method in ['duplicate'], f'Synapse addition method "{method}" not supported (must be "duplicate")!')
+    logging.log_assert(method in ['duplicate', 'derive'], f'Synapse addition method "{method}" not supported (must be "duplicate" or "derive")!')
     # method: duplicate ... Duplicate existing synapses
-    #         [NYI] derive ... Derive from existing synapses (duplicate and randomize certain properties)
+    #         derive ... Derive from existing synapses (duplicate and randomize certain properties)
     #         [NYI] randomize ... Fully randomized parameterization, based on model-based distributions
     #         [NYI] load ... Load from external connectome, e.g. structural connectome
     
@@ -63,7 +63,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
             # Determine connection strength (sum of g_syns per connection) BEFORE adding synapses
             gsyn_table = get_gsyn_sum_per_conn(edges_table, gids_src, gids_dest)
         
-        if method == 'duplicate': # Duplicate existing synapses
+        if method == 'duplicate' or method == 'derive': # Duplicate or derive from existing synapses
             if np.isscalar(num_add): # Overall number of synapses to add
                 sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_add) # Random sampling from existing synapses with replacement
             else: # Number of synapses per connection to add [requires syn_conn_idx for mapping between connections and synapses]
@@ -76,6 +76,10 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
                     conn_sel[syn_sel_idx==True] = syn_conn_idx == cidx # Sub-select (mask) synapses belonging to given connection from all selected synapses
                     sel_dupl[dupl_idx[cidx]:dupl_idx[cidx+1]] = np.random.choice(np.where(conn_sel)[0], num) # Random sampling from existing synapses per connection with replacement
             new_edges = edges_table.iloc[sel_dupl]
+            
+            if method == 'derive': # Derive from existing synapses (duplicate and randomize certain properties based on a model)
+                #TODO
+                logging.log_assert(False, f'Method "{method}" not yet implemented!')
         else:
             logging.log_assert(False, f'Method "{method}" not supported!')
         
