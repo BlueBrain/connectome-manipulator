@@ -12,140 +12,153 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 """ Extract statistics for synaptic properties from a sample of pairs of neurons """
-def extract(circuit, sample_size_per_group=None, **_):
+def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, **_):
     
     nodes = circuit.nodes['All']
     edges = circuit.edges['default']
-    m_types = sorted(nodes.property_values('mtype'))
+    m_types = sorted(nodes.property_values('mtype', is_present=True))
+    m_type_class = [nodes.get({'mtype': m}, properties='synapse_class').iloc[0] for m in m_types]
+    m_type_layer = [nodes.get({'mtype': m}, properties='layer').iloc[0] for m in m_types]
     syn_props = list(filter(lambda x: not np.any([excl in x for excl in ['@', 'delay', 'afferent', 'efferent', 'spine_length']]), edges.property_names))
     
-    model_dict = {'mean_conn': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value means across connections
-                  'std_conn': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value stds across connections
-                  'std_syn': np.full((len(m_types), len(m_types), len(syn_props)), np.nan)} # Property value stds across synapses within connections
+    print(f'INFO: Estimating statistics for {len(syn_props)} properties between {len(m_types)}x{len(m_types)} m-types', flush=True)
     
+    # Statistics for #syn/conn
+    syns_per_conn_data = {'mean': np.full((len(m_types), len(m_types)), np.nan),
+                          'std': np.full((len(m_types), len(m_types)), np.nan),
+                          'min': np.full((len(m_types), len(m_types)), np.nan),
+                          'max': np.full((len(m_types), len(m_types)), np.nan)}
+    
+    # Statistics for synapse/connection properties
+    conn_prop_data = {'mean': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value means across connections
+                      'std': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value stds across connections
+                      'std-within': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value stds across synapses within connections
+                      'min': np.full((len(m_types), len(m_types), len(syn_props)), np.nan), # Property value overall min
+                      'max': np.full((len(m_types), len(m_types), len(syn_props)), np.nan)} # Property value overall max
+    
+    # Extract statistics
+    conn_counts = {'min': np.inf, 'max': -np.inf, 'sel': 0} # Count connections for reporting
     pbar = progressbar.ProgressBar()
     for sidx in pbar(range(len(m_types))):
         sids = nodes.ids({'mtype': m_types[sidx]})
         for tidx in range(len(m_types)):
             tids = nodes.ids({'mtype': m_types[tidx]})
-                edges_sel = edges.pathway_edges(sids, tids, ['@source_node', '@target_node'] + syn_props)
-                conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_sel[['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
-                if len(num_syn_per_conn) == 0: # No synapses between pair of m-types
-                    continue
-                
-                if sample_size_per_group is None or sample_size_per_group == 0: # Use all connections available
-                    conn_sel = range(len(num_syn_per_conn))
-                elif sample_size_per_group <= len(num_syn_per_conn): # Subsample connections
-                    conn_sel = sorted(np.random.choice(len(num_syn_per_conn), sample_size_per_group, replace=False))
-                else: # Not enough connections available
-                    continue
-                
-                means_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-                stds_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-                for cidx, c in enumerate(conn_sel):
-                    means_within[cidx, :] = edges_sel.loc[syn_conn_idx==c, syn_props].mean()
-                    stds_within[cidx, :] = edges_sel.loc[syn_conn_idx==c, syn_props].std()
-                
-                
-                
-    if sample_size_per_group is None or sample_size <= 0 or sample_size >= len(node_ids):
-        sample_size = len(node_ids)
-    node_ids_sel = node_ids[np.random.permutation([True] * sample_size + [False] * (len(node_ids) - sample_size))]
+            edges_sel = edges.pathway_edges(sids, tids, ['@source_node', '@target_node'] + syn_props)
+            if edges_sel.shape[0] == 0: # No synapses between pair of m-types
+                continue
+            
+            conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_sel[['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
+            conn_counts['min'] = min(conn_counts['min'], len(num_syn_per_conn))
+            conn_counts['max'] = max(conn_counts['max'], len(num_syn_per_conn))
+            conn_sel = range(len(num_syn_per_conn)) # Select all connections
+            if not min_sample_size_per_group is None and min_sample_size_per_group > 0 and len(conn_sel) < min_sample_size_per_group: # Not enough connections available
+                continue
+            if not max_sample_size_per_group is None and max_sample_size_per_group > 0 and len(conn_sel) > max_sample_size_per_group: # Subsample connections
+                conn_sel = sorted(np.random.choice(conn_sel, max_sample_size_per_group, replace=False))
+            conn_counts['sel'] += 1
+            
+            syns_per_conn_data['mean'][sidx, tidx] = np.mean(num_syn_per_conn[conn_sel])
+            syns_per_conn_data['std'][sidx, tidx] = np.std(num_syn_per_conn[conn_sel])
+            syns_per_conn_data['min'][sidx, tidx] = np.min(num_syn_per_conn[conn_sel])
+            syns_per_conn_data['max'][sidx, tidx] = np.max(num_syn_per_conn[conn_sel])
+            
+            means_within = np.full((len(conn_sel), len(syn_props)), np.nan)
+            stds_within = np.full((len(conn_sel), len(syn_props)), np.nan)
+            mins_within = np.full((len(conn_sel), len(syn_props)), np.nan)
+            maxs_within = np.full((len(conn_sel), len(syn_props)), np.nan)
+            for cidx, c in enumerate(conn_sel):
+                means_within[cidx, :] = np.mean(edges_sel.loc[syn_conn_idx==c, syn_props], 0)
+                stds_within[cidx, :] = np.std(edges_sel.loc[syn_conn_idx==c, syn_props], 0)
+                mins_within[cidx, :] = np.min(edges_sel.loc[syn_conn_idx==c, syn_props], 0)
+                maxs_within[cidx, :] = np.max(edges_sel.loc[syn_conn_idx==c, syn_props], 0)
+            
+            conn_prop_data['mean'][sidx, tidx, :] = np.mean(means_within, 0)
+            conn_prop_data['std'][sidx, tidx, :] = np.std(means_within, 0)
+            conn_prop_data['std-within'][sidx, tidx, :] = np.mean(stds_within, 0)
+            conn_prop_data['min'][sidx, tidx, :] = np.min(mins_within, 0)
+            conn_prop_data['max'][sidx, tidx, :] = np.max(maxs_within, 0)
     
-    edges = circuit.edges['default']
-    edges_table = edges.pathway_edges(source=node_ids_sel, target=node_ids_sel, properties=['@source_node', 'delay', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z'])
+    print(f'INFO: Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types)**2} pathways selected.')
     
-    print(f'INFO: Extracting delays from {edges_table.shape[0]} synapses between {sample_size} neurons')
-    
-    src_pos = nodes.positions(edges_table['@source_node'].to_numpy()).to_numpy() # Soma position of pre-synaptic neuron
-    tgt_pos = edges_table[['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
-    src_tgt_dist = np.sqrt(np.sum((tgt_pos - src_pos)**2, 1))
-    src_tgt_delay = edges_table['delay'].to_numpy()
-    
-    # Extract distance-dependent delays
-    if max_range_um is None:
-        max_range_um = np.max(src_tgt_dist)
-    num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
-    dist_bins = np.arange(0, num_bins + 1) * bin_size_um
-    dist_delays_mean = np.full(num_bins, np.nan)
-    dist_delays_std = np.full(num_bins, np.nan)
-    dist_count = np.zeros(num_bins).astype(int)
-
-    print('Extracting distance-dependent synaptic delays...', flush=True)
-    pbar = progressbar.ProgressBar()
-    for idx in pbar(range(num_bins)):
-        d_sel = np.logical_and(src_tgt_dist >= dist_bins[idx], (src_tgt_dist < dist_bins[idx + 1]) if idx < num_bins - 1 else (src_tgt_dist <= dist_bins[idx + 1])) # Including last edge
-        dist_count[idx] = np.sum(d_sel)
-        if dist_count[idx] > 0:
-            dist_delays_mean[idx] = np.mean(src_tgt_delay[d_sel])
-            dist_delays_std[idx] = np.std(src_tgt_delay[d_sel])
-    
-    return {'dist_bins': dist_bins, 'dist_delays_mean': dist_delays_mean, 'dist_delays_std': dist_delays_std, 'dist_count': dist_count, 'dist_delay_min': np.min(src_tgt_delay)}
+    return {'syns_per_conn_data': syns_per_conn_data, 'conn_prop_data': conn_prop_data, 'm_types': m_types, 'm_type_class': m_type_class, 'm_type_layer': m_type_layer, 'syn_props': syn_props}
 
 
-""" Build distance-dependent synaptic delay model (linear model for delay mean, const model for delay std) """
-def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size_um, **_):
+""" Build model from data (lookup table with missing values interpolated at different levels of granularity) """
+def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_layer, syn_props, **_):
     
-    assert np.all((np.diff(dist_bins) - bin_size_um) < 1e-12), 'ERROR: Bin size mismatch!'
-    bin_offset = 0.5 * bin_size_um
+    # Interpolate missing values in lookup tables
+    syns_per_conn_model = {k: v.copy() for (k, v) in syns_per_conn_data.items()}
+    conn_prop_model = {k: v.copy() for (k, v) in conn_prop_data.items()}
+    missing_list = np.array(np.where(np.logical_not(np.isfinite(syns_per_conn_model['mean'])))).T
+    level_counts = {} # Count interpolation levels for reporting
+    for (sidx, tidx) in missing_list:
+        # Select level of granularity
+        for level in range(5):
+            if level == 0: # Use source m-type/target layer/synapse class value, if existent
+                src_sel = [sidx]
+                tgt_sel = np.logical_and(np.array(m_type_layer) == m_type_layer[tidx], np.array(m_type_class) == m_type_class[tidx])
+            elif level == 1: # Use source m-type/target synapse class value, if existent
+                src_sel = [sidx]
+                tgt_sel = np.array(m_type_class) == m_type_class[tidx]
+            elif level == 2: # Use per layer/synapse class value, if existent
+                src_sel = np.logical_and(np.array(m_type_layer) == m_type_layer[sidx], np.array(m_type_class) == m_type_class[sidx])
+                tgt_sel = np.logical_and(np.array(m_type_layer) == m_type_layer[tidx], np.array(m_type_class) == m_type_class[tidx])
+            elif level == 3: # Use per synapse class value, if existent
+                src_sel = np.array(m_type_class) == m_type_class[sidx]
+                tgt_sel = np.array(m_type_class) == m_type_class[tidx]
+            else: # Otherwise: Use overall value
+                src_sel = range(len(m_types))
+                tgt_sel = range(len(m_types))
+            if np.any(np.isfinite(syns_per_conn_data['mean'][src_sel, :][:, tgt_sel])):
+                level_counts[f'Level{level}'] = level_counts.get(f'Level{level}', 0) + 1
+                break
+        
+        # Interpolate missing values
+        syns_per_conn_model['mean'][sidx, tidx] = np.nanmean(syns_per_conn_data['mean'][src_sel, :][:, tgt_sel])
+        syns_per_conn_model['std'][sidx, tidx] = np.nanmean(syns_per_conn_data['std'][src_sel, :][:, tgt_sel])
+        syns_per_conn_model['min'][sidx, tidx] = np.nanmin(syns_per_conn_data['min'][src_sel, :][:, tgt_sel])
+        syns_per_conn_model['max'][sidx, tidx] = np.nanmax(syns_per_conn_data['max'][src_sel, :][:, tgt_sel])
+        conn_prop_model['mean'][sidx, tidx, :] = [np.nanmean(conn_prop_data['mean'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
+        conn_prop_model['std'][sidx, tidx, :] = [np.nanmean(conn_prop_data['std'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
+        conn_prop_model['std-within'][sidx, tidx, :] = [np.nanmean(conn_prop_data['std-within'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
+        conn_prop_model['min'][sidx, tidx, :] = [np.nanmin(conn_prop_data['min'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
+        conn_prop_model['max'][sidx, tidx, :] = [np.nanmax(conn_prop_data['max'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
     
-    # Mean delay model (linear)
-    X = np.array(dist_bins[:-1][np.isfinite(dist_delays_mean)] + bin_offset, ndmin=2).T
-    y = dist_delays_mean[np.isfinite(dist_delays_mean)]
-    dist_delays_mean_model = LinearRegression().fit(X, y)
+    print(f'INFO: Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }')
     
-    # Std delay model (const)
-    dist_delays_std_model = np.mean(dist_delays_std)
-
-    # Min delay model (const)
-    dist_delays_min_model = dist_delay_min
-
-    print(f'MODEL FIT: dist_delays_mean_model(x) = {dist_delays_mean_model.coef_[0]:.3f} * x + {dist_delays_mean_model.intercept_:.3f}')
-    print(f'           dist_delays_std_model(x)  = {dist_delays_std_model:.3f}')
-    print(f'           dist_delays_min_model(x)  = {dist_delays_min_model:.3f}')
+    # Create model dictionary (lookup-table)
+    prop_model_dict = {syn_props[p]: {m_types[s]: {m_types[t]: {k: conn_prop_model[k][s, t, p] for k in conn_prop_model.keys()} for t in range(len(m_types))} for s in range(len(m_types)) } for p in range(len(syn_props))}
+    prop_model_dict.update({'n_syn_per_conn': {m_types[s]: {m_types[t]: {k: syns_per_conn_model[k][s, t] for k in syns_per_conn_model.keys()} for t in range(len(m_types))} for s in range(len(m_types))}})
     
-    return {'model': 'dist_delays_mean_model.predict(np.array(d, ndmin=2).T) if type=="mean" else (np.full_like(d, dist_delays_std_model, dtype=np.double) if type=="std" else (np.full_like(d, dist_delays_min_model, dtype=np.double) if type=="min" else None))',
-            'model_inputs': ['d', 'type'],
-            'model_params': {'dist_delays_mean_model': dist_delays_mean_model, 'dist_delays_std_model': dist_delays_std_model, 'dist_delays_min_model': dist_delays_min_model}}
+    print(f'MODEL FIT for synapse/connection properties ({len(m_types)}x{len(m_types)} m-types):')
+    print(list(prop_model_dict.keys()))
+    
+    return {'model': 'prop_model_dict[prop_name][src_type][tgt_type][stat_type]',
+            'model_inputs': ['prop_name', 'src_type', 'tgt_type', 'stat_type'],
+            'model_params': {'prop_model_dict': prop_model_dict}}
 
 
 """ Visualize data vs. model """
-def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, dist_count, model, model_inputs, model_params, **_):
+def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, model_inputs, model_params, **_):
     
-    bin_width = np.diff(dist_bins[:2])[0]
-    
-    mean_model_str = f'f(x) = {model_params["dist_delays_mean_model"].coef_[0]:.3f} * x + {model_params["dist_delays_mean_model"].intercept_:.3f}'
-    std_model_str = f'f(x) = {model_params["dist_delays_std_model"]:.3f}'
-    min_model_str = f'f(x) = {model_params["dist_delays_min_model"]:.3f}'
     model_fct = model_building.get_model(model, model_inputs, model_params)
+    prop_names = syn_props + ['n_syn_per_conn']
     
     # Draw figure
-    plt.figure(figsize=(8, 4), dpi=300)
-    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_mean, width=0.95 * bin_width, facecolor='tab:blue', label=f'Data mean: N = {np.sum(dist_count)} synapses')
-    plt.bar(dist_bins[:-1] + 0.5 * bin_width, dist_delays_std, width=0.5 * bin_width, facecolor='tab:red', label=f'Data std: N = {np.sum(dist_count)} synapses')
-    plt.plot(dist_bins, model_fct(dist_bins, 'mean'), '--', color='tab:brown', label='Model mean: ' + mean_model_str)
-    plt.plot(dist_bins, model_fct(dist_bins, 'std'), '--', color='tab:olive', label='Model std: ' + std_model_str)
-    plt.plot(dist_bins, model_fct(dist_bins, 'min'), '--', color='tab:gray', label='Model min: ' + min_model_str)
-    plt.xlim((dist_bins[0], dist_bins[-1]))
-    plt.xlabel('Distance [um]')
-    plt.ylabel('Delay [ms]')
-    plt.title(f'Distance-dependent synaptic delays', fontweight='bold')
-    plt.legend(loc='upper left', bbox_to_anchor=(1.1, 1.0))
-    
-    # Add second axis with bin counts
-    count_color = 'tab:orange'
-    ax_count = plt.gca().twinx()
-    ax_count.set_yscale('log')
-    ax_count.step(dist_bins, np.concatenate((dist_count[:1], dist_count)), color=count_color)
-    ax_count.set_ylabel('Count', color=count_color)
-    ax_count.tick_params(axis='y', which='both', colors=count_color)
-    ax_count.spines['right'].set_color(count_color)
-    
-    plt.tight_layout()
-    
-    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
-    plt.savefig(out_fn)
+    data_sel = 'mean' # Plot mean only
+    for pidx, p in enumerate(prop_names):
+        plt.figure(figsize=(8, 3), dpi=300)
+        for didx, data in enumerate([conn_prop_data[data_sel][:, :, pidx] if pidx < conn_prop_data[data_sel].shape[2] else syns_per_conn_data[data_sel], np.array([[model_fct(p, s, t, data_sel) for t in m_types] for s in m_types])]):
+            plt.subplot(1, 2, didx + 1)
+            plt.imshow(data, interpolation='nearest', cmap='jet')
+            plt.xticks(range(len(m_types)), m_types, rotation=90, fontsize=3)
+            plt.yticks(range(len(m_types)), m_types, rotation=0, fontsize=3)
+            plt.colorbar()
+        plt.suptitle(p)
+        plt.tight_layout()
+        
+        out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model__{p}.png'))
+        print(f'INFO: Saving {out_fn}...')
+        plt.savefig(out_fn)
     
     return
-
