@@ -21,7 +21,7 @@ With the tools implemented in this repository, it is possible to apply manipulat
   Processing pipeline code, containing the specific implementation of all manipulations, model building, and visualizations
 * __/working_dir__\
   Working directory (created at runtime) to store all pre-computed results for analyses and visualizations\
-  `Note: The actual connectome manipulations are stored directly at the circuit location!`
+  > Note: The actual connectome manipulations are stored directly at the circuit location!
 
 
 ## Processing pipeline

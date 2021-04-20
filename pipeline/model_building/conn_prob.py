@@ -569,7 +569,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
     plt.xlabel('$\Delta$x')
-    plt.ylabel('Model\n$\Delta$z')
+    plt.ylabel('$\Delta$z')
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 5)
