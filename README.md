@@ -30,7 +30,7 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 * __Connectome manipulator__\
   Depending on the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA file. All manipulations are separately implemented in sub-modules and can be easily extended.\
-  Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](pipeline/connectome_manipulation/README.md)
+  Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](pipeline/connectome_manipulation/)
 
 * __Model building__\
   Depending on the config, builds a model from a given connectome and write the model to a file to be loaded and used by some manipulations requiring a model (e.g., for model-based rewiring based on given connection probabilities). All models are separately implemented in sub-modules and can be easily extended.
