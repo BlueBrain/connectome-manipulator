@@ -11,13 +11,13 @@ With the tools implemented in this repository, it is possible to apply manipulat
 
 ## Folder overview
 
-* __/bin__\
+* __[/bin](bin)__\
   Shell scripts to launch connectome manipulations independently as SLURM jobs
-* __/images__\
+* __[/images](images)__\
   Image files used in documentation pages
-* __/notebooks__\
+* __[/notebooks](notebooks)__\
   Main scripts (Jupyter notebooks) for running connectome manipulations, model building, and visualizations
-* __/pipeline__\
+* __[/pipeline](pipeline)__\
   Processing pipeline code, containing the specific implementation of all manipulations, model building, and visualizations
 * __/working_dir__\
   Working directory (created at runtime) to store all pre-computed results for analyses and visualizations\
@@ -51,17 +51,11 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are divided into k blocks targeting disjoint sets of N post-synaptic neurons (SONATA nodes), which reduces the memory consumption and facilitates parallelization on multiple computation nodes. Each block is an edge table loaded as Pandas dataframe and comprising a list of synapses together with all synapse properties, an example is shown in Figure 3. The manipulations are then applied separately to each edge table in sequence (or alternatively, in parallel), resulting in manipulated edge tables which are then written to separate .parquet files. In the end, all .parquet files are merged into one manipulated SONATA connectome file.
 
-> ~~~
-> Note 1: All synapses belonging to a certain pre-post connection are always within the same edge table.
-> ~~~
+`Note 1: All synapses belonging to a certain pre-post connection are always within the same edge table.`
 
-> ~~~
-> Note 2: The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.
-> ~~~
+`Note 2: The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.`
 
-> ~~~
-> Note 3: Synapse indices do not need to be unique across all edge tables, as synapse indices are not stored in the resulting SONATA connectome.
-> ~~~
+`Note 3: Synapse indices do not need to be unique across all edge tables, as synapse indices are not stored in the resulting SONATA connectome.`
 
 | ![Operation principle](images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
 | :-: |
