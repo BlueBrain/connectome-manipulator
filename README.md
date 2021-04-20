@@ -33,7 +33,8 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
   Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](pipeline/connectome_manipulation/)
 
 * __Model building__\
-  Depending on the config, builds a model from a given connectome and write the model to a file to be loaded and used by some manipulations requiring a model (e.g., for model-based rewiring based on given connection probabilities). All models are separately implemented in sub-modules and can be easily extended.
+  Depending on the config, builds a model from a given connectome and write the model to a file to be loaded and used by some manipulations requiring a model (e.g., for model-based rewiring based on given connection probabilities). All models are separately implemented in sub-modules and can be easily extended.\
+  Details can be found in the corresponding README file: [/pipeline/model_building/README.md](pipeline/model_building/)
 
 * __Structural comparator__\
   Performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.
@@ -51,11 +52,11 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are divided into k blocks targeting disjoint sets of N post-synaptic neurons (SONATA nodes), which reduces the memory consumption and facilitates parallelization on multiple computation nodes. Each block is an edge table loaded as Pandas dataframe and comprising a list of synapses together with all synapse properties, an example is shown in Figure 3. The manipulations are then applied separately to each edge table in sequence (or alternatively, in parallel), resulting in manipulated edge tables which are then written to separate .parquet files. In the end, all .parquet files are merged into one manipulated SONATA connectome file.
 
-`Note 1: All synapses belonging to a certain pre-post connection are always within the same edge table.`
+> Note 1: All synapses belonging to a certain pre-post connection are always within the same edge table.
 
-`Note 2: The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.`
+> Note 2: The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.
 
-`Note 3: Synapse indices do not need to be unique across all edge tables, as synapse indices are not stored in the resulting SONATA connectome.`
+> Note 3: Synapse indices do not need to be unique across all edge tables, as synapse indices are not stored in the resulting SONATA connectome.
 
 | ![Operation principle](images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
 | :-: |
