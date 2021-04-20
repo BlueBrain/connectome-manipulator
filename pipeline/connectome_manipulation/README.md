@@ -1,6 +1,6 @@
 # Manipulations overview
 
-| File | Description | Illustration |
+| File | Description | Example |
 | :-- | :-- | :-- |
 | __[/no_manipulation.py](no_manipulation.py)__ | __No manipulation__ <br> This is just a dummy manipulation function performing no manipulation at all. This function is intended as a control condition to run the manipulation pipeline without actually manipulating the connectome. |  |
 | __[/conn_removal.py](conn_removal.py)__ | __Connection removal__ <br> Removes a certain percentage of connections (i.e., all synapses belonging to a connection) between selected groups of neurons (layers, m-types, ...), optionally removing only connections within a certain range of #synapses/connection. | ![Connection removal](../../images/conn_removal.png "Connection removal") |

@@ -1,6 +1,6 @@
 # Models overview
 
-| File | Description | Illustration |
+| File | Description | Example |
 | :-- | :-- | :-- |
 | __[/conn_prob.py](conn_prob.py)__ | __Connection probability model__ <br> 1st order model [[Gal et al. 2020]](https://www.biorxiv.org/content/10.1101/656058v3 "E Gal, R Perin, H Markram, M London, I Segev. Neuron Geometry Underlies Universal Network Features in Cortical Microcircuits. bioRxiv, 2020, 656058."): Erdős-Rényi (constant) |  |
 | | 2nd order model [[Gal et al. 2020]](https://www.biorxiv.org/content/10.1101/656058v3 "E Gal, R Perin, H Markram, M London, I Segev. Neuron Geometry Underlies Universal Network Features in Cortical Microcircuits. bioRxiv, 2020, 656058."): Distance dependent model (exponential fit) | ![Distance dependent connection probability model](../../images/2nd_order_prob_model.png "Distance dependent connection probability model") |
