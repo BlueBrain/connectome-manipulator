@@ -7,11 +7,11 @@
 
 from model_building import model_building
 import os.path
+import pickle
 import progressbar
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from scipy.spatial import distance_matrix
 from scipy.sparse import csr_matrix
@@ -21,7 +21,7 @@ from scipy.optimize import curve_fit
 def extract(circuit, order, sample_size=None, **kwargs):
     
     #TODO: Add cell selection criteria (layers, mtypes, ...)
-    #      Add coordinate system mapping (flatspace)
+    #      Use linear interpolation instead of RandomForestRegressor (?)
     
     print(f'INFO: Running order-{order} data extraction...')
     
@@ -79,40 +79,65 @@ def plot(order, **kwargs):
         assert False, f'ERROR: Order-{order} data/model visualization not supported!'
 
 
-""" Computes dx/dy/dz offset matrices between pairs of neurons """
-def compute_offset_matrices(nodes, src_node_ids, tgt_node_ids):
+###################################################################################################
+# Helper functions
+###################################################################################################
+
+""" Load a position mapping model from file """
+def load_pos_mapping_model(pos_map_file):
     
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    if pos_map_file is None:
+        pos_map = None
+    else:
+        assert os.path.exists(pos_map_file), 'Position mapping model file not found!'
+        print(f'Loading position mapping model from {pos_map_file}')
+        with open(pos_map_file, 'rb') as f:
+            pos_map_dict = pickle.load(f)
+        pos_map = model_building.get_model(pos_map_dict['model'], pos_map_dict['model_inputs'], pos_map_dict['model_params'])
     
-    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
-    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
-    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
+    return pos_map
+
+
+""" Get neuron positions (optionally, using position mapping) """
+def get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file=None):
     
-    return dx_mat, dy_mat, dz_mat
+    pos_map = load_pos_mapping_model(pos_map_file)
+    
+    if pos_map is None:
+        src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
+        tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    else:
+        src_nrn_pos = pos_map(src_node_ids)
+        tgt_nrn_pos = pos_map(tgt_node_ids)
+    
+    return src_nrn_pos, tgt_nrn_pos
+
+
+""" Computes distance matrix between pairs of neurons """
+def compute_dist_matrix(src_nrn_pos, tgt_nrn_pos):
+    
+    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
+    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+    
+    return dist_mat
 
 
 """ Computes bipolar matrix between pairs of neurons (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron) """
-def compute_bip_matrix(nodes, src_node_ids, tgt_node_ids):
-    
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+def compute_bip_matrix(src_nrn_pos, tgt_nrn_pos):
     
     bip_mat = np.sign(np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0))) # Bipolar distinction based on difference in z coordinate
     
     return bip_mat
 
 
-""" Computes distance matrix between pairs of neurons """
-def compute_dist_matrix(nodes, src_node_ids, tgt_node_ids):
+""" Computes dx/dy/dz offset matrices between pairs of neurons """
+def compute_offset_matrices(src_nrn_pos, tgt_nrn_pos):
     
-    src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-    tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
+    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
+    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
+    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
     
-    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
-    
-    return dist_mat
+    return dx_mat, dy_mat, dz_mat
 
 
 """ Extract D-dimensional conn. prob. dependent on D property matrices between source-target pairs of neurons within given range of bins """
@@ -145,7 +170,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
         sidx, tidx = np.nonzero(dep_sel)
         count_all[idx] = np.sum(dep_sel)
         count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
-    p_conn = count_conn / count_all
+    p_conn = np.array(count_conn / count_all)
     p_conn[np.isnan(p_conn)] = 0.0
     
     return p_conn, count_conn, count_all
@@ -206,14 +231,17 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
-#   2nd order (distance-dependent)
+#   2nd order (distance-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
 """ Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons """
-def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
+def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+    
+    # Get neuron positions (incl. position mapping, if provided)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
     
     # Compute distance matrix
-    dist_mat = compute_dist_matrix(nodes, src_node_ids, tgt_node_ids)
+    dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
     
     # Extract distance-dependent connection probabilities
     if max_range_um is None:
@@ -244,7 +272,7 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
 
 
 """ Visualize data vs. model (2nd order) """
-def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
     
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -259,9 +287,9 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     plt.plot(dist_bins[:-1] + bin_offset, p_conn_dist, '.-', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
     plt.plot(dist_model, model_fct(dist_model), '--', label='Model: ' + model_str)
     plt.grid()
-    plt.xlabel('Distance [um]')
+    plt.xlabel('Distance [$\mu$m]')
     plt.ylabel('Conn. prob.')
-    plt.title(f'Dist-dep. conn. prob. (2nd order)')
+    plt.title(f'Data vs. model fit')
     plt.legend()
     
     # 2D connection probability (model)
@@ -281,9 +309,10 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     plt.yticks([])
     plt.xlabel('$\Delta$x')
     plt.ylabel('$\Delta$z')
-    plt.title('2D conn. prob. (2nd order model)')
+    plt.title('2D model')
     plt.colorbar(label='Conn. prob.')
     
+    plt.suptitle(f'Distance-dependent connection probability model (2nd order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
     print(f'INFO: Saving {out_fn}...')
@@ -294,17 +323,20 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
-#   3rd order (bipolar distance-dependent)
+#   3rd order (bipolar distance-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
 """ Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons """
-def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
+def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+    
+    # Get neuron positions (incl. position mapping, if provided)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
     
     # Compute distance matrix
-    dist_mat = get_dist_matrix(nodes, src_node_ids, tgt_node_ids)
+    dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
     
     # Compute bipolar matrix (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
-    bip_mat = compute_bip_matrix(nodes, src_node_ids, tgt_node_ids)
+    bip_mat = compute_bip_matrix(src_nrn_pos, tgt_nrn_pos)
     
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
@@ -341,7 +373,7 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, bip_bins, **_):
 
 
 """ Visualize data vs. model (3rd order) """
-def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
     
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -360,9 +392,9 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
     plt.plot(-dist_model, model_fct(dist_model, np.sign(-dist_model)), '--', label='Model: ' + model_strN)
     plt.plot(dist_model, model_fct(dist_model, np.sign(dist_model)), '--', label='Model: ' + model_strP)
     plt.grid()
-    plt.xlabel('sign($\Delta$z) * Distance [um]')
+    plt.xlabel('sign($\Delta$z) * Distance [$\mu$m]')
     plt.ylabel('Conn. prob.')
-    plt.title(f'Bipolar dist-dep. conn. prob. (3rd order)')
+    plt.title(f'Data vs. model fit')
     plt.legend(loc='upper left')
     
     # 2D connection probability (model)
@@ -383,9 +415,10 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
     plt.yticks([])
     plt.xlabel('$\Delta$x')
     plt.ylabel('$\Delta$z')
-    plt.title('2D conn. prob. (3rd order model)')
+    plt.title('2D model')
     plt.colorbar(label='Conn. prob.')
     
+    plt.suptitle(f'Bipolar distance-dependent connection probability model (3rd order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
     print(f'INFO: Saving {out_fn}...')
@@ -396,14 +429,17 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
-#   4th order (offset-dependent)
+#   4th order (offset-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
 """ Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons """
-def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, **_):
+def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+    
+    # Get neuron positions (incl. position mapping, if provided)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
     
     # Compute dx/dy/dz offset matrices
-    dx_mat, dy_mat, dz_mat = compute_offset_matrices(nodes, src_node_ids, tgt_node_ids)
+    dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
     
     # Extract offset-dependent connection probabilities
     if max_range_um is None:
@@ -470,7 +506,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, n_estimators=500, 
 
 
 """ Visualize data vs. model (4th order) """
-def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
     
     model_fct = model_building.get_model(model, model_inputs, model_params)
     
@@ -504,9 +540,9 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
     ax.set_zlim((dz_bins[0], dz_bins[-1]))
-    ax.set_xlabel('$\Delta$x [um]')
-    ax.set_ylabel('$\Delta$y [um]')
-    ax.set_zlabel('$\Delta$z [um]')
+    ax.set_xlabel('$\Delta$x [$\mu$m]')
+    ax.set_ylabel('$\Delta$y [$\mu$m]')
+    ax.set_zlabel('$\Delta$z [$\mu$m]')
     plt.colorbar(p_color_map, label='Conn. prob.')
     plt.title(f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
     
@@ -519,13 +555,13 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
     ax.set_zlim((dz_bins[0], dz_bins[-1]))
-    ax.set_xlabel('$\Delta$x [um]')
-    ax.set_ylabel('$\Delta$y [um]')
-    ax.set_zlabel('$\Delta$z [um]')
+    ax.set_xlabel('$\Delta$x [$\mu$m]')
+    ax.set_ylabel('$\Delta$y [$\mu$m]')
+    ax.set_zlabel('$\Delta$z [$\mu$m]')
     plt.colorbar(p_color_map, label='Conn. prob.')
     plt.title(f'Model: {str(model_params["offset_regr_model"]).split("(")[0]}')
     
-    plt.suptitle('Offset-dependent connection probability')
+    plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_3d.png'))
     print(f'INFO: Saving {out_fn}...')
@@ -539,8 +575,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$x')
-    plt.ylabel('$\Delta$z')
+    plt.xlabel('$\Delta$x [$\mu$m]')
+    plt.ylabel('$\Delta$z [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 2)
@@ -548,8 +584,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$y')
-    plt.ylabel('$\Delta$z')
+    plt.xlabel('$\Delta$y [$\mu$m]')
+    plt.ylabel('$\Delta$z [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
     plt.title('Data')
 
@@ -558,8 +594,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$x')
-    plt.ylabel('$\Delta$y')
+    plt.xlabel('$\Delta$x [$\mu$m]')
+    plt.ylabel('$\Delta$y [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
 
     # (Model)
@@ -568,8 +604,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$x')
-    plt.ylabel('$\Delta$z')
+    plt.xlabel('$\Delta$x [$\mu$m]')
+    plt.ylabel('$\Delta$z [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 5)
@@ -577,8 +613,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$y')
-    plt.ylabel('$\Delta$z')
+    plt.xlabel('$\Delta$y [$\mu$m]')
+    plt.ylabel('$\Delta$z [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
     plt.title('Model')
 
@@ -587,11 +623,11 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel('$\Delta$x')
-    plt.ylabel('$\Delta$y')
+    plt.xlabel('$\Delta$x [$\mu$m]')
+    plt.ylabel('$\Delta$y [$\mu$m]')
     plt.colorbar(label='Max. conn. prob.')
 
-    plt.suptitle('Offset-dependent connection probability')
+    plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_2d.png'))
     print(f'INFO: Saving {out_fn}...')
