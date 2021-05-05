@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 from sklearn.ensemble import RandomForestRegressor
+import scipy.interpolate
 from scipy.spatial import distance_matrix
 from scipy.sparse import csr_matrix
 from scipy.optimize import curve_fit
@@ -21,7 +22,6 @@ from scipy.optimize import curve_fit
 def extract(circuit, order, sample_size=None, **kwargs):
     
     #TODO: Add cell selection criteria (layers, mtypes, ...)
-    #      Use linear interpolation instead of RandomForestRegressor (?)
     
     print(f'INFO: Running order-{order} data extraction...')
     
@@ -429,7 +429,10 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
-#   4th order (offset-dependent) => Position mapping model (flatmap) supported
+#   4th order (offset-dependent)
+#     => Position mapping model (flatmap) supported
+#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
 """ Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons """
@@ -484,29 +487,50 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
 
 
 """ Build 4th order model (random forest regression model for offset-dependent conn. prob.) """
-def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, n_estimators=500, max_depth=None, **_):
+def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs={'name': 'LinearInterpolation'}, **_):
     
     x_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
     y_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
     z_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
     
-    xv, yv, zv = np.meshgrid(dx_bins[:-1] + x_bin_offset, dy_bins[:-1] + y_bin_offset, dz_bins[:-1] + z_bin_offset, indexing='ij')
-    data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten()]).T
-    data_val = p_conn_offset.flatten()
+    dx_pos = dx_bins[:-1] + x_bin_offset # Positions at bin centers
+    dy_pos = dy_bins[:-1] + y_bin_offset # Positions at bin centers
+    dz_pos = dz_bins[:-1] + z_bin_offset # Positions at bin centers
     
-    offset_regr_model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=0)
-    offset_regr_model.fit(data_pos, data_val)
+    model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all model types!
+    if model_specs.get('name') == 'LinearInterpolation':
+        
+        # Linear interpolation model
+        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+        
+        model_dict = {'model': 'interp_fct((dx_pos, dy_pos, dz_pos), p_conn_offset, np.array([np.array(dx), np.array(dy), np.array(dz)]).T, method="linear", bounds_error=False, fill_value=None)',
+                      'model_inputs': model_inputs,
+                      'model_params': {'interp_fct': scipy.interpolate.interpn, 'dx_pos': dx_pos, 'dy_pos': dy_pos, 'dz_pos': dz_pos, 'p_conn_offset': p_conn_offset}}
+        
+    elif model_specs.get('name') == 'RandomForestRegressor':
+        
+        # Random Forest Regressor model
+        xv, yv, zv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
+        data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten()]).T
+        data_val = p_conn_offset.flatten()
+        
+        offset_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
+        offset_regr_model.fit(data_pos, data_val)
+        
+        model_dict = {'model': 'offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T)',
+                      'model_inputs': model_inputs,
+                      'model_params': {'offset_regr_model': offset_regr_model}}
+        
+    else:
+        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
     
-    print(f'OFFSET MODEL FIT: f(dx, dy, dz) ~ {str(offset_regr_model)}')
-    print(offset_regr_model.get_params())
+    print(f'OFFSET MODEL: f(dx, dy, dz) ~ {model_specs.get("name")} {model_specs.get("kwargs", {})}')
     
-    return {'model': 'offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T)',
-            'model_inputs': ['dx', 'dy', 'dz'],
-            'model_params': {'offset_regr_model': offset_regr_model}}
+    return model_dict
 
 
 """ Visualize data vs. model (4th order) """
-def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):
     
     model_fct = model_building.get_model(model, model_inputs, model_params)
     
@@ -514,7 +538,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     y_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
     z_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
     
-    model_ovsampl = 2 # Model oversampling factor (per dimension)
+    model_ovsampl = 4 # Model oversampling factor (per dimension)
     dx_pos_model = np.linspace(dx_bins[0], dx_bins[-1], len(dx_bins) * model_ovsampl)
     dy_pos_model = np.linspace(dy_bins[0], dy_bins[-1], len(dy_bins) * model_ovsampl)
     dz_pos_model = np.linspace(dz_bins[0], dz_bins[-1], len(dz_bins) * model_ovsampl)
@@ -559,7 +583,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax.set_ylabel('$\Delta$y [$\mu$m]')
     ax.set_zlabel('$\Delta$z [$\mu$m]')
     plt.colorbar(p_color_map, label='Conn. prob.')
-    plt.title(f'Model: {str(model_params["offset_regr_model"]).split("(")[0]}')
+    plt.title(f'Model: {model_specs.get("name")}')
     
     plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
@@ -571,7 +595,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.figure(figsize=(12, 6), dpi=300)
     # (Data)
     plt.subplot(2, 3, 1)
-    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -580,7 +604,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 2)
-    plt.imshow(np.max(p_conn_offset, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(p_conn_offset, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -590,7 +614,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.title('Data')
 
     plt.subplot(2, 3, 3)
-    plt.imshow(np.max(p_conn_offset, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(p_conn_offset, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -600,7 +624,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 
     # (Model)
     plt.subplot(2, 3, 4)
-    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -609,7 +633,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 5)
-    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='bilinear', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -619,7 +643,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.title('Model')
 
     plt.subplot(2, 3, 6)
-    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='bilinear', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=plt.cm.hot, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
