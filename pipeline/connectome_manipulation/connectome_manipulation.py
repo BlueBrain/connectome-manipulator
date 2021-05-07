@@ -4,6 +4,14 @@
 #   - applying manipulations to the connectome
 #   - writing back the manipulated connectome and a new circuit config
 
+#TODO: ***Generalization to arbitrary edges populations (e.g., projections)***
+#      -Update SNAP
+#      -Assume exactly one edges population in given edges file, and select its population name (not using 'default' by default)
+#      -Use source/target nodes population names from selected edges population => USE FROM edges.source.name/edges.target.name
+#      -Determine the two filenames corresponding to edges' source/target nodes population names
+#      -Update entire code to support 2 separate nodes populations
+#      -Update parquet-to-sonata conversion to use proper population files & names
+
 from bluepysnap.circuit import Circuit
 from bluepysnap.sonata_constants import Node
 from bluepysnap.sonata_constants import Edge
@@ -19,13 +27,13 @@ import logging
 from datetime import datetime
 
 """ Load SONATA circuit using SNAP """
-def load_circuit(circuit_config, N_split=1):
+def load_circuit(sonata_config, N_split=1):
     
     # Load circuit
-    logging.info(f'Loading circuit from {circuit_config} (N_split={N_split})')
+    logging.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
         
-    c = Circuit(circuit_config)
-    nodes = c.nodes['All']
+    c = Circuit(sonata_config)
+    nodes = c.nodes['All'] 
     edges = c.edges['default']
     
     nodes_file = c.config['networks']['nodes'][0]['nodes_file']
@@ -184,9 +192,8 @@ def main(manip_config, do_profiling=False):
     resource_profiling(do_profiling, 'initial', reset=True)
 
     # Load circuit
-    circuit_name = os.path.split(manip_config['circuit_path'])[-1]
-    circuit_config =  os.path.join(manip_config['circuit_path'], 'CircuitConfig') # [Using default name]
-    sonata_config =  os.path.join(manip_config['circuit_path'], 'sonata', 'circuit_config.json') # [Using default name]
+    logging.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'ERROR: SONATA (.json) config required!')
+    sonata_config =  os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
     N_split = max(manip_config.get('N_split_nodes', 1), 1)
     
     nodes, nodes_file, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
@@ -244,20 +251,23 @@ def main(manip_config, do_profiling=False):
     logging.info(f'Creating file {json_file}')
     
     # Create new symlink (using rel. path) and circuit config
-    with open(circuit_config, 'r') as file: # Read CircuitConfig
-        config = file.read()
-    nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0, config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file    
+    if not manip_config.get('blue_config_to_update') is None:
+        blue_config =  os.path.join(manip_config['circuit_path'], manip_config['blue_config_to_update'])
+        logging.log_assert(os.path.exists(blue_config), f'ERROR: Blue config "{manip_config["blue_config_to_update"]}" does not exist!')
+        with open(blue_config, 'r') as file: # Read blue config
+            config = file.read()
+        nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0, config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file    
 
-    symlink_src = os.path.relpath(edges_file_manip, os.path.split(nrn_path)[0])
-    symlink_dst = os.path.join(os.path.split(nrn_path)[0], os.path.splitext(edge_fn_manip)[0] + '.sonata')
-    if os.path.isfile(symlink_dst):
-        os.remove(symlink_dst) # Remove if already exists
-    os.symlink(symlink_src, symlink_dst)
-    logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
-    
-    circuit_config_manip = os.path.splitext(circuit_config)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(circuit_config)[1]
-    config_replacement = {nrn_path: symlink_dst}
-    create_new_file_from_template(circuit_config_manip, circuit_config, config_replacement)
+        symlink_src = os.path.relpath(edges_file_manip, os.path.split(nrn_path)[0])
+        symlink_dst = os.path.join(os.path.split(nrn_path)[0], os.path.splitext(edge_fn_manip)[0] + '.sonata')
+        if os.path.isfile(symlink_dst):
+            os.remove(symlink_dst) # Remove if already exists
+        os.symlink(symlink_src, symlink_dst)
+        logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+
+        blue_config_manip = os.path.splitext(blue_config)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(blue_config)[1]
+        config_replacement = {nrn_path: symlink_dst}
+        create_new_file_from_template(blue_config_manip, blue_config, config_replacement)
     
     resource_profiling(do_profiling, 'final')
     
