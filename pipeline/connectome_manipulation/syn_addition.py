@@ -27,8 +27,8 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
     #         [NYI] load ... Load from external connectome, e.g. structural connectome
     
     # Determine number of synapses to be added
-    gids_src = nodes.ids(sel_src)
-    gids_dest = nodes.ids(sel_dest)
+    gids_src = nodes[0].ids(sel_src)
+    gids_dest = nodes[1].ids(sel_dest)
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest))
     num_syn = np.sum(syn_sel_idx)
     

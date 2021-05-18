@@ -20,17 +20,17 @@ def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0)
     if pair_gids is None:
         logging.info('Sampling pairs of neurons for axon rewiring...')
         
-        gids1 = nodes.ids(sel_grp1)
-        gids2 = nodes.ids(sel_grp2)
+        gids1 = nodes[0].ids(sel_grp1)
+        gids2 = nodes[0].ids(sel_grp2)
         logging.log_assert(len(np.intersect1d(gids1, gids2)) == 0, 'Overlapping groups of neurons not supported!')
         
-        sclass1 = nodes.get(gids1, properties='synapse_class').unique()
-        sclass2 = nodes.get(gids2, properties='synapse_class').unique()
+        sclass1 = nodes[0].get(gids1, properties='synapse_class').unique()
+        sclass2 = nodes[0].get(gids2, properties='synapse_class').unique()
         logging.log_assert((len(sclass1) == len(sclass2) == 1) and (sclass1[0] == sclass2[0]), 'Synapse class mismatch!')
         
         # Compute distance matrix
-        nrn_pos1 = nodes.positions(gids1)
-        nrn_pos2 = nodes.positions(gids2)
+        nrn_pos1 = nodes[0].positions(gids1)
+        nrn_pos2 = nodes[0].positions(gids2)
         dist_mat = distance_matrix(nrn_pos1.to_numpy(), nrn_pos2.to_numpy())
         
         logging.info(f'Upper limit of possible pairs: {np.min(dist_mat.shape)} (|grp1|={len(gids1)}, |grp2|={len(gids2)})')

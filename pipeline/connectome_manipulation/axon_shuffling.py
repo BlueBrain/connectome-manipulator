@@ -20,13 +20,13 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
     if pair_gids is None:
         logging.info('INFO: Sampling pairs of neurons for axon shuffling...')
         
-        gids = nodes.ids(sel_grp)
+        gids = nodes[0].ids(sel_grp)
         
-        sclass = nodes.get(gids, properties='synapse_class').unique()
+        sclass = nodes[0].get(gids, properties='synapse_class').unique()
         logging.log_assert(len(sclass) == 1, 'Multiple synapse classes found!')
         
         # Compute distance matrix
-        nrn_pos = nodes.positions(gids).to_numpy()
+        nrn_pos = nodes[0].positions(gids).to_numpy()
         dist_mat = distance_matrix(nrn_pos, nrn_pos)
         
         logging.info(f'Upper limit of possible pairs: {np.floor(dist_mat.shape[0] / 2).astype(int)} (|grp|={len(gids)})')

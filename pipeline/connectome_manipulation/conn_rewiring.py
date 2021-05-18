@@ -48,11 +48,11 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         logging.info(f'No delay model provided')
     
     # Determine source/target nodes for rewiring
-    src_class = nodes.get(sel_src, properties='synapse_class')
+    src_class = nodes[0].get(sel_src, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
     logging.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
     
-    tgt_node_ids = nodes.ids(sel_dest)
+    tgt_node_ids = nodes[1].ids(sel_dest)
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
@@ -123,7 +123,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         # Assign new distance-dependent delay, drawn from truncated normal distribution (optional)
         if not d_model is None:
             # Determine distance from source neuron (soma) to synapse on target neuron
-            src_new_pos = nodes.positions(src_new).to_numpy()
+            src_new_pos = nodes[0].positions(src_new).to_numpy()
             syn_pos = edges_table.loc[syn_sel_idx, ['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
             syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_syn_idx, :])**2, 1))
             

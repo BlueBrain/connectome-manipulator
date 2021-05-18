@@ -4,14 +4,6 @@
 #   - applying manipulations to the connectome
 #   - writing back the manipulated connectome and a new circuit config
 
-#TODO: ***Generalization to arbitrary edges populations (e.g., projections)***
-#      -Update SNAP
-#      -Assume exactly one edges population in given edges file, and select its population name (not using 'default' by default)
-#      -Use source/target nodes population names from selected edges population => USE FROM edges.source.name/edges.target.name
-#      -Determine the two filenames corresponding to edges' source/target nodes population names
-#      -Update entire code to support 2 separate nodes populations
-#      -Update parquet-to-sonata conversion to use proper population files & names
-
 from bluepysnap.circuit import Circuit
 from bluepysnap.sonata_constants import Node
 from bluepysnap.sonata_constants import Edge
@@ -31,18 +23,34 @@ def load_circuit(sonata_config, N_split=1):
     
     # Load circuit
     logging.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
-        
     c = Circuit(sonata_config)
-    nodes = c.nodes['All'] 
-    edges = c.edges['default']
     
-    nodes_file = c.config['networks']['nodes'][0]['nodes_file']
+    # Select edge population [assuming exactly one edge population in given edges file (to be manipulated)]
+    logging.log_assert(len(c.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported to be manipulated!')
+    edges = c.edges[c.edges.population_names[0]]
     edges_file = c.config['networks']['edges'][0]['edges_file']
     
-    node_ids = nodes.ids()
-    node_ids_split = np.split(node_ids, np.cumsum([np.ceil(len(node_ids) / N_split).astype(int)] * (N_split - 1)))
+    # Select corresponding source/target nodes populations
+    src_nodes = edges.source
+    tgt_nodes = edges.target
+    nodes = [src_nodes, tgt_nodes]
     
-    return nodes, nodes_file, node_ids_split, edges, edges_file 
+    src_file_idx = np.where(np.array(c.nodes.population_names) == src_nodes.name)[0]
+    logging.log_assert(len(src_file_idx) == 1, 'ERROR: Source nodes population file index error!')
+    tgt_file_idx = np.where(np.array(c.nodes.population_names) == tgt_nodes.name)[0]
+    logging.log_assert(len(tgt_file_idx) == 1, 'ERROR: Target nodes population file index error!')
+    
+    src_nodes_file = c.config['networks']['nodes'][src_file_idx[0]]['nodes_file']
+    tgt_nodes_file = c.config['networks']['nodes'][tgt_file_idx[0]]['nodes_file']
+    nodes_files = [src_nodes_file, tgt_nodes_file]
+    
+    logging.info(f'Using edges population "{edges.name}" between nodes "{src_nodes.name}" and "{tgt_nodes.name}"')
+    
+    # Define target node splits
+    tgt_node_ids = tgt_nodes.ids()
+    node_ids_split = np.split(tgt_node_ids, np.cumsum([np.ceil(len(tgt_node_ids) / N_split).astype(int)] * (N_split - 1)))
+    
+    return nodes, nodes_files, node_ids_split, edges, edges_file 
 
 
 """ Apply manipulation to connectome (edges_table) as specified in the manip_config """
@@ -72,13 +80,13 @@ def edges_to_parquet(edges_table, output_file):
 
 
 """ Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!) """
-def parquet_to_sonata(input_file_list, output_file, nodes_file):
+def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
     
     logging.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
     input_files = ' '.join(input_file_list)
     
     proc = subprocess.Popen(f'module load unstable parquet-converters;\
-                              parquet2hdf5 --format SONATA --from {nodes_file} All --to {nodes_file} All -o {output_file} {input_files}',
+                              parquet2hdf5 --format SONATA --from {nodes_files[0]} {nodes[0].name} --to {nodes_files[1]} {nodes[1].name} -o {output_file} {input_files}',
                               shell=True, stdout=subprocess.PIPE)
     logging.info(proc.communicate()[0].decode())
 
@@ -182,7 +190,7 @@ def logging_init(circuit_path):
     setattr(logging, 'log_assert', log_assert)
 
 
-""" Main entry point for circuit manipulations [OPTIMIZATION FOR HUGE CONNECTOMES: SPLIT INTO N PARTS (OPTIONAL)] """
+""" Main entry point for circuit manipulations [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically into N disjoint parts of target neurons (OPTIONAL)] """
 def main(manip_config, do_profiling=False):
 
     # Initialize logger
@@ -196,7 +204,7 @@ def main(manip_config, do_profiling=False):
     sonata_config =  os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
     N_split = max(manip_config.get('N_split_nodes', 1), 1)
     
-    nodes, nodes_file, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
+    nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
     
     # Prepare output parquet path
     parquet_path = os.path.join(os.path.split(edges_file)[0], 'parquet')
@@ -235,7 +243,7 @@ def main(manip_config, do_profiling=False):
     
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.splitext(edges_file)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1]
-    parquet_to_sonata(parquet_file_list, edges_file_manip, nodes_file)
+    parquet_to_sonata(parquet_file_list, edges_file_manip, nodes, nodes_files)
     
     # Create new sonata config
     edge_fn = os.path.split(edges_file)[1]
