@@ -98,19 +98,12 @@ def load_pos_mapping_model(pos_map_file):
     return pos_map
 
 
-""" Get neuron positions (optionally, using position mapping) """
-def get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file=None):
+""" Get neuron positions (using position access/mapping function) [NOTE: node_ids_list should be list of node_ids lists!] """
+def get_neuron_positions(pos_fct, node_ids_list):
     
-    pos_map = load_pos_mapping_model(pos_map_file)
+    nrn_pos = [np.array(pos_fct(node_ids)) for node_ids in node_ids_list]
     
-    if pos_map is None:
-        src_nrn_pos = nodes.positions(src_node_ids).to_numpy()
-        tgt_nrn_pos = nodes.positions(tgt_node_ids).to_numpy()
-    else:
-        src_nrn_pos = pos_map(src_node_ids)
-        tgt_nrn_pos = pos_map(tgt_node_ids)
-    
-    return src_nrn_pos, tgt_nrn_pos
+    return nrn_pos
 
 
 """ Computes distance matrix between pairs of neurons """
@@ -238,7 +231,8 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model
 def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
     
     # Get neuron positions (incl. position mapping, if provided)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
+    pos_map = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute distance matrix
     dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
@@ -330,7 +324,8 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
 def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
     
     # Get neuron positions (incl. position mapping, if provided)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
+    pos_map = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute distance matrix
     dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
@@ -439,7 +434,8 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, bip_bins, src_cell_count
 def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
     
     # Get neuron positions (incl. position mapping, if provided)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes, src_node_ids, tgt_node_ids, pos_map_file)
+    pos_map = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute dx/dy/dz offset matrices
     dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)

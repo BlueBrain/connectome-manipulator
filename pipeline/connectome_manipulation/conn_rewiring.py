@@ -15,7 +15,7 @@ import pickle
 from scipy.stats import truncnorm
 
 """ Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses and optionally, number of ingoing connections) """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, keep_indegree=True, amount_pct=100.0):
+def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, pos_map_file=None, keep_indegree=True, amount_pct=100.0):
     
     logging.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
@@ -47,6 +47,17 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         d_model = None
         logging.info(f'No delay model provided')
     
+    # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
+    if not pos_map_file is None:
+        logging.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
+        logging.info(f'Loading position map from {pos_map_file}')
+        with open(pos_map_file, 'rb') as f:
+            pos_map_dict = pickle.load(f)
+        pos_map = model_building.get_model(pos_map_dict['model'], pos_map_dict['model_inputs'], pos_map_dict['model_params'])
+    else:
+        pos_map = None
+        logging.info(f'No position mapping model provided')
+    
     # Determine source/target nodes for rewiring
     src_class = nodes[0].get(sel_src, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
@@ -61,6 +72,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     
     # Run connection rewiring
     warning_syn_count_diff = [] # Keep track of synapse count mismatch to provide a warning
+    src_pos = None
     for tgt in tgt_node_ids:
         syn_sel_idx = edges_table['@target_node'] == tgt
         
@@ -81,7 +93,10 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         if model_order == 1: # Constant conn. prob. (no inputs)
             p_src = np.full(len(src_node_ids), p_model())
         elif model_order == 2: # Distance-dependent conn. prob. (1 input: distance)
-            d = conn_prob.compute_dist_matrix(nodes, src_node_ids, [tgt])
+            if src_pos is None: # Load source positions only once, as they remain unchanged
+                src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
+            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
+            d = conn_prob.compute_dist_matrix(src_pos, tgt_pos)
             p_src = p_model(d).flatten()
             p_src[np.isnan(p_src)] = 0.0
         else:

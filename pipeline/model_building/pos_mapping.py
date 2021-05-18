@@ -15,11 +15,11 @@ from voxcell.nexus.voxelbrain import Atlas
 from scipy.interpolate import griddata
 from scipy.spatial import distance_matrix
 
-""" Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) """
-def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, **_):
+""" Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) of a given nodes population """
+def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name='All', **_):
     
     # Get neuron positions
-    nodes = circuit.nodes['All']
+    nodes = circuit.nodes[nodes_pop_name]
     nrn_pos = nodes.positions()
     nrn_ids = nrn_pos.index.to_numpy()
     nrn_pos = nrn_pos.to_numpy()
