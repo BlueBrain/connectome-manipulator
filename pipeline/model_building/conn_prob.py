@@ -363,7 +363,7 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, bip_bins, **_):
     print(f'                              AVERAGE OF BOTH MODELS  if dz == 0')
     
     return {'model': 'np.select([np.array(dz) < 0, np.array(dz) > 0, np.array(dz) == 0], [aN_opt * np.exp(-bN_opt * np.array(d)), aP_opt * np.exp(-bP_opt * np.array(d)), 0.5 * (aN_opt * np.exp(-bN_opt * np.array(d)) + aP_opt * np.exp(-bP_opt * np.array(d)))])',
-            'model_inputs': ['d, dz'],
+            'model_inputs': ['d', 'dz'],
             'model_params': {'aN_opt': aN_opt, 'bN_opt': bN_opt, 'aP_opt': aP_opt, 'bP_opt': bP_opt}}
 
 
@@ -482,7 +482,7 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_offset': p_conn_offset, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'dist_offset_count_conn': dist_offset_count_conn, 'dist_offset_count_all': dist_offset_count_all, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-""" Build 4th order model (random forest regression model for offset-dependent conn. prob.) """
+""" Build 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.) """
 def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs={'name': 'LinearInterpolation'}, **_):
     
     x_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
@@ -493,7 +493,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs={'name
     dy_pos = dy_bins[:-1] + y_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + z_bin_offset # Positions at bin centers
     
-    model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all model types!
+    model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation':
         
         # Linear interpolation model
