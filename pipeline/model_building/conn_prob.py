@@ -18,29 +18,38 @@ from scipy.spatial import distance_matrix
 from scipy.sparse import csr_matrix
 from scipy.optimize import curve_fit
 
-""" Extract connection probability from a sample of pairs of neurons """
-def extract(circuit, order, sample_size=None, **kwargs):
+""" Extract connection probability between samples of neurons """
+def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwargs):
     
-    #TODO: Add cell selection criteria (layers, mtypes, ...)
+    print(f'INFO: Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)...')
     
-    print(f'INFO: Running order-{order} data extraction...')
+    # Select edge population [assuming exactly one edge population in given edges file]
+    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
+    edges = circuit.edges[circuit.edges.population_names[0]]
     
-    nodes = circuit.nodes['All']
-    node_ids = nodes.ids()
-    if sample_size is None or sample_size <= 0 or sample_size >= len(node_ids):
-        sample_size = len(node_ids)
-    node_ids_sel = node_ids[np.random.permutation([True] * sample_size + [False] * (len(node_ids) - sample_size))]
+    # Select corresponding source/target nodes populations
+    src_nodes = edges.source
+    tgt_nodes = edges.target
+    nodes = [src_nodes, tgt_nodes]
     
-    edges = circuit.edges['default']
+    node_ids_src = src_nodes.ids(sel_src)
+    node_ids_dest = tgt_nodes.ids(sel_dest)
+    
+    if sample_size is None or sample_size <= 0:
+        sample_size = np.inf # Select all nodes
+    sample_size_src = min(sample_size, len(node_ids_src))
+    sample_size_dest = min(sample_size, len(node_ids_dest))
+    node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
+    node_ids_dest_sel = node_ids_dest[np.random.permutation([True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest))]
     
     if order == 1:
-        return extract_1st_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
+        return extract_1st_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     elif order == 2:
-        return extract_2nd_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
+        return extract_2nd_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     elif order == 3:
-        return extract_3rd_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
+        return extract_3rd_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     elif order == 4:
-        return extract_4th_order(nodes, edges, node_ids_sel, node_ids_sel, **kwargs)
+        return extract_4th_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     else:
         assert False, f'ERROR: Order-{order} data extraction not supported!'
 
@@ -101,7 +110,12 @@ def load_pos_mapping_model(pos_map_file):
 """ Get neuron positions (using position access/mapping function) [NOTE: node_ids_list should be list of node_ids lists!] """
 def get_neuron_positions(pos_fct, node_ids_list):
     
-    nrn_pos = [np.array(pos_fct(node_ids)) for node_ids in node_ids_list]
+    if not isinstance(pos_fct, list):
+        pos_fct = [pos_fct for i in node_ids_list]
+    else:
+        assert len(pos_fct) == len(node_ids_list), 'ERROR: "pos_fct" must be scalar or a list with same length as "node_ids_list"!'
+    
+    nrn_pos = [np.array(pos_fct[i](node_ids_list[i])) for i in range(len(node_ids_list))]
     
     return nrn_pos
 
@@ -232,7 +246,7 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     
     # Get neuron positions (incl. position mapping, if provided)
     pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute distance matrix
     dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
@@ -325,7 +339,7 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     
     # Get neuron positions (incl. position mapping, if provided)
     pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute distance matrix
     dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
@@ -435,7 +449,7 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     
     # Get neuron positions (incl. position mapping, if provided)
     pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(nodes.positions if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute dx/dy/dz offset matrices
     dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)

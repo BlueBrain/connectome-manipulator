@@ -16,9 +16,13 @@ from scipy.interpolate import griddata
 from scipy.spatial import distance_matrix
 
 """ Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) of a given nodes population """
-def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name='All', **_):
+def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name=None, **_):
     
     # Get neuron positions
+    if nodes_pop_name is None:
+        assert len(circuit.nodes.population_names) == 1, f'ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!'
+        nodes_pop_name = circuit.nodes.population_names[0]
+        print(f'INFO: Loading nodes population "{nodes_pop_name}"')
     nodes = circuit.nodes[nodes_pop_name]
     nrn_pos = nodes.positions()
     nrn_ids = nrn_pos.index.to_numpy()

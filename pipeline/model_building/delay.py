@@ -12,22 +12,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-""" Extract distance-dependent synaptic delays from a sample of pairs of neurons """
-def extract(circuit, bin_size_um, max_range_um=None, sample_size=None, **_):
+""" Extract distance-dependent synaptic delays between samples of neurons """
+def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None, sample_size=None, **_):
+    
+    # Select edge population [assuming exactly one edge population in given edges file]
+    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
+    edges = circuit.edges[circuit.edges.population_names[0]]
+    
+    # Select corresponding source/target nodes populations
+    src_nodes = edges.source
+    tgt_nodes = edges.target
+    
+    node_ids_src = src_nodes.ids(sel_src)
+    node_ids_dest = tgt_nodes.ids(sel_dest)
+    
+    if sample_size is None or sample_size <= 0:
+        sample_size = np.inf # Select all nodes
+    sample_size_src = min(sample_size, len(node_ids_src))
+    sample_size_dest = min(sample_size, len(node_ids_dest))
+    node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
+    node_ids_dest_sel = node_ids_dest[np.random.permutation([True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest))]
     
     # Extract distance/delay values
-    nodes = circuit.nodes['All']
-    node_ids = nodes.ids()
-    if sample_size is None or sample_size <= 0 or sample_size >= len(node_ids):
-        sample_size = len(node_ids)
-    node_ids_sel = node_ids[np.random.permutation([True] * sample_size + [False] * (len(node_ids) - sample_size))]
+    edges_table = edges.pathway_edges(source=node_ids_src_sel, target=node_ids_dest_sel, properties=['@source_node', 'delay', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z'])
     
-    edges = circuit.edges['default']
-    edges_table = edges.pathway_edges(source=node_ids_sel, target=node_ids_sel, properties=['@source_node', 'delay', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z'])
+    print(f'INFO: Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)')
     
-    print(f'INFO: Extracting delays from {edges_table.shape[0]} synapses between {sample_size} neurons')
-    
-    src_pos = nodes.positions(edges_table['@source_node'].to_numpy()).to_numpy() # Soma position of pre-synaptic neuron
+    src_pos = src_nodes.positions(edges_table['@source_node'].to_numpy()).to_numpy() # Soma position of pre-synaptic neuron
     tgt_pos = edges_table[['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
     src_tgt_dist = np.sqrt(np.sum((tgt_pos - src_pos)**2, 1))
     src_tgt_delay = edges_table['delay'].to_numpy()
