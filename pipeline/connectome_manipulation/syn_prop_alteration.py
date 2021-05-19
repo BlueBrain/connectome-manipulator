@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 """ Modify property values of a selected set of synapses, either by relative scaling or a new absolute value """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_prop, new_value, syn_filter={}, amount_pct=100.0):
+def apply(edges_table, nodes, aux_dict, syn_prop, new_value, sel_src=None, sel_dest=None, syn_filter={}, amount_pct=100.0):
     
     # Input checks
     available_properties = np.setdiff1d(edges_table.columns, ['@source_node', '@target_node']).tolist() # Source/target nodes excluded
@@ -36,7 +36,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_prop, new_value, 
     num_syn = np.sum(syn_sel_idx)
     num_alter = np.round(amount_pct * num_syn / 100).astype(int)
     
-    logging.info(f'Altering "{syn_prop}" in {num_alter} ({amount_pct}%) of {num_syn} selected synapses from {sel_src} to {sel_dest} neurons based on "{new_value["mode"]}" mode')
+    logging.info(f'Altering "{syn_prop}" in {num_alter} ({amount_pct}%) of {num_syn} selected synapses based on "{new_value["mode"]}" mode (sel_src={sel_src}, sel_dest={sel_dest})')
     
     if num_alter < num_syn:
         sel_alter = np.random.permutation([True] * num_alter + [False] * (num_syn - num_alter))

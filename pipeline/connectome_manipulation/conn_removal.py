@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 """ Remove percentage of randomly selected connections (i.e., all synapses per connection) according to certain cell and syn/conn selection criteria """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, min_syn_per_conn=None, max_syn_per_conn=None):
+def apply(edges_table, nodes, aux_dict, sel_src=None, sel_dest=None, amount_pct=100.0, min_syn_per_conn=None, max_syn_per_conn=None):
     
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
     
@@ -46,7 +46,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, min
         syn_per_conn_info = f'with min {min_syn_per_conn} syns/conn '
     else:
         syn_per_conn_info = ''
-    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_conn} connections {syn_per_conn_info}from {sel_src} to {sel_dest} neurons ({np.sum(syn_idx_remove)} synapses)')
+    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_conn} connections {syn_per_conn_info}(sel_src={sel_src}, sel_dest={sel_dest}, {np.sum(syn_idx_remove)} synapses)')
     
     syn_sel_idx[syn_sel_idx == True] = syn_idx_remove # Set actual indices of connections to be removed
     edges_table_manip = edges_table[~syn_sel_idx].copy()

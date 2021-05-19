@@ -11,7 +11,7 @@ import numpy as np
 from helper_functions import get_gsyn_sum_per_conn, rescale_gsyn_per_conn
 
 """ Remove percentage of randomly selected synapses according to certain cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn) and rescaling g_syns to keep sum of g_syns per connection constant (unless there is no synapse per connection left) """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, keep_conns=False, rescale_gsyn=False):
+def apply(edges_table, nodes, aux_dict, sel_src=None, sel_dest=None, amount_pct=100.0, keep_conns=False, rescale_gsyn=False):
     
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
     
@@ -36,7 +36,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount_pct=100.0, kee
     num_syn = np.sum(syn_sel_idx)
     num_remove = np.round(amount_pct * num_syn / 100).astype(int)
     
-    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_syn} synapses from {sel_src} to {sel_dest} neurons (keep_conns={keep_conns}, rescale_gsyn={rescale_gsyn})')
+    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_syn} synapses (sel_src={sel_src}, sel_dest={sel_dest}, keep_conns={keep_conns}, rescale_gsyn={rescale_gsyn})')
     
     sel_remove = np.random.permutation([True] * num_remove + [False] * (num_syn - num_remove))
     syn_sel_idx[syn_sel_idx == True] = sel_remove # Set actual indices of synapses to be removed

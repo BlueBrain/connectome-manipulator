@@ -15,7 +15,7 @@ import pickle
 from scipy.stats import truncnorm
 
 """ Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (keeping synapses and optionally, number of ingoing connections) """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model_file, delay_model_file=None, pos_map_file=None, keep_indegree=True, amount_pct=100.0):
+def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, keep_indegree=True, amount_pct=100.0):
     
     logging.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     logging.log_assert(amount_pct >= 0.0 and amount_pct <= 100.0, 'amount_pct out of range!')
@@ -75,7 +75,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
     
-    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons, selected from {sel_src} to {sel_dest} neurons (keep_indegree={keep_indegree})')
+    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons (sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree})')
     
     # Run connection rewiring
     warning_syn_count_diff = [] # Keep track of synapse count mismatch to provide a warning

@@ -11,7 +11,7 @@ import numpy as np
 from helper_functions import get_gsyn_sum_per_conn, rescale_gsyn_per_conn
 
 """ Add certain amount of synapses to existing connections, optionally keeping sum of g_syns per connection constant """
-def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=False, method='duplicate'):
+def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, rescale_gsyn=False, method='duplicate'):
     
     # Input checks
     logging.log_assert(isinstance(amount, dict) and 'type' in amount.keys() and 'value' in amount.keys(), 'Amount must be specified as dict with "type"/"value" entries!')
@@ -55,7 +55,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, amount, rescale_gsyn=
     else:
         logging.log_assert(False, f'Amount type "{amount["type"]}" not supported!')
     
-    logging.info(f'Adding {np.sum(num_add)} synapses to {edges_table.shape[0]} total synapses from {sel_src} to {sel_dest} neurons (amount type={amount["type"]}, amount value={amount["value"]}, method={method}, rescale_gsyn={rescale_gsyn})')
+    logging.info(f'Adding {np.sum(num_add)} synapses to {edges_table.shape[0]} total synapses (sel_src={sel_src}, sel_dest={sel_dest}, amount type={amount["type"]}, amount value={amount["value"]}, method={method}, rescale_gsyn={rescale_gsyn})')
         
     # Add num_add synapses between src and dest nodes
     if np.sum(num_add) > 0:
