@@ -27,13 +27,17 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         prob_model_dict = pickle.load(f)
     p_model = model_building.get_model(prob_model_dict['model'], prob_model_dict['model_inputs'], prob_model_dict['model_params'])
     
-    # Determine model order
     if len(prob_model_dict['model_inputs']) == 0:
         model_order = 1 # Constant conn. prob. (no inputs)
     elif len(prob_model_dict['model_inputs']) == 1:
         model_order = 2 # Distance-dependent conn. prob. (1 input: distance)
+    elif len(prob_model_dict['model_inputs']) == 2:
+        model_order = 3 # Bipolar distance-dependent conn. prob. (2 inputs: distance, z offset)
+    elif len(prob_model_dict['model_inputs']) == 3:
+        model_order = 4 # Offset-dependent conn. prob. (3 inputs: x/y/z offsets)
     else:
         logging.log_assert(False, 'Model order could not be determined!')
+    logging.info(f'Model order {model_order} detected')
     
     # Load delay model (optional)
     if not delay_model_file is None:
@@ -49,6 +53,7 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     
     # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
     if not pos_map_file is None:
+        logging.log_assert(model_order >= 2, 'Position mapping only applicable for 2nd-order models and higher!')
         logging.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
         logging.info(f'Loading position map from {pos_map_file}')
         with open(pos_map_file, 'rb') as f:
@@ -62,6 +67,8 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     src_class = nodes[0].get(sel_src, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
     logging.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
+    if model_order >= 2:
+        src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
     
     tgt_node_ids = nodes[1].ids(sel_dest)
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
@@ -72,7 +79,6 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
     
     # Run connection rewiring
     warning_syn_count_diff = [] # Keep track of synapse count mismatch to provide a warning
-    src_pos = None
     for tgt in tgt_node_ids:
         syn_sel_idx = edges_table['@target_node'] == tgt
         
@@ -93,15 +99,22 @@ def apply(edges_table, nodes, aux_dict, sel_src, sel_dest, syn_class, prob_model
         if model_order == 1: # Constant conn. prob. (no inputs)
             p_src = np.full(len(src_node_ids), p_model())
         elif model_order == 2: # Distance-dependent conn. prob. (1 input: distance)
-            if src_pos is None: # Load source positions only once, as they remain unchanged
-                src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
             tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
             d = conn_prob.compute_dist_matrix(src_pos, tgt_pos)
             p_src = p_model(d).flatten()
-            p_src[np.isnan(p_src)] = 0.0
+        elif model_order == 3: # Bipolar distance-dependent conn. prob. (2 inputs: distance, z offset)
+            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
+            d = conn_prob.compute_dist_matrix(src_pos, tgt_pos)
+            bip = conn_prob.compute_bip_matrix(src_pos, tgt_pos)
+            p_src = p_model(d, bip).flatten()
+        elif model_order == 4: # Offset-dependent conn. prob. (3 inputs: x/y/z offsets)
+            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
+            dx, dy, dz = conn_prob.compute_offset_matrices(src_pos, tgt_pos)
+            p_src = p_model(dx, dy, dz).flatten()
         else:
             logging.log_assert(False, f'Model order {model_order} not supported!')
         
+        p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
         p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
         
         # Sample new presynaptic neurons from list of source nodes according to conn. prob.

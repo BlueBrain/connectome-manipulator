@@ -118,7 +118,7 @@ def compute_dist_matrix(src_nrn_pos, tgt_nrn_pos):
 """ Computes bipolar matrix between pairs of neurons (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron) """
 def compute_bip_matrix(src_nrn_pos, tgt_nrn_pos):
     
-    bip_mat = np.sign(np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0))) # Bipolar distinction based on difference in z coordinate
+    bip_mat = np.sign(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in z coordinate
     
     return bip_mat
 
@@ -499,7 +499,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs={'name
         # Linear interpolation model
         assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
         
-        model_dict = {'model': 'interp_fct((dx_pos, dy_pos, dz_pos), p_conn_offset, np.array([np.array(dx), np.array(dy), np.array(dz)]).T, method="linear", bounds_error=False, fill_value=None)',
+        model_dict = {'model': 'np.maximum(interp_fct((dx_pos, dy_pos, dz_pos), p_conn_offset, np.array([np.array(dx), np.array(dy), np.array(dz)]).T, method="linear", bounds_error=False, fill_value=None), 0)',
                       'model_inputs': model_inputs,
                       'model_params': {'interp_fct': scipy.interpolate.interpn, 'dx_pos': dx_pos, 'dy_pos': dy_pos, 'dz_pos': dz_pos, 'p_conn_offset': p_conn_offset}}
         
@@ -513,7 +513,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs={'name
         offset_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
         offset_regr_model.fit(data_pos, data_val)
         
-        model_dict = {'model': 'offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T)',
+        model_dict = {'model': 'np.maximum(offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T), 0)',
                       'model_inputs': model_inputs,
                       'model_params': {'offset_regr_model': offset_regr_model}}
         
