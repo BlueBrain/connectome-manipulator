@@ -6,7 +6,7 @@
 
 An important way to study cortical function _in-silico_ lies in manipulations that are impossible to perform _in-vivo_ and _in-vitro_. One type of manipulations includes manipulations of the (micro-)structure of synaptic connections. The aim of this project is to provide a general framework to apply and study structural manipulations of a circuit connectome, referred to as rewiring.
 
-With the tools implemented in this repository, it is possible to apply manipulations to the connectome of a SONATA circuit, and to run a structural and topological comparison of the raw and manipulated connectomes. Importantly, the resulting (manipulated) SONATA connectomes are intended to be used in neural network simulations, which opens new possibilities for all kinds of simulation experiments to find causal relationships between structure and function.
+With the tools implemented in this repository, it is possible to apply manipulations to the connectome of a [SONATA](https://github.com/AllenInstitute/sonata/blob/master/docs/SONATA_DEVELOPER_GUIDE.md) circuit, and to run a structural and topological comparison of the raw and manipulated connectomes. Importantly, the resulting (manipulated) SONATA connectomes are intended to be used in neural network simulations, which opens new possibilities for all kinds of simulation experiments to find causal relationships between structure and function.
 
 
 ## Folder overview
