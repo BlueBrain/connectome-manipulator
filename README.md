@@ -27,7 +27,7 @@ With the tools implemented in this repository, it is possible to apply manipulat
 
 ## Processing pipeline
 
-The connectome manipulation pipeline is illustrated in Figure 1 and consists of the following modules:
+The connectome manipulation pipeline is illustrated in Figure 1 and consists of the following modules. The Python library [Blue Brain SNAP](https://github.com/BlueBrain/snap) is used to access SONATA circuits.
 
 * __Connectome manipulator__\
   Depending on the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA file. All manipulations are separately implemented in sub-modules and can be easily extended.\
@@ -55,13 +55,15 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 ## Operation principle of the _Connectome manipulator_
 
-As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are divided into k blocks targeting disjoint sets of N post-synaptic neurons (SONATA nodes), which reduces the memory consumption and facilitates parallelization on multiple computation nodes. Each block is an edge table loaded as Pandas dataframe and comprising a list of synapses together with all synapse properties, an example is shown in Figure 3. The manipulations are then applied separately to each edge table in sequence (or alternatively, in parallel), resulting in manipulated edge tables which are then written to separate .parquet files. In the end, all .parquet files are merged into one manipulated SONATA connectome file.
+As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are divided into k blocks targeting disjoint sets of N post-synaptic neurons (SONATA nodes), which reduces the memory consumption and facilitates parallelization on multiple computation nodes. Each block is an edge table loaded as Pandas dataframe and comprising a list of synapses together with all synapse properties, an example is shown in Figure 3. The manipulations are then applied separately to each edge table in sequence (or alternatively, in parallel), resulting in manipulated edge tables which are then written to separate .parquet files. In the end, all .parquet files are merged into one manipulated SONATA connectome file using [Parquet Converters](https://bbpgitlab.epfl.ch/hpc/circuit-building/parquet-converters).
 
-> __Note 1:__ All synapses belonging to a certain pre-post connection are always within the same edge table.
+> __Note 1:__ A SONATA edges file is expected to contain a single edge population (to be manipulated) connecting two arbitrary source/target node populations.
 
-> __Note 2:__ The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.
+> __Note 2:__ All synapses belonging to a certain pre-post connection are always within the same edge table.
 
-> __Note 3:__ Synapse indices do not need to be unique across all edge tables, as synapse indices are not stored in the resulting SONATA connectome.
+> __Note 3:__ The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edge tables are to be returned with synapses sorted by post-synaptic neuron ID.
+
+> __Note 4:__ Synapse indices do not need to be unique across all manipulated edge tables, as synapse indices are not stored in the resulting SONATA connectome.
 
 | ![Operation principle](images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
 | :-: |
