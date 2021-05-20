@@ -21,34 +21,43 @@ from matplotlib import colors
 """ Compute mean/std/... values of all synapse properties grouped by given cell property """
 def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, per_conn=False, **_):
     
+    # Select edge population [assuming exactly one edge population in given edges file]
+    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
+    edges = circuit.edges[circuit.edges.population_names[0]]
+    
+    # Select corresponding source/target nodes populations
+    src_nodes = edges.source
+    tgt_nodes = edges.target
+    
     if group_by is None:
         group_values = ['Overall']
-        if isinstance(nrn_filter, dict):
-            group_sel = [nrn_filter]
-        else:
-            group_sel = ['All']
+        src_group_sel = [nrn_filter]
+        tgt_group_sel = [nrn_filter]
     else:
-        group_values = sorted(circuit.nodes['All'].property_values(group_by))
-        group_sel = [{group_by: group_values[idx]} for idx in range(len(group_values))]
+        src_group_values = sorted(src_nodes.property_values(group_by))
+        src_group_sel = [{group_by: src_group_values[idx]} for idx in range(len(src_group_values))]
+        tgt_group_values = sorted(tgt_nodes.property_values(group_by))
+        tgt_group_sel = [{group_by: tgt_group_values[idx]} for idx in range(len(tgt_group_values))]
         if isinstance(nrn_filter, dict):
             print(f'INFO: Applying neuron filter {nrn_filter}', flush=True)
             assert group_by not in nrn_filter.keys(), 'ERROR: Group/filter selection mismatch!'
-            for idx in range(len(group_sel)):
-                group_sel[idx].update(nrn_filter)
+            for idx in range(len(src_group_sel)):
+                src_group_sel[idx].update(nrn_filter)
+            for idx in range(len(tgt_group_sel)):
+                tgt_group_sel[idx].update(nrn_filter)
     
-    print(f'INFO: Extracting synapse properties (group_by={group_by}, nrn_filter={nrn_filter}, N={len(group_values)}, per_conn={per_conn})', flush=True)
+    print(f'INFO: Extracting synapse properties (group_by={group_by}, nrn_filter={nrn_filter}, N={len(src_group_values)}x{len(tgt_group_values)} groups, per_conn={per_conn})', flush=True)
     
-    edges = circuit.edges['default']
     edge_props = sorted(edges.property_names)
     print(f'INFO: Available synapse properties: \n{edge_props}', flush=True)
     
     prop_fct = eval(fct)
-    prop_tables = np.full((len(group_sel), len(group_sel), len(edge_props)), np.nan)
+    prop_tables = np.full((len(src_group_sel), len(tgt_group_sel), len(edge_props)), np.nan)
     pbar = progressbar.ProgressBar()
-    for idx_pre in pbar(range(len(group_sel))):
-        sel_pre = group_sel[idx_pre]
-        for idx_post in range(len(group_values)):
-            sel_post = group_sel[idx_post]
+    for idx_pre in pbar(range(len(src_group_sel))):
+        sel_pre = src_group_sel[idx_pre]
+        for idx_post in range(len(tgt_group_sel)):
+            sel_post = tgt_group_sel[idx_post]
             e_sel = edges.pathway_edges(sel_pre, sel_post, edge_props)
             if e_sel.size > 0:
                 if per_conn: # Apply prop_fct to average value per connection
@@ -63,7 +72,7 @@ def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, per_conn=Fal
     fname = prop_fct.__name__[0].upper() + prop_fct.__name__[1:]
     cname = ' (per conn)' if per_conn else ''
     res_dict = {edge_props[idx]: {'data': prop_tables[:, :, idx], 'name': f'"{edge_props[idx]}" property', 'unit': f'{fname} {edge_props[idx]}{cname}'} for idx in range(len(edge_props))}
-    res_dict['common'] = {'group_values': group_values}
+    res_dict['common'] = {'src_group_values': src_group_values, 'tgt_group_values': tgt_group_values}
     
     return res_dict
 
@@ -75,7 +84,7 @@ def plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None, isdiff=Fal
         assert -vmin == vmax, 'ERROR: Symmetric plot range required!'
         cmap = 'PiYG' # Symmetric (diverging) colormap
     else: # Regular plot
-        cmap = 'jet' # Regular colormap
+        cmap = 'hot_r' # Regular colormap
     
     plt.imshow(res_dict['data'], interpolation='nearest', cmap=cmap, vmin=vmin, vmax=vmax)
     
@@ -88,15 +97,17 @@ def plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None, isdiff=Fal
         plt.xlabel(f'Postsynaptic {group_by}')
         plt.ylabel(f'Presynaptic {group_by}')
     
-    if len(common_dict['group_values']) > 0:
-        if max([len(str(grp)) for grp in common_dict['group_values']]) > 1:
+    if len(common_dict['src_group_values']) > 0:
+        font_size = max(13 - len(common_dict['src_group_values']) / 6, 1) # Font scaling
+        plt.yticks(range(len(common_dict['src_group_values'])), common_dict['src_group_values'], rotation=0, fontsize=font_size)
+    
+    if len(common_dict['tgt_group_values']) > 0:
+        if max([len(str(grp)) for grp in common_dict['tgt_group_values']]) > 1:
             rot_x = 90
         else:
             rot_x = 0
-        font_size = max(13 - len(res_dict['data']) / 6, 1) # Font scaling
-        
-        plt.xticks(range(len(common_dict['group_values'])), common_dict['group_values'], rotation=rot_x, fontsize=font_size)
-        plt.yticks(range(len(common_dict['group_values'])), common_dict['group_values'], rotation=0, fontsize=font_size)
+        font_size = max(13 - len(common_dict['tgt_group_values']) / 6, 1) # Font scaling
+        plt.xticks(range(len(common_dict['tgt_group_values'])), common_dict['tgt_group_values'], rotation=rot_x, fontsize=font_size)
     
     cb = plt.colorbar()
     cb.set_label(res_dict['unit'])

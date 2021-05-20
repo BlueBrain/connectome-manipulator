@@ -19,36 +19,54 @@ import matplotlib.pyplot as plt
 """ Extract adjacency and count matrices """
 def compute(circuit, nrn_filter=None, **_):
     
-    all_node_ids = circuit.nodes['All'].ids()
-    node_ids = circuit.nodes['All'].ids(nrn_filter)
-
-    # Map node ids to continuous range of indices for plotting
-    gid_min = min(all_node_ids)
-    gid_max = max(all_node_ids)
+    # Select edge population [assuming exactly one edge population in given edges file]
+    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
+    edges = circuit.edges[circuit.edges.population_names[0]]
     
-    plot_ids = np.full(gid_max - gid_min + 1, -1).astype(int)
-    gid_offset = gid_min
-    plot_ids[node_ids - gid_offset] = np.arange(len(node_ids))
-    def gid_to_idx(gids):
-        return plot_ids[gids - gid_offset]
+    # Select corresponding source/target nodes populations
+    src_nodes = edges.source
+    tgt_nodes = edges.target
     
-    print(f'INFO: Creating adjacency matrix (nrn_filter={nrn_filter})', flush=True)
+    src_node_ids = src_nodes.ids(nrn_filter)
+    tgt_node_ids = tgt_nodes.ids(nrn_filter)
     
-    count_matrix = np.zeros([len(node_ids)] * 2).astype(int)
-    pbar = progressbar.ProgressBar()
-    for pre_idx in pbar(range(len(node_ids))):
-        
-        pre_gid = node_ids[pre_idx]
-        conns = np.array(list(circuit.edges['default'].iter_connections(pre_gid, return_edge_count=True)))
-        if len(conns) > 0:
-            idx = gid_to_idx(conns[:, 1])
-            count_matrix[gid_to_idx(pre_gid), idx[idx >= 0]] = conns[idx >= 0, 2] # Filter selected gids here [faster than selecting post GIDs within iter_connections]
+    # Map source/target node ids to continuous range of indices for plotting
+    src_gid_min = min(src_nodes.ids())
+    src_gid_max = max(src_nodes.ids())
+    tgt_gid_min = min(tgt_nodes.ids())
+    tgt_gid_max = max(tgt_nodes.ids())
+    
+    src_plot_ids = np.full(src_gid_max - src_gid_min + 1, -1).astype(int)
+    src_gid_offset = src_gid_min
+    src_plot_ids[src_node_ids - src_gid_offset] = np.arange(len(src_node_ids))
+    def src_gid_to_idx(gids):
+        return src_plot_ids[gids - src_gid_offset]
+    
+    tgt_plot_ids = np.full(tgt_gid_max - tgt_gid_min + 1, -1).astype(int)
+    tgt_gid_offset = tgt_gid_min
+    tgt_plot_ids[tgt_node_ids - tgt_gid_offset] = np.arange(len(tgt_node_ids))
+    def tgt_gid_to_idx(gids):
+        return tgt_plot_ids[gids - tgt_gid_offset]
+    
+    print(f'INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (nrn_filter={nrn_filter})', flush=True)
+    
+    count_matrix = np.zeros((len(src_node_ids), len(tgt_node_ids)), dtype=int)
+#     pbar = progressbar.ProgressBar()
+#     for post_idx in pbar(range(len(tgt_node_ids))):
+#         post_gid = tgt_node_ids[post_idx]
+#         conns = np.array(list(edges.iter_connections(target=post_gid, return_edge_count=True)))
+#         if len(conns) > 0:
+#             idx = src_gid_to_idx(conns[:, 0])
+#             count_matrix[idx[idx >= 0], tgt_gid_to_idx(post_gid)] = conns[idx >= 0, 2]
+    
+    conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)))
+    count_matrix[src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1])] = conns[:, 2]
     
     adj_matrix = count_matrix > 0
     
     return {'adj': {'data': adj_matrix, 'name': 'Adjacency', 'unit': None},
             'adj_cnt': {'data': count_matrix, 'name': 'Adjacency count', 'unit': 'Synapse count'},
-            'common': {'gids': node_ids}}
+            'common': {'src_gids': src_node_ids, 'tgt_gids': tgt_node_ids}}
 
 
 """ Plot adjacency matrix [NOT using imshow causing display errors] """
