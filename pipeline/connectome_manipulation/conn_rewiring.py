@@ -54,6 +54,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
     if not pos_map_file is None:
         logging.log_assert(model_order >= 2, 'Position mapping only applicable for 2nd-order models and higher!')
+        logging.log_assert((nodes[0].name == nodes[1].name) or (nodes[0].ids().min() > nodes[1].ids().max()) or (nodes[0].ids().max() < nodes[1].ids().min()), 'Position mapping only supported for same source/taget node population or non-overlapping id ranges!')
         logging.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
         logging.info(f'Loading position map from {pos_map_file}')
         with open(pos_map_file, 'rb') as f:

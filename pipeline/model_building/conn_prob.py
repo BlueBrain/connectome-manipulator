@@ -35,6 +35,9 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     node_ids_src = src_nodes.ids(sel_src)
     node_ids_dest = tgt_nodes.ids(sel_dest)
     
+    if not kwargs.get('pos_map_file') is None:
+        assert (src_nodes.name == tgt_nodes.name) or (src_nodes.ids().min() > tgt_nodes.ids().max()) or (src_nodes.ids().max() < tgt_nodes.ids().min()), 'ERROR: Position mapping only supported for same source/taget node population or non-overlapping id ranges!'
+    
     if sample_size is None or sample_size <= 0:
         sample_size = np.inf # Select all nodes
     sample_size_src = min(sample_size, len(node_ids_src))
