@@ -11,6 +11,9 @@ import progressbar
 import numpy as np
 import matplotlib.pyplot as plt
 
+# TODO: Visualize and capture actual distributions of synaptic properties
+#       Visualize and capture correlations between synaptic properties
+
 """ Extract statistics for synaptic properties between samples of neurons for each pair of m-types """
 def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, **_):
     

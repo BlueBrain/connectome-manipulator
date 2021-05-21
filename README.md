@@ -42,7 +42,8 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
   > __Note 2:__ Some models may depend on other models as input for model building.
 
 * __Structural comparator__\
-  Performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.
+  Performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.\
+  Details can be found in the corresponding README file: [/pipeline/connectome_comparison/README.md](pipeline/connectome_comparison/)
 
 * __Topological comparator__\
   Performs a topological comparison of the original and manipulated connectomes based on advanced topological metrics.\
