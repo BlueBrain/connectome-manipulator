@@ -11,7 +11,7 @@ import progressbar
 import numpy as np
 import matplotlib.pyplot as plt
 
-# TODO: Visualize and capture actual distributions of synaptic properties
+# TODO: Visualize and capture actual distributions of synaptic properties (incl. data type!)
 #       Visualize and capture correlations between synaptic properties
 
 """ Extract statistics for synaptic properties between samples of neurons for each pair of m-types """
@@ -143,7 +143,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
     print(f'MODEL FIT for synapse/connection properties ({len(m_types[0])}x{len(m_types[1])} m-types):')
     print(list(prop_model_dict.keys()))
     
-    return {'model': 'prop_model_dict[prop_name][src_type][tgt_type][stat_type]',
+    return {'model': 'prop_model_dict.keys() if prop_name is None else prop_model_dict[prop_name][src_type][tgt_type][stat_type]',
             'model_inputs': ['prop_name', 'src_type', 'tgt_type', 'stat_type'],
             'model_params': {'prop_model_dict': prop_model_dict}}
 
