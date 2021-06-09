@@ -7,6 +7,7 @@
 # - Returns a manipulated edged_table
 
 # TODO: Refactor into sub-functions for separate methods (to be accessed internally and externally by other manipulations)
+# TODO: Add duplicate_sample method from conn_rewiring
 
 from helper_functions import get_gsyn_sum_per_conn, rescale_gsyn_per_conn
 from model_building import model_building

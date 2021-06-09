@@ -156,6 +156,14 @@ def compute_offset_matrices(src_nrn_pos, tgt_nrn_pos):
     return dx_mat, dy_mat, dz_mat
 
 
+""" Computes x/y/z position matrices (PRE neuron positions repeated over POST neuron number) """
+def compute_position_matrices(src_nrn_pos, tgt_nrn_pos):
+    
+    x_mat, y_mat, z_mat = [np.tile(src_nrn_pos[:, i:i+1], [1, tgt_nrn_pos.shape[0]]) for i in range(src_nrn_pos.shape[1])]
+    
+    return x_mat, y_mat, z_mat
+
+
 """ Extract D-dimensional conn. prob. dependent on D property matrices between source-target pairs of neurons within given range of bins """
 def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins):
     
@@ -685,7 +693,7 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
     
     # Compute PRE position & POST-PRE offset matrices
-    x_mat, y_mat, z_mat = [np.tile(src_nrn_pos[:, i:i+1], [1, tgt_nrn_pos.shape[0]]) for i in range(src_nrn_pos.shape[1])]
+    x_mat, y_mat, z_mat = compute_position_matrices(src_nrn_pos, tgt_nrn_pos)
     dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
     
     # Extract position- & offset-dependent connection probabilities
