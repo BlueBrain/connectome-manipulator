@@ -105,6 +105,26 @@ def create_new_file_from_template(new_file, template_file, replacements_dict):
         file.write(content)
 
 
+""" Create new SONATA config (.JSON) from original, incl. modifications """
+def create_new_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, rebase_dir=None):
+    
+    logging.info(f'Creating SONATA config {new_config_file}')
+    fct_rebase = lambda d: {k: v.replace('$BASE_DIR', '$ORIG_BASE_DIR') if isinstance(v, str) and not 'edges' in k.lower() else v for k, v in d.items()}
+    fct_rename = lambda d: {k: v.replace(orig_edges_fn, new_edges_fn) if isinstance(v, str) else v for k, v in d.items()}
+    if rebase_dir is None:
+        fct_mod = fct_rename
+    else:
+        fct_mod = lambda d: fct_rename(fct_rebase(d))
+    with open(orig_config_file, 'r') as file:
+        config = json.load(file, object_hook=fct_mod)
+    
+    if not rebase_dir is None:
+        config['manifest'] = {'$ORIG_BASE_DIR': rebase_dir, **config['manifest']}
+    
+    with open(new_config_file, 'w') as f:
+        json.dump(config, f, indent=2)
+
+
 def resource_profiling(enabled=False, description='', reset=False):
     
     if not enabled:
@@ -166,10 +186,10 @@ def resource_profiling(enabled=False, description='', reset=False):
 
 
 """ Initialize logger (with custom log level for profiling and assert with logging) """
-def logging_init(circuit_path):
+def logging_init(output_path):
     
     # Configure logging
-    log_path = os.path.join(circuit_path, 'logs')
+    log_path = os.path.join(output_path, 'logs')
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     
@@ -196,13 +216,21 @@ def logging_init(circuit_path):
 
 """ Main entry point for circuit manipulations [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically into N disjoint parts of target neurons (OPTIONAL)] """
 def main(manip_config, do_profiling=False):
-
+    
+    # Set output path
+    if manip_config.get('output_path') is None:
+        output_path = manip_config['circuit_path'] # If no path provided, use circuit path for output
+    else:
+        output_path = manip_config['output_path']
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+    
     # Initialize logger
-    logging_init(manip_config['circuit_path'])
+    logging_init(output_path)
     
     # Initialize profiler
     resource_profiling(do_profiling, 'initial', reset=True)
-
+    
     # Load circuit
     logging.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'ERROR: SONATA (.json) config required!')
     sonata_config =  os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
@@ -210,8 +238,12 @@ def main(manip_config, do_profiling=False):
     
     nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
     
+    logging.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'ERROR: Edges file not within circuit path!')
+    edges_fn = os.path.split(edges_file)[1]
+    rel_edges_path = os.path.relpath(os.path.split(edges_file)[0], manip_config['circuit_path'])
+    
     # Prepare output parquet path
-    parquet_path = os.path.join(os.path.split(edges_file)[0], 'parquet')
+    parquet_path = os.path.join(output_path, rel_edges_path, 'parquet')
     if not os.path.exists(parquet_path):
         os.makedirs(parquet_path)
     
@@ -246,40 +278,70 @@ def main(manip_config, do_profiling=False):
     logging.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)}\n')
     
     # Convert .parquet file(s) to SONATA file
-    edges_file_manip = os.path.splitext(edges_file)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1]
+    edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
     parquet_to_sonata(parquet_file_list, edges_file_manip, nodes, nodes_files)
     
-    # Create new sonata config
-    edge_fn = os.path.split(edges_file)[1]
-    edge_fn_manip = os.path.split(edges_file_manip)[1]
-    sonata_config_manip = os.path.splitext(sonata_config)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(sonata_config)[1]
-    config_replacement = {edge_fn: edge_fn_manip}
-    create_new_file_from_template(sonata_config_manip, sonata_config, config_replacement)
+    # Create new SONATA config (.JSON) from original config file
+    edges_fn_manip = os.path.split(edges_file_manip)[1]
+    sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
+    create_new_sonata_config(sonata_config_manip, edges_fn_manip, sonata_config, edges_fn, rebase_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None)
     
     # Write manipulation config to JSON file
-    json_file = os.path.join(os.path.split(sonata_config)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
+    json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
     with open(json_file, 'w') as f:
         json.dump(manip_config, f, indent=2)
     logging.info(f'Creating file {json_file}')
-    
-    # Create new symlink (using rel. path) and circuit config
+        
+    # Create new symlinks and circuit config
     if not manip_config.get('blue_config_to_update') is None:
         blue_config =  os.path.join(manip_config['circuit_path'], manip_config['blue_config_to_update'])
         logging.log_assert(os.path.exists(blue_config), f'ERROR: Blue config "{manip_config["blue_config_to_update"]}" does not exist!')
         with open(blue_config, 'r') as file: # Read blue config
             config = file.read()
-        nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0, config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file    
-
-        symlink_src = os.path.relpath(edges_file_manip, os.path.split(nrn_path)[0])
-        symlink_dst = os.path.join(os.path.split(nrn_path)[0], os.path.splitext(edge_fn_manip)[0] + '.sonata')
+        nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0, config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file from BlueConfig
+        circ_path_entry = list(filter(lambda x: x.find('CircuitPath') >= 0, config.splitlines()))[0].strip() # Extract circuit path entry from BlueConfig
+        logging.log_assert(os.path.abspath(nrn_path).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'ERROR: nrnPath not within circuit path!')
+        nrn_path_manip = os.path.join(output_path, os.path.relpath(nrn_path, manip_config['circuit_path'])) # Re-based path
+        if not os.path.exists(os.path.split(nrn_path_manip)[0]):
+            os.makedirs(os.path.split(nrn_path_manip)[0])
+        
+        # Symbolic link for edges.sonata
+        symlink_src = os.path.relpath(edges_file_manip, os.path.split(nrn_path_manip)[0])
+        symlink_dst = os.path.join(os.path.split(nrn_path_manip)[0], os.path.splitext(edges_fn_manip)[0] + '.sonata')
         if os.path.isfile(symlink_dst):
             os.remove(symlink_dst) # Remove if already exists
         os.symlink(symlink_src, symlink_dst)
         logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
-
-        blue_config_manip = os.path.splitext(blue_config)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(blue_config)[1]
-        config_replacement = {nrn_path: symlink_dst}
+                
+        # Create BlueConfig for manipulated circuit
+        blue_config_manip = os.path.join(output_path, os.path.splitext(manip_config['blue_config_to_update'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['blue_config_to_update'])[1])
+        config_replacement = {nrn_path: symlink_dst,
+                              circ_path_entry: f'CircuitPath {output_path}'}
         create_new_file_from_template(blue_config_manip, blue_config, config_replacement)
+        
+        # Symbolic link for start.target
+        symlink_src = os.path.join(manip_config['circuit_path'], 'start.target')
+        if os.path.isfile(symlink_src):
+            symlink_dst = os.path.join(output_path, 'start.target')
+            if os.path.isfile(symlink_dst):
+                os.remove(symlink_dst) # Remove if already exists
+            os.symlink(symlink_src, symlink_dst)
+            logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+
+        # Create bbp-workflow config from template to register manipulated circuit
+        if not manip_config.get('workflow_template') is None:
+            workflow_template_file = manip_config['workflow_template']
+            workflow_file_manip = os.path.split(os.path.splitext(workflow_template_file)[0])[1] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(workflow_template_file)[1]
+            workflow_path = os.path.join(output_path, 'workflows')
+            if not os.path.exists(workflow_path):
+                os.makedirs(workflow_path)
+            
+            config_replacements = {'$CIRCUIT_NAME': '_'.join(manip_config['circuit_path'].split('/')[-4:] + [manip_config['manip']['name']]),
+                                   '$CIRCUIT_DESCRIPTION': f'{manip_config["manip"]["name"]} applied to {manip_config["circuit_path"]}',
+                                   '$CIRCUIT_TYPE': 'Circuit manipulated by connectome_manipulator',
+                                   '$CIRCUIT_CONFIG': blue_config_manip,
+                                   '$DATE': datetime.today().strftime('%Y-%m-%d %H:%M:%S') + ' [generated from template]',
+                                   '$FILE_NAME': workflow_file_manip}
+            create_new_file_from_template(os.path.join(workflow_path, workflow_file_manip), workflow_template_file, config_replacements)
     
     resource_profiling(do_profiling, 'final')
-    
