@@ -16,13 +16,17 @@ With the tools implemented in this repository, it is possible to apply manipulat
 * __[/images](images)__\
   Image files used in documentation pages
 * __[/notebooks](notebooks)__\
-  Main scripts (Jupyter notebooks) for running connectome manipulations, model building, and visualizations
+  Main scripts (Jupyter notebooks) for setting up and running
+  - Connectome manipulations
+  - Model building
+  - Structural comparisons
+  - Topological comparisons \[requires [BluePy v2](https://bbpteam.epfl.ch/documentation/projects/bluepy/latest/) to interface with external [topological_comparator](https://bbpgitlab.epfl.ch/conn/personal/reimann/topological_comparator/-/tree/newbluepy) pipeline\]
 * __[/pipeline](pipeline)__\
   Processing pipeline code, containing the specific implementation of all manipulations, model building, and visualizations
 * __/working_dir__\
-  Working directory (created at runtime) to store all pre-computed results for analyses and visualizations
+  Working directory (created at runtime) to store all pre-computed config files and results for analyses and visualizations
   
-  > __Note:__ The actual connectome manipulations are stored directly at the circuit location!
+  > __Note:__ The manipulated connectome is stored directly at the circuit location or at some specified folder path!
 
 
 ## Processing pipeline
@@ -47,7 +51,7 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 * __Topological comparator__\
   Performs a topological comparison of the original and manipulated connectomes based on advanced topological metrics.\
-  External GitHub project: [MWolfR / topological_comparator](https://github.com/MWolfR/topological_comparator)
+  External GitLab project: [reimann / topological_comparator](https://bbpgitlab.epfl.ch/conn/personal/reimann/topological_comparator/-/tree/newbluepy)
 
 | ![Schematic overview](images/schematic_overview.png "Schematic overview of the connectome manipulation pipeline, consisting of the 'Connectome manipulator', 'Model building', 'Structural comparator', and 'Topological comparator' modules.") |
 | :-: |
