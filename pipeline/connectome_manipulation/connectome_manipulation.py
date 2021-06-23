@@ -327,7 +327,18 @@ def main(manip_config, do_profiling=False):
                 os.remove(symlink_dst) # Remove if already exists
             os.symlink(symlink_src, symlink_dst)
             logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
-
+        
+        # Symbolic link for CellLibraryFile
+        cell_lib_fn = list(filter(lambda x: x.find('CellLibraryFile') >= 0, config.splitlines()))[0].replace('CellLibraryFile', '').strip() # Extract cell library file from BlueConfig
+        if len(os.path.split(cell_lib_fn)[0]) == 0: # Filename only, no path
+            symlink_src = os.path.join(manip_config['circuit_path'], cell_lib_fn)
+            if os.path.isfile(symlink_src):
+                symlink_dst = os.path.join(output_path, cell_lib_fn)
+                if os.path.isfile(symlink_dst):
+                    os.remove(symlink_dst) # Remove if already exists
+                os.symlink(symlink_src, symlink_dst)
+                logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+        
         # Create bbp-workflow config from template to register manipulated circuit
         if not manip_config.get('workflow_template') is None:
             workflow_template_file = manip_config['workflow_template']
