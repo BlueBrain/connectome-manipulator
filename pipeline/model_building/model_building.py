@@ -33,8 +33,8 @@ def get_model(model, model_inputs, model_params):
     return model_fct
 
 
-""" Create model config dict for all pairs of pathways (m-types) """
-def create_model_config_per_pathway(model_config, src_sel_key='sel_src', dest_sel_key='sel_dest'):
+""" Create model config dict for pathways between all pairs of groups (e.g. layer, mtype, ...) """
+def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_src', dest_sel_key='sel_dest'):
     
     # Check model config
     assert 'model' in model_config.keys(), 'ERROR: "model" key missing in model_config!'
@@ -56,27 +56,41 @@ def create_model_config_per_pathway(model_config, src_sel_key='sel_src', dest_se
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
     tgt_nodes = edges.target
-        
-    # Find pathways between pairs of m-types (within current selection)
-    sel_src = model_config['model']['fct']['kwargs'].get(src_sel_key)
-    sel_dest = model_config['model']['fct']['kwargs'].get(dest_sel_key)
     
-    src_mtypes = list(np.unique(src_nodes.get(sel_src, properties='mtype')))
-    tgt_mtypes = list(np.unique(tgt_nodes.get(sel_dest, properties='mtype')))
+    # Find pathways between pairs of groups (within current selection)
+    sel_src = model_config['model']['fct']['kwargs'].get(src_sel_key)
+    if not sel_src is None:
+        assert isinstance(sel_src, dict), 'ERROR: Source node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
+    sel_dest = model_config['model']['fct']['kwargs'].get(dest_sel_key)
+    if not sel_dest is None:
+        assert isinstance(sel_dest, dict), 'ERROR: Target node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
+    
+    assert grouped_by in src_nodes.property_names, f'ERROR: "{grouped_by}" property not found in source nodes!'
+    assert grouped_by in tgt_nodes.property_names, f'ERROR: "{grouped_by}" property not found in target nodes!'
+    
+    src_types = list(np.unique(src_nodes.get(sel_src, properties=grouped_by)))
+    tgt_types = list(np.unique(tgt_nodes.get(sel_dest, properties=grouped_by)))
     
     # Create list of model configs per pathway
     model_build_name = model_config['model']['name']
     model_config_pathways = []
-    for s in src_mtypes:
-        for t in tgt_mtypes:
+    for s in src_types:
+        for t in tgt_types:
             m_dict = deepcopy(model_config)
-            m_dict['model']['fct']['kwargs'].update({src_sel_key: {'mtype': s}, dest_sel_key: {'mtype': t}})
-            m_dict['model']['name'] += f'__{s.replace(":", "_")}-{t.replace(":", "_")}'
-            m_dict['working_dir'] = os.path.join(m_dict['working_dir'], model_build_name + '__Per_Pathway')
-            m_dict['out_dir'] = os.path.join(m_dict['out_dir'], model_build_name + '__Per_Pathway')
+            if sel_src is None:
+                m_dict['model']['fct']['kwargs'].update({src_sel_key: {grouped_by: s}})
+            else:
+                m_dict['model']['fct']['kwargs'][src_sel_key].update({grouped_by: s})
+            if sel_dest is None:
+                m_dict['model']['fct']['kwargs'].update({dest_sel_key: {grouped_by: t}})
+            else:
+                m_dict['model']['fct']['kwargs'][dest_sel_key].update({grouped_by: t})
+            m_dict['model']['name'] += f'__{grouped_by}__{str(s).replace(":", "_")}-{str(t).replace(":", "_")}'
+            m_dict['working_dir'] = os.path.join(m_dict['working_dir'], model_build_name + f'__{grouped_by}_pathways')
+            m_dict['out_dir'] = os.path.join(m_dict['out_dir'], model_build_name + f'__{grouped_by}_pathways')
             model_config_pathways.append(m_dict)
     
-    print(f'INFO: Created model configurations for {len(model_config_pathways)} pathways between {len(src_mtypes)}x{len(tgt_mtypes)} m-types')
+    print(f'INFO: Created model configurations for {len(model_config_pathways)} pathways between {len(src_types)}x{len(tgt_types)} {grouped_by}{"e" if grouped_by[-1] == "s" else ""}s')
     
     return model_config_pathways
 
