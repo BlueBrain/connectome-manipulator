@@ -173,7 +173,10 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     
     # Extract adjacency
     conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids)))
-    adj_mat = csr_matrix((np.full(conns.shape[0], True), conns.T.tolist()), shape=(max(src_node_ids) + 1, max(tgt_node_ids) + 1))
+    if len(conns) > 0:
+        adj_mat = csr_matrix((np.full(conns.shape[0], True), conns.T.tolist()), shape=(max(src_node_ids) + 1, max(tgt_node_ids) + 1))
+    else:
+        adj_mat = csr_matrix((max(src_node_ids) + 1, max(tgt_node_ids) + 1)) # Empty matrix
     if np.any(adj_mat.diagonal()):
         print('WARNING: Autaptic connection(s) found!')
     
