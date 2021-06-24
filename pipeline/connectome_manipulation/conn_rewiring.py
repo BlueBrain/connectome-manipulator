@@ -104,7 +104,11 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     per_mtype_dict = {} # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
     stats_dict['target_count'] = num_tgt
     stats_dict['unable_to_rewire_count'] = 0
+    progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
+        if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
+            print(f'{progress_pct[tidx]}%', end=' ' if tidx < len(tgt_node_ids) - 1 else '\n') # Just for console, no logging
+        
         syn_sel_idx_tgt = edges_table['@target_node'] == tgt
         syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_type)
         num_sel = np.sum(syn_sel_idx)
