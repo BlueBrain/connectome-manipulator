@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 """ Compute mean/std/... values of all synapse properties grouped by given cell property """
-def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, per_conn=False, **_):
+def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, per_conn=False, **_):
     
     # Select edge population [assuming exactly one edge population in given edges file]
     assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
@@ -31,22 +31,23 @@ def compute(circuit, fct='np.mean', group_by=None, nrn_filter=None, per_conn=Fal
     
     if group_by is None:
         group_values = ['Overall']
-        src_group_sel = [nrn_filter]
-        tgt_group_sel = [nrn_filter]
+        src_group_sel = [sel_src]
+        tgt_group_sel = [sel_dest]
     else:
+        if sel_src is None:
+            sel_src = {}
+        else:
+            assert isinstance(sel_src, dict), 'ERROR: Source node selection must be a dict or empty!' # Otherwise, it cannot be merged with group selection
+        if sel_dest is None:
+            sel_dest = {}
+        else:
+            assert isinstance(sel_dest, dict), 'ERROR: Target node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
         src_group_values = sorted(src_nodes.property_values(group_by))
-        src_group_sel = [{group_by: src_group_values[idx]} for idx in range(len(src_group_values))]
+        src_group_sel = [{group_by: src_group_values[idx], **sel_src} for idx in range(len(src_group_values))]
         tgt_group_values = sorted(tgt_nodes.property_values(group_by))
-        tgt_group_sel = [{group_by: tgt_group_values[idx]} for idx in range(len(tgt_group_values))]
-        if isinstance(nrn_filter, dict):
-            print(f'INFO: Applying neuron filter {nrn_filter}', flush=True)
-            assert group_by not in nrn_filter.keys(), 'ERROR: Group/filter selection mismatch!'
-            for idx in range(len(src_group_sel)):
-                src_group_sel[idx].update(nrn_filter)
-            for idx in range(len(tgt_group_sel)):
-                tgt_group_sel[idx].update(nrn_filter)
+        tgt_group_sel = [{group_by: tgt_group_values[idx], **sel_dest} for idx in range(len(tgt_group_values))]
     
-    print(f'INFO: Extracting synapse properties (group_by={group_by}, nrn_filter={nrn_filter}, N={len(src_group_values)}x{len(tgt_group_values)} groups, per_conn={per_conn})', flush=True)
+    print(f'INFO: Extracting synapse properties (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups, per_conn={per_conn})', flush=True)
     
     edge_props = sorted(edges.property_names)
     print(f'INFO: Available synapse properties: \n{edge_props}', flush=True)

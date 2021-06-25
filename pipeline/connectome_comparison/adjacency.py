@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 """ Extract adjacency and count matrices """
-def compute(circuit, nrn_filter=None, **_):
+def compute(circuit, sel_src=None, sel_dest=None, **_):
     
     # Select edge population [assuming exactly one edge population in given edges file]
     assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
@@ -27,8 +27,8 @@ def compute(circuit, nrn_filter=None, **_):
     src_nodes = edges.source
     tgt_nodes = edges.target
     
-    src_node_ids = src_nodes.ids(nrn_filter)
-    tgt_node_ids = tgt_nodes.ids(nrn_filter)
+    src_node_ids = src_nodes.ids(sel_src)
+    tgt_node_ids = tgt_nodes.ids(sel_dest)
     
     # Map source/target node ids to continuous range of indices for plotting
     src_gid_min = min(src_nodes.ids())
@@ -48,7 +48,7 @@ def compute(circuit, nrn_filter=None, **_):
     def tgt_gid_to_idx(gids):
         return tgt_plot_ids[gids - tgt_gid_offset]
     
-    print(f'INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (nrn_filter={nrn_filter})', flush=True)
+    print(f'INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (sel_src={sel_src}, sel_dest={sel_dest})', flush=True)
     
     count_matrix = np.zeros((len(src_node_ids), len(tgt_node_ids)), dtype=int)
 #     pbar = progressbar.ProgressBar()

@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 """ Compute connectivity grouped by given property """
-def compute(circuit, group_by=None, nrn_filter=None, **_):
+def compute(circuit, group_by=None, sel_src=None, sel_dest=None, **_):
     
     # Select edge population [assuming exactly one edge population in given edges file]
     assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
@@ -30,22 +30,23 @@ def compute(circuit, group_by=None, nrn_filter=None, **_):
     
     if group_by is None:
         group_values = ['Overall']
-        src_group_sel = [nrn_filter]
-        tgt_group_sel = [nrn_filter]
+        src_group_sel = [sel_src]
+        tgt_group_sel = [sel_dest]
     else:
+        if sel_src is None:
+            sel_src = {}
+        else:
+            assert isinstance(sel_src, dict), 'ERROR: Source node selection must be a dict or empty!' # Otherwise, it cannot be merged with group selection
+        if sel_dest is None:
+            sel_dest = {}
+        else:
+            assert isinstance(sel_dest, dict), 'ERROR: Target node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
         src_group_values = sorted(src_nodes.property_values(group_by))
-        src_group_sel = [{group_by: src_group_values[idx]} for idx in range(len(src_group_values))]
+        src_group_sel = [{group_by: src_group_values[idx], **sel_src} for idx in range(len(src_group_values))]
         tgt_group_values = sorted(tgt_nodes.property_values(group_by))
-        tgt_group_sel = [{group_by: tgt_group_values[idx]} for idx in range(len(tgt_group_values))]
-        if isinstance(nrn_filter, dict):
-            print(f'INFO: Applying neuron filter {nrn_filter}', flush=True)
-            assert group_by not in nrn_filter.keys(), 'ERROR: Group/filter selection mismatch!'
-            for idx in range(len(src_group_sel)):
-                src_group_sel[idx].update(nrn_filter)
-            for idx in range(len(tgt_group_sel)):
-                tgt_group_sel[idx].update(nrn_filter)
+        tgt_group_sel = [{group_by: tgt_group_values[idx], **sel_dest} for idx in range(len(tgt_group_values))]
     
-    print(f'INFO: Computing connectivity (group_by={group_by}, nrn_filter={nrn_filter}, N={len(src_group_values)}x{len(tgt_group_values)} groups)', flush=True)
+    print(f'INFO: Computing connectivity (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups)', flush=True)
     
     syn_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))
     p_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))
