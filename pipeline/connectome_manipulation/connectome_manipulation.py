@@ -26,7 +26,7 @@ def load_circuit(sonata_config, N_split=1):
     c = Circuit(sonata_config)
     
     # Select edge population [assuming exactly one edge population in given edges file (to be manipulated)]
-    logging.log_assert(len(c.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported to be manipulated!')
+    logging.log_assert(len(c.edges.population_names) == 1, 'Only a single edge population per file supported to be manipulated!')
     edges = c.edges[c.edges.population_names[0]]
     edges_file = c.config['networks']['edges'][0]['edges_file']
     
@@ -36,9 +36,9 @@ def load_circuit(sonata_config, N_split=1):
     nodes = [src_nodes, tgt_nodes]
     
     src_file_idx = np.where(np.array(c.nodes.population_names) == src_nodes.name)[0]
-    logging.log_assert(len(src_file_idx) == 1, 'ERROR: Source nodes population file index error!')
+    logging.log_assert(len(src_file_idx) == 1, 'Source nodes population file index error!')
     tgt_file_idx = np.where(np.array(c.nodes.population_names) == tgt_nodes.name)[0]
-    logging.log_assert(len(tgt_file_idx) == 1, 'ERROR: Target nodes population file index error!')
+    logging.log_assert(len(tgt_file_idx) == 1, 'Target nodes population file index error!')
     
     src_nodes_file = c.config['networks']['nodes'][src_file_idx[0]]['nodes_file']
     tgt_nodes_file = c.config['networks']['nodes'][tgt_file_idx[0]]['nodes_file']
@@ -87,19 +87,26 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
     
     proc = subprocess.Popen(f'module load unstable parquet-converters;\
                               parquet2hdf5 --format SONATA --from {nodes_files[0]} {nodes[0].name} --to {nodes_files[1]} {nodes[1].name} -o {output_file} {input_files}',
-                              shell=True, stdout=subprocess.PIPE)
+                              shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logging.info(proc.communicate()[0].decode())
 
 
 """ Create new text file from template with replacements """
-def create_new_file_from_template(new_file, template_file, replacements_dict):
+def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
     
     logging.info(f'Creating file {new_file}')
     with open(template_file, 'r') as file:
         content = file.read()
     
-    for (src, dest) in replacements_dict.items():
-        content = content.replace(src, dest)
+    content_lines = []
+    for l in content.splitlines():
+        if skip_comments and len(l.strip()) > 0 and l.strip()[0] == '#': # Skip replacement in commented lines
+            content_lines.append(l)
+        else: # Apply replacements
+            for (src, dest) in replacements_dict.items():
+                l = l.replace(src, dest)
+            content_lines.append(l)
+    content = '\n'.join(content_lines)
     
     with open(new_file, 'w') as file:
         file.write(content)
@@ -123,6 +130,23 @@ def create_new_sonata_config(new_config_file, new_edges_fn, orig_config_file, or
     
     with open(new_config_file, 'w') as f:
         json.dump(config, f, indent=2)
+
+
+""" Create bbp-workflow config for circuit registration (from template) """
+def create_workflow_config(circuit_path, blue_config, circuit_type, manip_name, output_path, template):
+            workflow_template_file = template
+            workflow_file = os.path.split(os.path.splitext(workflow_template_file)[0])[1] + f'_{manip_name}' + os.path.splitext(workflow_template_file)[1]
+            workflow_path = os.path.join(output_path, 'workflows')
+            if not os.path.exists(workflow_path):
+                os.makedirs(workflow_path)
+            
+            config_replacements = {'$CIRCUIT_NAME': '_'.join(circuit_path.split('/')[-4:] + [manip_name]),
+                                   '$CIRCUIT_DESCRIPTION': f'{manip_name} applied to {circuit_path}',
+                                   '$CIRCUIT_TYPE': circuit_type,
+                                   '$CIRCUIT_CONFIG': blue_config,
+                                   '$DATE': datetime.today().strftime('%Y-%m-%d %H:%M:%S') + ' [generated from template]',
+                                   '$FILE_NAME': workflow_file}
+            create_new_file_from_template(os.path.join(workflow_path, workflow_file), workflow_template_file, config_replacements, skip_comments=False)
 
 
 def resource_profiling(enabled=False, description='', reset=False):
@@ -232,13 +256,13 @@ def main(manip_config, do_profiling=False):
     resource_profiling(do_profiling, 'initial', reset=True)
     
     # Load circuit
-    logging.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'ERROR: SONATA (.json) config required!')
+    logging.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'SONATA (.json) config required!')
     sonata_config =  os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
     N_split = max(manip_config.get('N_split_nodes', 1), 1)
     
     nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
     
-    logging.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'ERROR: Edges file not within circuit path!')
+    logging.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'Edges file not within circuit path!')
     edges_fn = os.path.split(edges_file)[1]
     rel_edges_path = os.path.relpath(os.path.split(edges_file)[0], manip_config['circuit_path'])
     
@@ -265,7 +289,7 @@ def main(manip_config, do_profiling=False):
         # Apply connectome manipulation
         aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
         edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
-        logging.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'ERROR: Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
+        logging.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
         N_syn_out.append(edges_table_manip.shape[0])
         resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}')
         
@@ -275,7 +299,7 @@ def main(manip_config, do_profiling=False):
         parquet_file_list.append(parquet_file_manip)
         resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}')
     
-    logging.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)}\n')
+    logging.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
     
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
@@ -295,12 +319,12 @@ def main(manip_config, do_profiling=False):
     # Create new symlinks and circuit config
     if not manip_config.get('blue_config_to_update') is None:
         blue_config =  os.path.join(manip_config['circuit_path'], manip_config['blue_config_to_update'])
-        logging.log_assert(os.path.exists(blue_config), f'ERROR: Blue config "{manip_config["blue_config_to_update"]}" does not exist!')
+        logging.log_assert(os.path.exists(blue_config), f'Blue config "{manip_config["blue_config_to_update"]}" does not exist!')
         with open(blue_config, 'r') as file: # Read blue config
             config = file.read()
-        nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0, config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file from BlueConfig
-        circ_path_entry = list(filter(lambda x: x.find('CircuitPath') >= 0, config.splitlines()))[0].strip() # Extract circuit path entry from BlueConfig
-        logging.log_assert(os.path.abspath(nrn_path).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'ERROR: nrnPath not within circuit path!')
+        nrn_path = list(filter(lambda x: x.find('nrnPath') >= 0 and not x.strip()[0] == '#', config.splitlines()))[0].replace('nrnPath', '').strip() # Extract path to edges file from BlueConfig
+        circ_path_entry = list(filter(lambda x: x.find('CircuitPath') >= 0 and not x.strip()[0] == '#', config.splitlines()))[0].strip() # Extract circuit path entry from BlueConfig
+        logging.log_assert(os.path.abspath(nrn_path).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'nrnPath not within circuit path!')
         nrn_path_manip = os.path.join(output_path, os.path.relpath(nrn_path, manip_config['circuit_path'])) # Re-based path
         if not os.path.exists(os.path.split(nrn_path_manip)[0]):
             os.makedirs(os.path.split(nrn_path_manip)[0])
@@ -341,18 +365,6 @@ def main(manip_config, do_profiling=False):
         
         # Create bbp-workflow config from template to register manipulated circuit
         if not manip_config.get('workflow_template') is None:
-            workflow_template_file = manip_config['workflow_template']
-            workflow_file_manip = os.path.split(os.path.splitext(workflow_template_file)[0])[1] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(workflow_template_file)[1]
-            workflow_path = os.path.join(output_path, 'workflows')
-            if not os.path.exists(workflow_path):
-                os.makedirs(workflow_path)
-            
-            config_replacements = {'$CIRCUIT_NAME': '_'.join(manip_config['circuit_path'].split('/')[-4:] + [manip_config['manip']['name']]),
-                                   '$CIRCUIT_DESCRIPTION': f'{manip_config["manip"]["name"]} applied to {manip_config["circuit_path"]}',
-                                   '$CIRCUIT_TYPE': 'Circuit manipulated by connectome_manipulator',
-                                   '$CIRCUIT_CONFIG': blue_config_manip,
-                                   '$DATE': datetime.today().strftime('%Y-%m-%d %H:%M:%S') + ' [generated from template]',
-                                   '$FILE_NAME': workflow_file_manip}
-            create_new_file_from_template(os.path.join(workflow_path, workflow_file_manip), workflow_template_file, config_replacements)
+            create_workflow_config(manip_config['circuit_path'], blue_config_manip, 'Circuit manipulated by connectome_manipulator', manip_config['manip']['name'], output_path, manip_config['workflow_template'])
     
     resource_profiling(do_profiling, 'final')
