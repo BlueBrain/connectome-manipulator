@@ -113,7 +113,7 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
 
 
 """ Create new SONATA config (.JSON) from original, incl. modifications """
-def create_new_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, rebase_dir=None):
+def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, rebase_dir=None):
     
     logging.info(f'Creating SONATA config {new_config_file}')
     fct_rebase = lambda d: {k: v.replace('$BASE_DIR', '$ORIG_BASE_DIR') if isinstance(v, str) and not 'edges' in k.lower() else v for k, v in d.items()}
@@ -133,20 +133,33 @@ def create_new_sonata_config(new_config_file, new_edges_fn, orig_config_file, or
 
 
 """ Create bbp-workflow config for circuit registration (from template) """
-def create_workflow_config(circuit_path, blue_config, circuit_type, manip_name, output_path, template):
-            workflow_template_file = template
-            workflow_file = os.path.split(os.path.splitext(workflow_template_file)[0])[1] + f'_{manip_name}' + os.path.splitext(workflow_template_file)[1]
-            workflow_path = os.path.join(output_path, 'workflows')
-            if not os.path.exists(workflow_path):
-                os.makedirs(workflow_path)
-            
-            config_replacements = {'$CIRCUIT_NAME': '_'.join(circuit_path.split('/')[-4:] + [manip_name]),
-                                   '$CIRCUIT_DESCRIPTION': f'{manip_name} applied to {circuit_path}',
-                                   '$CIRCUIT_TYPE': circuit_type,
-                                   '$CIRCUIT_CONFIG': blue_config,
-                                   '$DATE': datetime.today().strftime('%Y-%m-%d %H:%M:%S') + ' [generated from template]',
-                                   '$FILE_NAME': workflow_file}
-            create_new_file_from_template(os.path.join(workflow_path, workflow_file), workflow_template_file, config_replacements, skip_comments=False)
+def create_workflow_config(circuit_path, blue_config, manip_name, output_path, template_file):
+    
+    if manip_name is None:
+        manip_name = ''
+    
+    if len(manip_name) > 0:
+        workflow_file = os.path.split(os.path.splitext(template_file)[0])[1] + f'_{manip_name}' + os.path.splitext(template_file)[1]
+        circuit_name = '_'.join(circuit_path.split('/')[-4:] + [manip_name])
+        circuit_descr = f'{manip_name} applied to {circuit_path}'
+        circuit_type = 'Circuit manipulated by connectome_manipulator'
+    else:
+        workflow_file = os.path.split(template_file)[1]
+        circuit_name = '_'.join(circuit_path.split('/')[-4:])
+        circuit_descr = f'No manipulation applied to {circuit_path}'
+        circuit_type = 'Circuit w/o manipulation'
+    
+    workflow_path = os.path.join(output_path, 'workflows')
+    if not os.path.exists(workflow_path):
+        os.makedirs(workflow_path)
+    
+    config_replacements = {'$CIRCUIT_NAME': circuit_name,
+                           '$CIRCUIT_DESCRIPTION': circuit_descr,
+                           '$CIRCUIT_TYPE': circuit_type,
+                           '$CIRCUIT_CONFIG': blue_config,
+                           '$DATE': datetime.today().strftime('%Y-%m-%d %H:%M:%S') + ' [generated from template]',
+                           '$FILE_NAME': workflow_file}
+    create_new_file_from_template(os.path.join(workflow_path, workflow_file), template_file, config_replacements, skip_comments=False)
 
 
 def resource_profiling(enabled=False, description='', reset=False):
@@ -308,7 +321,7 @@ def main(manip_config, do_profiling=False):
     # Create new SONATA config (.JSON) from original config file
     edges_fn_manip = os.path.split(edges_file_manip)[1]
     sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
-    create_new_sonata_config(sonata_config_manip, edges_fn_manip, sonata_config, edges_fn, rebase_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None)
+    create_sonata_config(sonata_config_manip, edges_fn_manip, sonata_config, edges_fn, rebase_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None)
     
     # Write manipulation config to JSON file
     json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
@@ -343,28 +356,24 @@ def main(manip_config, do_profiling=False):
                               circ_path_entry: f'CircuitPath {output_path}'}
         create_new_file_from_template(blue_config_manip, blue_config, config_replacement)
         
-        # Symbolic link for start.target
+        # Symbolic link for start.target (if not existing)
         symlink_src = os.path.join(manip_config['circuit_path'], 'start.target')
-        if os.path.isfile(symlink_src):
-            symlink_dst = os.path.join(output_path, 'start.target')
-            if os.path.isfile(symlink_dst):
-                os.remove(symlink_dst) # Remove if already exists
+        symlink_dst = os.path.join(output_path, 'start.target')
+        if os.path.isfile(symlink_src) and not os.path.isfile(symlink_dst):
             os.symlink(symlink_src, symlink_dst)
             logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
         
-        # Symbolic link for CellLibraryFile
+        # Symbolic link for CellLibraryFile (if not existing)
         cell_lib_fn = list(filter(lambda x: x.find('CellLibraryFile') >= 0, config.splitlines()))[0].replace('CellLibraryFile', '').strip() # Extract cell library file from BlueConfig
         if len(os.path.split(cell_lib_fn)[0]) == 0: # Filename only, no path
             symlink_src = os.path.join(manip_config['circuit_path'], cell_lib_fn)
-            if os.path.isfile(symlink_src):
-                symlink_dst = os.path.join(output_path, cell_lib_fn)
-                if os.path.isfile(symlink_dst):
-                    os.remove(symlink_dst) # Remove if already exists
+            symlink_dst = os.path.join(output_path, cell_lib_fn)
+            if os.path.isfile(symlink_src) and not os.path.isfile(symlink_dst):
                 os.symlink(symlink_src, symlink_dst)
                 logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
         
         # Create bbp-workflow config from template to register manipulated circuit
         if not manip_config.get('workflow_template') is None:
-            create_workflow_config(manip_config['circuit_path'], blue_config_manip, 'Circuit manipulated by connectome_manipulator', manip_config['manip']['name'], output_path, manip_config['workflow_template'])
+            create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
     
     resource_profiling(do_profiling, 'final')
