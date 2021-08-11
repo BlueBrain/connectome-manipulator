@@ -1,0 +1,11 @@
+doc/build
+doc/source/submodules
+.coverage
+.tox
+*.pyc
+*.swp
+.ipynb_checkpoints/
+dist/
+build/
+connectome_manipulator.egg-info
+__pycache__

@@ -11,17 +11,17 @@ With the tools implemented in this repository, it is possible to apply manipulat
 
 ## Folder overview
 
-* __[/bin](bin)__\
+* __[/bin](examples/bin)__\
   Shell scripts to launch connectome manipulations independently as SLURM jobs
-* __[/images](images)__\
+* __[/images](doc/source/images)__\
   Image files used in documentation pages
-* __[/notebooks](notebooks)__\
+* __[/notebooks](examples/ipython_notebooks)__\
   Main scripts (Jupyter notebooks) for setting up and running
   - Connectome manipulations
   - Model building
   - Structural comparisons
   - Topological comparisons \[requires [BluePy v2](https://bbpteam.epfl.ch/documentation/projects/bluepy/latest/) to interface with external [topological_comparator](https://bbpgitlab.epfl.ch/conn/personal/reimann/topological_comparator/-/tree/newbluepy) pipeline\]
-* __[/pipeline](pipeline)__\
+* __[/pipeline](connectome_manipulator)__\
   Processing pipeline code, containing the specific implementation of all manipulations, model building, and visualizations
 * __/working_dir__\
   Working directory (created at runtime) to store all pre-computed config files and results for analyses and visualizations
@@ -35,11 +35,11 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 * __Connectome manipulator__\
   Depending on the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA file. All manipulations are separately implemented in sub-modules and can be easily extended.\
-  Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](pipeline/connectome_manipulation/)
+  Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](connectome_manipulator/connectome_manipulation/)
 
 * __Model building__\
   Depending on the config, builds a model from a given connectome and writes the model to a file to be loaded and used by some manipulations requiring a model (e.g., model-based rewiring based on given connection probability model). All models are separately implemented in sub-modules and can be easily extended.\
-  Details can be found in the corresponding README file: [/pipeline/model_building/README.md](pipeline/model_building/)
+  Details can be found in the corresponding README file: [/pipeline/model_building/README.md](connectome_manipulator/model_building/)
   
   > __Note 1:__ Some models may not even require a connectome as input.
   
@@ -47,13 +47,13 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 
 * __Structural comparator__\
   Performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.\
-  Details can be found in the corresponding README file: [/pipeline/connectome_comparison/README.md](pipeline/connectome_comparison/)
+  Details can be found in the corresponding README file: [/pipeline/connectome_comparison/README.md](connectome_manipulator/connectome_comparison/)
 
 * __Topological comparator__\
   Performs a topological comparison of the original and manipulated connectomes based on advanced topological metrics.\
   External GitLab project: [reimann / topological_comparator](https://bbpgitlab.epfl.ch/conn/personal/reimann/topological_comparator/-/tree/newbluepy)
 
-| ![Schematic overview](images/schematic_overview.png "Schematic overview of the connectome manipulation pipeline, consisting of the 'Connectome manipulator', 'Model building', 'Structural comparator', and 'Topological comparator' modules.") |
+| ![Schematic overview](doc/source/images/schematic_overview.png "Schematic overview of the connectome manipulation pipeline, consisting of the 'Connectome manipulator', 'Model building', 'Structural comparator', and 'Topological comparator' modules.") |
 | :-: |
 | __Figure 1:__ Schematic overview of the connectome manipulation pipeline, consisting of the _Connectome manipulator_, _Model building_, _Structural comparator_, and _Topological comparator_ modules. |
 
@@ -70,10 +70,10 @@ As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are di
 
 > __Note 4:__ Synapse indices do not need to be unique across all manipulated edge tables, as synapse indices are not stored in the resulting SONATA connectome.
 
-| ![Operation principle](images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
+| ![Operation principle](doc/source/images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
 | :-: |
 | __Figure 2:__ Operation principle of the _Connectome manipulator_, illustrating the block-based processing architecture. |
 
-| ![Edge table](images/edge_table.png "Example of an edge table (Pandas dataframe) comprising all synapse properties.") |
+| ![Edge table](doc/source/images/edge_table.png "Example of an edge table (Pandas dataframe) comprising all synapse properties.") |
 | :-: |
 | __Figure 3:__ Example of an edge table (Pandas dataframe), comprising a list of synapses together with all synapse properties. |
