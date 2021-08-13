@@ -1,3 +1,4 @@
+'''TODO: improve description'''
 # Connectome manipulation function
 #
 # Definition of apply(edges_table, nodes, ...):
@@ -7,17 +8,18 @@
 # - Returns a manipulated edged_table
 
 import logging
+
 import numpy as np
 
-""" Randomly permute order of synapses to be written to fiel in edges_table [FOR TESTING PURPOSES] """
-def apply(edges_table, nodes, aux_dict):
-    
+
+def apply(edges_table, _nodes, _aux_dict):
+    """Randomly permute order of synapses to be written to fiel in edges_table [FOR TESTING PURPOSES]."""
     logging.info('Permuting synapse order [TESTING]')
-    
+
     num_syn = edges_table.shape[0]
     perm_idx = np.random.permutation(num_syn)
     edges_table = edges_table.iloc[perm_idx]
-    
+
     logging.info(f'PERMUTATION INDEX: {perm_idx[:5]}..{perm_idx[-5:]}')
-    
+
     return edges_table

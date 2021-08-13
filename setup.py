@@ -24,7 +24,7 @@ setup(
     long_description_content_type="text/x-rst",
     url="https://bbpgitlab.epfl.ch/conn/structural/connectome_manipulator.git",
     project_urls={
-        "Tracker": "https://bbpteam.epfl.ch/project/issues/projects/NSETM/issues",
+        "Tracker": "https://bbpteam.epfl.ch/project/issues/projects/SSCXDIS/issues",
         "Source": "https://bbpgitlab.epfl.ch/conn/structural/connectome_manipulator.git",
     },
     license="BBP-internal-confidential",
