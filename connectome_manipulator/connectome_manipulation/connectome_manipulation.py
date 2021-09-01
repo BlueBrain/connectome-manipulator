@@ -83,10 +83,15 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
     log.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
     input_files = ' '.join(input_file_list)
 
-    proc = subprocess.Popen(f'module load unstable parquet-converters;\
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    
+    # Running parquet conversion [Requires parquet-converters/0.5.7 from archive/2021-07 (which should be used by used JupyterLab kernel)]
+    proc = subprocess.Popen(f'module load parquet-converters/0.5.7;\
                               parquet2hdf5 --format SONATA --from {nodes_files[0]} {nodes[0].name} --to {nodes_files[1]} {nodes[1].name} -o {output_file} {input_files}',
-                            shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                              shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     log.info(proc.communicate()[0].decode())
+    log.log_assert(os.path.exists(output_file), 'Parquet conversion error - SONATA file not created successfully!')
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
