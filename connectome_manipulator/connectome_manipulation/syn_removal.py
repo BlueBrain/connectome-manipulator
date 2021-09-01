@@ -7,8 +7,6 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
-
 import numpy as np
 
 from connectome_manipulator import log
@@ -41,7 +39,7 @@ def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct
     num_syn = np.sum(syn_sel_idx)
     num_remove = np.round(amount_pct * num_syn / 100).astype(int)
 
-    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_syn} synapses (sel_src={sel_src}, sel_dest={sel_dest}, keep_conns={keep_conns}, rescale_gsyn={rescale_gsyn})')
+    log.info(f'Removing {num_remove} ({amount_pct}%) of {num_syn} synapses (sel_src={sel_src}, sel_dest={sel_dest}, keep_conns={keep_conns}, rescale_gsyn={rescale_gsyn})')
 
     sel_remove = np.random.permutation([True] * num_remove + [False] * (num_syn - num_remove))
     syn_sel_idx[syn_sel_idx] = sel_remove # Set actual indices of synapses to be removed

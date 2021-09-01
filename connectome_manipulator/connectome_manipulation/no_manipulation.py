@@ -1,9 +1,10 @@
 '''TODO: improve description'''
-import logging
+
+from connectome_manipulator import log
 
 
 def apply(edges_table, _nodes, _aux_dict):
     """No manipulation (control condition)."""
-    logging.info('Nothing to do')
+    log.info('Nothing to do')
 
     return edges_table

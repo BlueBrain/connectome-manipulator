@@ -10,7 +10,6 @@
 # TODO: Refactor into sub-functions for separate methods (to be accessed internally and externally by other manipulations)
 # TODO: Add duplicate_sample method from conn_rewiring
 
-import logging
 import os.path
 import pickle
 
@@ -63,14 +62,14 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
     else:
         log.log_assert(False, f'Amount type "{amount["type"]}" not supported!')
 
-    logging.info(f'Adding {np.sum(num_add)} synapses to {edges_table.shape[0]} total synapses (sel_src={sel_src}, sel_dest={sel_dest}, amount[type]={amount["type"]}, amount[value]={amount["value"]}, method={method}, rescale_gsyn={rescale_gsyn})')
+    log.info(f'Adding {np.sum(num_add)} synapses to {edges_table.shape[0]} total synapses (sel_src={sel_src}, sel_dest={sel_dest}, amount[type]={amount["type"]}, amount[value]={amount["value"]}, method={method}, rescale_gsyn={rescale_gsyn})')
 
     # Load synapse properties model (required for "derive" method)
     if method == 'derive':
         # >example: props_model_file = '../working_dir/model_building/circuit-build-S1_v1/model/ConnPropsPerMType.pickle'
         log.log_assert(props_model_file is not None, f'Synaptic properties model file required for "{method}" method!')
         log.log_assert(os.path.exists(props_model_file), 'Synaptic properties model file not found!')
-        logging.info(f'Loading synaptic properties model from {props_model_file}')
+        log.info(f'Loading synaptic properties model from {props_model_file}')
         with open(props_model_file, 'rb') as f:
             props_model_dict = pickle.load(f)
         props_model = model_building.get_model(props_model_dict['model'], props_model_dict['model_inputs'], props_model_dict['model_params'])
@@ -80,7 +79,7 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
         # >example: ext_edges_config_file = '/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/circuit-build-S1_v1/sonata/struct_circuit_config.json'
         log.log_assert(ext_edges_config_file is not None, f'External connectome edges file required for "{method}" method!')
         log.log_assert(os.path.exists(ext_edges_config_file), 'External connectome edges file not found!')
-        logging.info(f'Loading external connectome edges from {ext_edges_config_file}')
+        log.info(f'Loading external connectome edges from {ext_edges_config_file}')
 
         # Load external circuit
         c_ext = Circuit(ext_edges_config_file)
@@ -101,7 +100,7 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
 
         # Remove duplicate synapses that are already in circuit edges table
         edges_table_ext = edges_table_ext.append(edges_table.append(edges_table)).drop_duplicates(keep=False, ignore_index=True)
-        logging.info(f'Loaded external edges table with {edges_table_ext.shape[0]} synapses ({num_syn_ext} synapses initially; {num_syn_ext - edges_table_ext.shape[0]} duplicates dropped)')
+        log.info(f'Loaded external edges table with {edges_table_ext.shape[0]} synapses ({num_syn_ext} synapses initially; {num_syn_ext - edges_table_ext.shape[0]} duplicates dropped)')
         log.log_assert(edges_table_ext.shape[0] > 0, 'External synapse table is empty!')
 
         # Select only synapses from connections that are also part of the selected circuit edges table (to not introduce new connections)
@@ -177,7 +176,7 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
                 num_syn_sel = np.sum(syn_sel_idx_ext)
                 if num_syn_sel < num_add:
                     sel_ext = np.where(syn_sel_idx_ext)[0] # Add all available synapses
-                    logging.warning(f'{num_add - num_syn_sel} of {num_add} synapses could not be added, since not enough external synapses provided!')
+                    log.warning(f'{num_add - num_syn_sel} of {num_add} synapses could not be added, since not enough external synapses provided!')
                 else:
                     sel_ext = np.random.choice(np.where(syn_sel_idx_ext)[0], num_add, replace=False) # Random sampling from external synapses without replacement
             else: # Number of external synapses per connection to add [requires syn_conn_idx_ext and conn_map for mapping between connections and external synapses]
@@ -193,7 +192,7 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
                     else:
                         sel_ext[ext_idx[cidx]:ext_idx[cidx + 1]] = np.random.choice(np.where(conn_sel_ext)[0], num, replace=False) # Random sampling from external synapses per connection without replacement
                 if np.sum(sel_ext == -1) > 0:
-                    logging.warning(f'{np.sum(sel_ext == -1)} of {np.sum(num_add)} synapses could not be added, since not enough external synapses provided!')
+                    log.warning(f'{np.sum(sel_ext == -1)} of {np.sum(num_add)} synapses could not be added, since not enough external synapses provided!')
                     sel_ext = sel_ext[sel_ext >= 0]
             new_edges = edges_table_ext.iloc[sel_ext].copy()
         else:
@@ -211,6 +210,6 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
             # ... and rescale g_syn so that the sum of g_syns per connections BEFORE and AFTER the manipulation is kept the same
             rescale_gsyn_per_conn(edges_table, gids_src, gids_dest, gsyn_table, gsyn_table_manip)
     else:
-        logging.warning('Nothing to add!')
+        log.warning('Nothing to add!')
 
     return edges_table

@@ -7,8 +7,6 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
-
 import numpy as np
 
 from connectome_manipulator import log
@@ -34,7 +32,7 @@ def apply(edges_table, nodes, aux_dict, syn_prop, new_value, sel_src=None, sel_d
 
     # Filter based on synapse properties (optional)
     if len(syn_filter) > 0:
-        logging.info(f'Applying synapse filter(s) on: {list(syn_filter.keys())}')
+        log.info(f'Applying synapse filter(s) on: {list(syn_filter.keys())}')
         for prop, val in syn_filter.items():
             syn_sel_idx = np.logical_and(syn_sel_idx, np.isin(edges_table[prop], val))
 
@@ -42,7 +40,7 @@ def apply(edges_table, nodes, aux_dict, syn_prop, new_value, sel_src=None, sel_d
     num_syn = np.sum(syn_sel_idx)
     num_alter = np.round(amount_pct * num_syn / 100).astype(int)
 
-    logging.info(f'Altering "{syn_prop}" in {num_alter} ({amount_pct}%) of {num_syn} selected synapses based on "{new_value["mode"]}" mode (sel_src={sel_src}, sel_dest={sel_dest})')
+    log.info(f'Altering "{syn_prop}" in {num_alter} ({amount_pct}%) of {num_syn} selected synapses based on "{new_value["mode"]}" mode (sel_src={sel_src}, sel_dest={sel_dest})')
 
     if num_alter < num_syn:
         sel_alter = np.random.permutation([True] * num_alter + [False] * (num_syn - num_alter))

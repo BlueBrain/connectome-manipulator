@@ -1,8 +1,20 @@
-'''customize logging'''
+'''Customized logging'''
 from datetime import datetime
 import logging
 import os
 import sys
+
+
+PROFILING_LOG_LEVEL = logging.INFO + 5
+
+def profiling(msg, *args, **kwargs):
+    '''Wrapper for profiling logging'''
+    return logging.log(PROFILING_LOG_LEVEL, msg, *args, **kwargs)
+
+
+def info(msg, *args, **kwargs):
+    '''Wrapper for info logging'''
+    return logging.info(msg, *args, **kwargs)
 
 
 def log_assert(cond, msg):
@@ -27,8 +39,4 @@ def logging_init(output_path, name):
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 
     # Add custom log level for profiling
-    profiling_log_level_name = 'PROFILING'
-    setattr(logging, profiling_log_level_name.upper(), logging.INFO + 5)
-    setattr(logging, profiling_log_level_name.lower(),
-            lambda msg, *args, **kwargs: logging.log(logging.PROFILING, msg, *args, **kwargs))
-    logging.addLevelName(logging.PROFILING, profiling_log_level_name)
+    logging.addLevelName(PROFILING_LOG_LEVEL, 'PROFILING')

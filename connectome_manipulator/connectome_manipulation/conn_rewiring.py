@@ -7,7 +7,6 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
 import os.path
 import pickle
 
@@ -31,7 +30,7 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
 
     # Load connection probability model
     log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
-    logging.info(f'Loading conn. prob. model from {prob_model_file}')
+    log.info(f'Loading conn. prob. model from {prob_model_file}')
     with open(prob_model_file, 'rb') as f:
         prob_model_dict = pickle.load(f)
     p_model = model_building.get_model(prob_model_dict['model'], prob_model_dict['model_inputs'], prob_model_dict['model_params'])
@@ -48,32 +47,32 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
         model_order = 5 # Position-dependent conn. prob. (6 inputs: x/y/z positions, x/y/z offsets)
     else:
         log.log_assert(False, 'Model order could not be determined!')
-    logging.info(f'Model order {model_order} detected')
+    log.info(f'Model order {model_order} detected')
 
     # Load delay model (optional)
     if delay_model_file is not None:
         log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
-        logging.info(f'Loading delay model from {delay_model_file}')
+        log.info(f'Loading delay model from {delay_model_file}')
         with open(delay_model_file, 'rb') as f:
             delay_model_dict = pickle.load(f)
         d_model = model_building.get_model(delay_model_dict['model'], delay_model_dict['model_inputs'], delay_model_dict['model_params'])
         log.log_assert(len(delay_model_dict['model_inputs']) == 2, 'Distance-dependent delay model with two inputs (d, type) expected!')
     else:
         d_model = None
-        logging.info('No delay model provided')
+        log.info('No delay model provided')
 
     # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
     if pos_map_file is not None:
         log.log_assert(model_order >= 2, 'Position mapping only applicable for 2nd-order models and higher!')
         log.log_assert((nodes[0].name == nodes[1].name) or (nodes[0].ids().min() > nodes[1].ids().max()) or (nodes[0].ids().max() < nodes[1].ids().min()), 'Position mapping only supported for same source/taget node population or non-overlapping id ranges!')
         log.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
-        logging.info(f'Loading position map from {pos_map_file}')
+        log.info(f'Loading position map from {pos_map_file}')
         with open(pos_map_file, 'rb') as f:
             pos_map_dict = pickle.load(f)
         pos_map = model_building.get_model(pos_map_dict['model'], pos_map_dict['model_inputs'], pos_map_dict['model_params'])
     else:
         pos_map = None
-        logging.info('No position mapping model provided')
+        log.info('No position mapping model provided')
 
     # Determine source/target nodes for rewiring
     stats_dict = {} # Keep track of statistics
@@ -98,7 +97,7 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
     else:
         log.log_assert(False, f'Synapse class {syn_class} not supported!')
 
-    logging.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons (sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
+    log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons (sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
 
     # Run connection rewiring
     props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
@@ -229,18 +228,18 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
     # Delete unused synapses (if any)
     if np.any(syn_del_idx):
         edges_table = edges_table[~syn_del_idx].copy()
-        logging.info(f'Deleted {np.sum(syn_del_idx)} unused synapses')
+        log.info(f'Deleted {np.sum(syn_del_idx)} unused synapses')
 
     # Add new synapses to table, re-sort, and assign new index
     if all_new_edges.size > 0:
         edges_table = edges_table.append(all_new_edges)
         edges_table.sort_values(['@target_node', '@source_node'], inplace=True)
         edges_table.reset_index(inplace=True, drop=True) # [No index offset required when merging files in block-based processing]
-        logging.info(f'Generated {all_new_edges.shape[0]} new synapses')
+        log.info(f'Generated {all_new_edges.shape[0]} new synapses')
 
     # Print statistics
     stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
-    logging.info('STATISTICS:\n%s', '\n'.join(stat_str))
+    log.info('STATISTICS:\n%s', '\n'.join(stat_str))
 
     return edges_table
 

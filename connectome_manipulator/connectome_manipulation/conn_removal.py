@@ -7,8 +7,6 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
-
 import numpy as np
 
 from connectome_manipulator import log
@@ -37,7 +35,7 @@ def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct
     conn_sel_idx = np.where(conn_sel)[0]
     num_conn = len(conn_sel_idx)
     if num_conn == 0:
-        logging.warning('Selection empty, nothing to remove!')
+        log.warning('Selection empty, nothing to remove!')
     num_remove = np.round(amount_pct * num_conn / 100).astype(int)
     conn_idx_remove = np.random.choice(conn_sel_idx, num_remove, replace=False)
     syn_idx_remove = np.isin(syn_conn_idx, conn_idx_remove)
@@ -50,7 +48,7 @@ def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct
         syn_per_conn_info = f'with min {min_syn_per_conn} syns/conn '
     else:
         syn_per_conn_info = ''
-    logging.info(f'Removing {num_remove} ({amount_pct}%) of {num_conn} connections {syn_per_conn_info}(sel_src={sel_src}, sel_dest={sel_dest}, {np.sum(syn_idx_remove)} synapses)')
+    log.info(f'Removing {num_remove} ({amount_pct}%) of {num_conn} connections {syn_per_conn_info}(sel_src={sel_src}, sel_dest={sel_dest}, {np.sum(syn_idx_remove)} synapses)')
 
     syn_sel_idx[syn_sel_idx] = syn_idx_remove # Set actual indices of connections to be removed
     edges_table_manip = edges_table[~syn_sel_idx].copy()

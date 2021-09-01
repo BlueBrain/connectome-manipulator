@@ -7,8 +7,6 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
-
 import numpy as np
 from scipy.spatial import distance_matrix
 
@@ -22,7 +20,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
 
     pair_gids = aux_dict.get('pair_gids', None) # Load GID mapping from earlier split iteration, if existing
     if pair_gids is None:
-        logging.info('INFO: Sampling pairs of neurons for axon shuffling...')
+        log.info('INFO: Sampling pairs of neurons for axon shuffling...')
 
         gids = nodes[0].ids(sel_grp)
 
@@ -33,7 +31,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         nrn_pos = nodes[0].positions(gids).to_numpy()
         dist_mat = distance_matrix(nrn_pos, nrn_pos)
 
-        logging.info(f'Upper limit of possible pairs: {np.floor(dist_mat.shape[0] / 2).astype(int)} (|grp|={len(gids)})')
+        log.info(f'Upper limit of possible pairs: {np.floor(dist_mat.shape[0] / 2).astype(int)} (|grp|={len(gids)})')
 
         # Thresholded distance matrix
         dist_mat_R = np.ones_like(dist_mat).astype(bool)
@@ -47,7 +45,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         dist_mat_R = dist_mat_R[sel_idx, :]
         dist_mat_R = dist_mat_R[:, sel_idx]
 
-        logging.info(f'Radius-dependent upper limit: {np.floor(dist_mat_R.shape[0] / 2).astype(int)} (R={R}um)')
+        log.info(f'Radius-dependent upper limit: {np.floor(dist_mat_R.shape[0] / 2).astype(int)} (R={R}um)')
 
         # Sample pairs n1-n2 of neurons to interchange axons
         dist_mat_R_choices = np.copy(dist_mat_R) # To keep track of possible choices in each step
@@ -73,7 +71,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         log.log_assert(len(np.unique(pair_gids)) == pair_gids.size, 'Duplicates in gid pairs found!')
         aux_dict.update({'pair_gids': pair_gids}) # Save GID mapping, to be reused in subsequent split iterations
 
-        logging.info(f'Actually selected GID pairs: {pair_gids.shape[0]} (amount={amount_pct}%)')
+        log.info(f'Actually selected GID pairs: {pair_gids.shape[0]} (amount={amount_pct}%)')
 
     # Rewire axons (interchange source ids in edges table)
     for id1, id2 in pair_gids:

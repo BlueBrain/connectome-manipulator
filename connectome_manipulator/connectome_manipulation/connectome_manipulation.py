@@ -7,7 +7,6 @@
 
 import importlib
 import json
-import logging
 import os
 import resource
 import subprocess
@@ -24,7 +23,7 @@ from connectome_manipulator import log
 def load_circuit(sonata_config, N_split=1):
     """Load SONATA circuit using SNAP."""
     # Load circuit
-    logging.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
+    log.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
     c = Circuit(sonata_config)
 
     # Select edge population [assuming exactly one edge population in given edges file (to be manipulated)]
@@ -46,7 +45,7 @@ def load_circuit(sonata_config, N_split=1):
     tgt_nodes_file = c.config['networks']['nodes'][tgt_file_idx[0]]['nodes_file']
     nodes_files = [src_nodes_file, tgt_nodes_file]
 
-    logging.info(f'Using edges population "{edges.name}" between nodes "{src_nodes.name}" and "{tgt_nodes.name}"')
+    log.info(f'Using edges population "{edges.name}" between nodes "{src_nodes.name}" and "{tgt_nodes.name}"')
 
     # Define target node splits
     tgt_node_ids = tgt_nodes.ids()
@@ -60,11 +59,11 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     import_root = os.path.split(__file__)[0]
     sys.path.insert(0, import_root)
 
-    logging.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
+    log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
     for m_step in range(len(manip_config['manip']['fcts'])):
         manip_source = manip_config['manip']['fcts'][m_step]['source']
         manip_kwargs = manip_config['manip']['fcts'][m_step]['kwargs']
-        logging.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
+        log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
 
         manip_module = importlib.import_module(manip_source)
         edges_table = manip_module.apply(edges_table, nodes, aux_dict, **manip_kwargs)
@@ -81,18 +80,18 @@ def edges_to_parquet(edges_table, output_file):
 
 def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
     """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!)."""
-    logging.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
+    log.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
     input_files = ' '.join(input_file_list)
 
     proc = subprocess.Popen(f'module load unstable parquet-converters;\
                               parquet2hdf5 --format SONATA --from {nodes_files[0]} {nodes[0].name} --to {nodes_files[1]} {nodes[1].name} -o {output_file} {input_files}',
                             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    logging.info(proc.communicate()[0].decode())
+    log.info(proc.communicate()[0].decode())
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
     """Create new text file from template with replacements."""
-    logging.info(f'Creating file {new_file}')
+    log.info(f'Creating file {new_file}')
     with open(template_file, 'r') as file:
         content = file.read()
 
@@ -112,7 +111,7 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
 
 def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, rebase_dir=None):
     """Create new SONATA config (.JSON) from original, incl. modifications."""
-    logging.info(f'Creating SONATA config {new_config_file}')
+    log.info(f'Creating SONATA config {new_config_file}')
     fct_rebase = lambda d: {k: v.replace('$BASE_DIR', '$ORIG_BASE_DIR') if isinstance(v, str) and 'edges' not in k.lower() else v
                             for k, v in d.items()}
     fct_rename = lambda d: {k: v.replace(orig_edges_fn, new_edges_fn) if isinstance(v, str) else v for k, v in d.items()}
@@ -216,7 +215,7 @@ def resource_profiling(enabled=False, description='', reset=False):
 
     log_msg = log_msg + '*' * field_width + '\n'
 
-    logging.profiling(log_msg)
+    log.profiling(log_msg)
 
 
 def main(manip_config, do_profiling=False):
@@ -262,7 +261,7 @@ def main(manip_config, do_profiling=False):
 
         # Load edge table containing all edge (=synapse) properties
         edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
-        logging.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties between {len(split_ids)} neurons')
+        log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties between {len(split_ids)} neurons')
         N_syn_in.append(edges_table.shape[0])
         resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}')
 
@@ -279,7 +278,7 @@ def main(manip_config, do_profiling=False):
         parquet_file_list.append(parquet_file_manip)
         resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}')
 
-    logging.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
+    log.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
 
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
@@ -294,7 +293,7 @@ def main(manip_config, do_profiling=False):
     json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
     with open(json_file, 'w') as f:
         json.dump(manip_config, f, indent=2)
-    logging.info(f'Creating file {json_file}')
+    log.info(f'Creating file {json_file}')
 
     # Create new symlinks and circuit config
     if not manip_config.get('blue_config_to_update') is None:
@@ -315,7 +314,7 @@ def main(manip_config, do_profiling=False):
         if os.path.isfile(symlink_dst):
             os.remove(symlink_dst) # Remove if already exists
         os.symlink(symlink_src, symlink_dst)
-        logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+        log.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
 
         # Create BlueConfig for manipulated circuit
         blue_config_manip = os.path.join(output_path, os.path.splitext(manip_config['blue_config_to_update'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['blue_config_to_update'])[1])
@@ -328,7 +327,7 @@ def main(manip_config, do_profiling=False):
         symlink_dst = os.path.join(output_path, 'start.target')
         if os.path.isfile(symlink_src) and not os.path.isfile(symlink_dst):
             os.symlink(symlink_src, symlink_dst)
-            logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+            log.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
 
         # Symbolic link for CellLibraryFile (if not existing)
         cell_lib_fn = list(filter(lambda x: x.find('CellLibraryFile') >= 0, config.splitlines()))[0].replace('CellLibraryFile', '').strip() # Extract cell library file from BlueConfig
@@ -337,7 +336,7 @@ def main(manip_config, do_profiling=False):
             symlink_dst = os.path.join(output_path, cell_lib_fn)
             if os.path.isfile(symlink_src) and not os.path.isfile(symlink_dst):
                 os.symlink(symlink_src, symlink_dst)
-                logging.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
+                log.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
 
         # Create bbp-workflow config from template to register manipulated circuit
         if not manip_config.get('workflow_template') is None:

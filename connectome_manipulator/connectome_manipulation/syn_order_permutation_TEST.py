@@ -7,19 +7,19 @@
 # - Other parameters may be added (optional)
 # - Returns a manipulated edged_table
 
-import logging
-
 import numpy as np
+
+from connectome_manipulator import log
 
 
 def apply(edges_table, _nodes, _aux_dict):
     """Randomly permute order of synapses to be written to fiel in edges_table [FOR TESTING PURPOSES]."""
-    logging.info('Permuting synapse order [TESTING]')
+    log.info('Permuting synapse order [TESTING]')
 
     num_syn = edges_table.shape[0]
     perm_idx = np.random.permutation(num_syn)
     edges_table = edges_table.iloc[perm_idx]
 
-    logging.info(f'PERMUTATION INDEX: {perm_idx[:5]}..{perm_idx[-5:]}')
+    log.info(f'PERMUTATION INDEX: {perm_idx[:5]}..{perm_idx[-5:]}')
 
     return edges_table
