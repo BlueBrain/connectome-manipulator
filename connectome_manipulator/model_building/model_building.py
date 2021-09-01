@@ -10,7 +10,6 @@
 import importlib
 import os.path
 import pickle
-import sys
 import time
 from copy import deepcopy
 
@@ -139,13 +138,13 @@ def main(model_config_input, show_fig=False, force_recomp=False):
             os.makedirs(os.path.split(model_dir)[0])
 
         # Prepare computation module
-        import_root = os.path.split(__file__)[0]
-        sys.path.insert(0, import_root)
-
         comp_source = model_config['model']['fct']['source']
         comp_kwargs = model_config['model']['fct']['kwargs']
 
-        comp_module = importlib.import_module(comp_source)
+        comp_module = importlib.import_module('connectome_manipulator.model_building.' + comp_source)
+        assert hasattr(comp_module, 'extract'), f'ERROR: Model building module "{comp_source}" requires extract() function!'
+        assert hasattr(comp_module, 'build'), f'ERROR: Model building module "{comp_source}" requires build() function!'
+        assert hasattr(comp_module, 'plot'), f'ERROR: Model building module "{comp_source}" requires plot() function!'
 
         # Extract data (or load from file)
         data_file = os.path.join(data_dir, model_build_name + '.pickle')

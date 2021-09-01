@@ -10,7 +10,6 @@ import json
 import os
 import resource
 import subprocess
-import sys
 import time
 from datetime import datetime
 
@@ -56,16 +55,14 @@ def load_circuit(sonata_config, N_split=1):
 
 def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
-    import_root = os.path.split(__file__)[0]
-    sys.path.insert(0, import_root)
-
     log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
     for m_step in range(len(manip_config['manip']['fcts'])):
         manip_source = manip_config['manip']['fcts'][m_step]['source']
         manip_kwargs = manip_config['manip']['fcts'][m_step]['kwargs']
         log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
 
-        manip_module = importlib.import_module(manip_source)
+        manip_module = importlib.import_module('connectome_manipulator.connectome_manipulation.' + manip_source)
+        log.log_assert(hasattr(manip_module, 'apply'), f'Manipulation module "{manip_source}" requires apply() function!')
         edges_table = manip_module.apply(edges_table, nodes, aux_dict, **manip_kwargs)
 
     return edges_table

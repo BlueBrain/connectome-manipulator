@@ -11,7 +11,6 @@ TODO: improve description
 import importlib
 import os.path
 import pickle
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,13 +19,11 @@ from bluepysnap.circuit import Circuit
 
 def compute_results(circuit, comp_dict):
     """Compute structural results used for circuit comparison."""
-    import_root = os.path.split(__file__)[0]
-    sys.path.insert(0, import_root)
-
     comp_source = comp_dict['fct']['source']
     comp_kwargs = comp_dict['fct']['kwargs']
 
-    comp_module = importlib.import_module(comp_source)
+    comp_module = importlib.import_module('connectome_manipulator.connectome_comparison.' + comp_source)
+    assert hasattr(comp_module, 'compute'), f'ERROR: Structural comparison module "{comp_source}" requires compute() function!'
     res_dict = comp_module.compute(circuit, **comp_kwargs)
     assert np.all(np.isin(comp_dict['res_sel'], list(res_dict.keys()))), 'ERROR: Specified results entry not found!'
 
@@ -57,13 +54,11 @@ def results_diff(res_dict1, res_dict2):
 
 def plot_results(res_dict, res_sel, plot_args, comp_dict):
     """Plot structural results."""
-    import_root = os.path.split(__file__)[0]
-    sys.path.insert(0, import_root)
-
     comp_source = comp_dict['fct']['source']
     comp_kwargs = comp_dict['fct']['kwargs']
 
-    comp_module = importlib.import_module(comp_source)
+    comp_module = importlib.import_module('connectome_manipulator.connectome_comparison.' + comp_source)
+    assert hasattr(comp_module, 'plot'), f'ERROR: Structural comparison module "{comp_source}" requires plot() function!'
     comp_module.plot(res_dict, res_sel, **plot_args, **comp_kwargs)
 
 
