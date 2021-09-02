@@ -17,7 +17,7 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import conn_prob, model_building
 
 
-def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, keep_indegree=True, gen_method=None, amount_pct=100.0):
+def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, keep_indegree=True, gen_method=None, amount_pct=100.0):
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
@@ -27,6 +27,9 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
         log.log_assert(gen_method in ['duplicate_sample'], 'Valid generation method required (must be "duplicate_sample")!')
         # 'duplicate_sample' ... duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
         # 'duplicate_randomize' [NYI] ... duplicate existing synapse position & model-based randomization using pathway-specific distributions
+
+    if gen_method == 'duplicate_sample' and aux_dict['N_split'] > 1:
+        log.warning(f'"{gen_method}" method samples only from synapses within same data split! Reduce number of splits to 1 to sample from all synapses!')
 
     # Load connection probability model
     log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
@@ -79,44 +82,52 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
     src_class = nodes[0].get(sel_src, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
     log.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
+    syn_sel_idx_src = np.isin(edges_table['@source_node'], src_node_ids)
+    log.log_assert(np.all(edges_table.loc[syn_sel_idx_src, 'syn_type_id'] >= 100) if syn_class == 'EXC'
+                   else np.all(edges_table.loc[syn_sel_idx_src, 'syn_type_id'] < 100), 'Synapse class error!')
     if model_order >= 2:
         src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
 
     tgt_node_ids = nodes[1].ids(sel_dest)
+    num_tgt_total = len(tgt_node_ids)
+    tgt_node_ids = np.intersect1d(tgt_node_ids, aux_dict['split_ids']) # Only select target nodes that are actually in current split of edges_table
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
+    if np.sum(tgt_sel) == 0: # Nothing to rewire
+        logging.info('No target nodes selected, nothing to rewire')
+        return edges_table
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
     tgt_mtypes = nodes[1].get(tgt_node_ids, properties='mtype').to_numpy()
     tgt_layers = nodes[1].get(tgt_node_ids, properties='layer').to_numpy()
 
-    # Rewire only synapses of given class (EXC/INH)
-    if syn_class == 'EXC':
-        syn_sel_idx_type = edges_table['syn_type_id'] >= 100
-    elif syn_class == 'INH':
-        syn_sel_idx_type = edges_table['syn_type_id'] < 100
-    else:
-        log.log_assert(False, f'Synapse class {syn_class} not supported!')
+    if gen_method == 'duplicate_sample':
+        if syn_class == 'EXC':
+            syn_sel_idx_type = edges_table['syn_type_id'] >= 100
+        elif syn_class == 'INH':
+            syn_sel_idx_type = edges_table['syn_type_id'] < 100
+        else:
+            log.log_assert(False, f'Synapse class {syn_class} not supported!')
 
-    log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons (sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
+    log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
 
     # Run connection rewiring
     props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
     per_mtype_dict = {} # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
-    stats_dict['target_count'] = num_tgt
-    stats_dict['unable_to_rewire_count'] = 0
+    stats_dict['target_count'] = num_tgt # (Neurons)
+    stats_dict['unable_to_rewire_count'] = 0 # (Neurons)
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
-            print(f'{progress_pct[tidx]}%', end=' ' if tidx < len(tgt_node_ids) - 1 else '\n') # Just for console, no logging
+            print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
 
         syn_sel_idx_tgt = edges_table['@target_node'] == tgt
-        syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_type)
+        syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_src)
         num_sel = np.sum(syn_sel_idx)
 
         if (keep_indegree and num_sel == 0) or np.sum(syn_sel_idx_tgt) == 0:
-            stats_dict['unable_to_rewire_count'] += 1
+            stats_dict['unable_to_rewire_count'] += 1 # (Neurons)
             continue # Nothing to rewire (no synapses on target node)
 
         # Determine conn. prob. of all source nodes to be connected with target node
@@ -163,8 +174,8 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
             if num_src > num_new: # Delete unused connections/synapses
                 syn_del_idx[syn_sel_idx] = src_syn_idx >= num_new # Set global indices of connections to be deleted
                 syn_sel_idx[syn_del_idx] = False # Remove to-be-deleted indices from selection
-                stats_dict['num_syn_removed'] = stats_dict.get('num_syn_removed', []) + [np.sum(src_syn_idx >= num_new)]
-                stats_dict['num_conn_removed'] = stats_dict.get('num_conn_removed', []) + [num_src - num_new]
+                stats_dict['num_syn_removed'] = stats_dict.get('num_syn_removed', []) + [np.sum(src_syn_idx >= num_new)] # (Synapses)
+                stats_dict['num_conn_removed'] = stats_dict.get('num_conn_removed', []) + [num_src - num_new] # (Connections)
                 src_syn_idx = src_syn_idx[src_syn_idx < num_new]
             elif num_src < num_new: # Generate new synapses/connections, if needed
                 num_gen_conn = num_new - num_src # Number of new connections to generate
@@ -201,8 +212,8 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
 
                     # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
                     new_edges['@source_node'] = src_gen[syn_conn_idx]
-                    stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)]
-                    stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)]
+                    stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
+                    stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
 
                     # Assign new distance-dependent delays (in-place), drawn from truncated normal distribution (optional)
                     if d_model is not None:
@@ -218,8 +229,8 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
 
         # Assign new source nodes = rewiring of existing connections
         edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_syn_idx] # Source node IDs per connection expanded to synapses
-        stats_dict['num_syn_rewired'] = stats_dict.get('num_syn_rewired', []) + [len(src_syn_idx)]
-        stats_dict['num_conn_rewired'] = stats_dict.get('num_conn_rewired', []) + [len(src_new)]
+        stats_dict['num_syn_rewired'] = stats_dict.get('num_syn_rewired', []) + [len(src_syn_idx)] # (Synapses)
+        stats_dict['num_conn_rewired'] = stats_dict.get('num_conn_rewired', []) + [len(src_new)] # (Connections)
 
         # Assign new distance-dependent delays (in-place), drawn from truncated normal distribution (optional)
         if d_model is not None:
@@ -238,7 +249,7 @@ def apply(edges_table, nodes, _aux_dict, syn_class, prob_model_file, sel_src=Non
         log.info(f'Generated {all_new_edges.shape[0]} new synapses')
 
     # Print statistics
-    stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
+    stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
     log.info('STATISTICS:\n%s', '\n'.join(stat_str))
 
     return edges_table

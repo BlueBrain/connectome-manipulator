@@ -12,6 +12,11 @@ def profiling(msg, *args, **kwargs):
     return logging.log(PROFILING_LOG_LEVEL, msg, *args, **kwargs)
 
 
+def warning(msg, *args, **kwargs):
+    '''Wrapper for warning logging'''
+    return logging.warning(msg, *args, **kwargs)
+
+
 def info(msg, *args, **kwargs):
     '''Wrapper for info logging'''
     return logging.info(msg, *args, **kwargs)
