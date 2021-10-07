@@ -35,6 +35,7 @@ setup(
         "scipy",
         "sklearn",
         "voxcell",
+        "pyarrow",
     ],
     packages=find_packages(),
     python_requires=">=3.6",

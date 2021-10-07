@@ -1,6 +1,7 @@
 doc/build
 doc/source/submodules
 .coverage
+coverage.xml
 .tox
 *.pyc
 *.swp

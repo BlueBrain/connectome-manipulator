@@ -91,7 +91,7 @@ def build(nrn_ids, flat_pos, **_):
             'model_params': {'flat_pos_model': flat_pos_model}}
 
 
-def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, model_inputs, model_params, **_):
+def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, model_inputs, model_params, **_):  # pragma: no cover
     """Visualize data vs. model."""
     model_fct = model_building.get_model(model, model_inputs, model_params)
     nrn_pos_model = model_fct(nrn_ids)

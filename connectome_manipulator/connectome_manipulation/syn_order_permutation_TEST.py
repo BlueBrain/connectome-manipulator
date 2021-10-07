@@ -12,7 +12,7 @@ import numpy as np
 from connectome_manipulator import log
 
 
-def apply(edges_table, _nodes, _aux_dict):
+def apply(edges_table, _nodes, _aux_dict):  # pragma: no cover
     """Randomly permute order of synapses to be written to fiel in edges_table [FOR TESTING PURPOSES]."""
     log.info('Permuting synapse order [TESTING]')
 

@@ -160,7 +160,7 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
     create_new_file_from_template(os.path.join(workflow_path, workflow_file), template_file, config_replacements, skip_comments=False)
 
 
-def resource_profiling(enabled=False, description='', reset=False):
+def resource_profiling(enabled=False, description='', reset=False):  # pragma: no cover
     '''TODO: improve docstring'''
     if not enabled:
         return
@@ -220,7 +220,7 @@ def resource_profiling(enabled=False, description='', reset=False):
     log.profiling(log_msg)
 
 
-def main(manip_config, do_profiling=False):
+def main(manip_config, do_profiling=False):  # pragma: no cover
     """Main entry point for circuit manipulations [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically into N disjoint parts of target neurons (OPTIONAL)]."""
     # Set output path
     if manip_config.get('output_path') is None:

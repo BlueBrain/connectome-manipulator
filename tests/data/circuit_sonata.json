@@ -1,0 +1,29 @@
+{
+    "version": 2,
+    "manifest": {
+        "$BASE_DIR": "./"
+    },
+    "networks": {
+        "nodes": [
+            {
+                "nodes_file": "$BASE_DIR/nodes.h5",
+                "populations": {
+                    "nodeA": {
+                        "type": "biophysical",
+                        "morphologies_dir": "."
+                    }
+                }
+            }
+        ],
+        "edges": [
+            {
+                "edges_file": "$BASE_DIR/edges.h5",
+                "populations": {
+                    "nodeA__nodeA__chemical": {
+                        "type": "chemical"
+                    }
+                }
+            }
+        ]
+    }
+}

@@ -72,7 +72,7 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
             'common': {'src_gids': src_node_ids, 'tgt_gids': tgt_node_ids}}
 
 
-def plot(res_dict, _common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, **_):
+def plot(res_dict, _common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, **_):  # pragma:no cover
     """Plot adjacency matrix [NOT using imshow causing display errors]."""
     if isdiff: # Difference plot
         assert -vmin == vmax, 'ERROR: Symmetric plot range required!'

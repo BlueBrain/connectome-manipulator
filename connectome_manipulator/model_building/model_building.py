@@ -95,7 +95,7 @@ def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_s
     return model_config_pathways
 
 
-def main(model_config_input, show_fig=False, force_recomp=False):
+def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no cover
     """Main entry point for connectome model building."""
     if not isinstance(model_config_input, list):
         assert isinstance(model_config_input, dict), 'ERROR: model_config_input must be of type list or dict!'

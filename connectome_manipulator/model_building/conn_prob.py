@@ -228,7 +228,7 @@ def build_1st_order(p_conn, **_):
             'model_params': {'p': p_conn_model}}
 
 
-def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):
+def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):  # pragma: no cover
     """Visualize data vs. model (1st order)."""
     model_str = f'f(x) = {model_params["p"]:.3f}'
     model_fct = model_building.get_model(model, model_inputs, model_params)
@@ -290,7 +290,7 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
             'model_params': {'a_opt': a_opt, 'b_opt': b_opt}}
 
 
-def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
+def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (2nd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -388,7 +388,7 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, _bip_bins, **_):
             'model_params': {'aN_opt': aN_opt, 'bN_opt': bN_opt, 'aP_opt': aP_opt, 'bP_opt': bP_opt}}
 
 
-def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, _bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):
+def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, _bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (3rd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -534,7 +534,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
     return model_dict
 
 
-def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (4th order)."""
     model_fct = model_building.get_model(model, model_inputs, model_params)
 
@@ -783,7 +783,7 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
     return model_dict
 
 
-def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):
+def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (5th order)."""
     model_fct = model_building.get_model(model, model_inputs, model_params)
 

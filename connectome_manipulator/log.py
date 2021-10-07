@@ -7,17 +7,17 @@ import sys
 
 PROFILING_LOG_LEVEL = logging.INFO + 5
 
-def profiling(msg, *args, **kwargs):
+def profiling(msg, *args, **kwargs):  # pragma: no cover
     '''Wrapper for profiling logging'''
     return logging.log(PROFILING_LOG_LEVEL, msg, *args, **kwargs)
 
 
-def warning(msg, *args, **kwargs):
+def warning(msg, *args, **kwargs):  # pragma: no cover
     '''Wrapper for warning logging'''
     return logging.warning(msg, *args, **kwargs)
 
 
-def info(msg, *args, **kwargs):
+def info(msg, *args, **kwargs):  # pragma: no cover
     '''Wrapper for info logging'''
     return logging.info(msg, *args, **kwargs)
 

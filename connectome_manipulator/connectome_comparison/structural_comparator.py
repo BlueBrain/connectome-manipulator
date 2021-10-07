@@ -62,7 +62,7 @@ def plot_results(res_dict, res_sel, plot_args, comp_dict):
     comp_module.plot(res_dict, res_sel, **plot_args, **comp_kwargs)
 
 
-def main(structcomp_config, show_fig=False, force_recomp=False):
+def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no cover
     """Main entry point for structural connectome comparison."""
     # Load circuits
     circuit_ids = sorted(structcomp_config['circuits'].keys())

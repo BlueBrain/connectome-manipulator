@@ -76,7 +76,7 @@ def compute(circuit, group_by=None, sel_src=None, sel_dest=None, **_):
             'common': {'src_group_values': src_group_values, 'tgt_group_values': tgt_group_values}}
 
 
-def plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, group_by=None, **_):
+def plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, group_by=None, **_):  # pragma:no cover
     """Connectivity (matrix) plotting."""
     if isdiff: # Difference plot
         assert -vmin == vmax, 'ERROR: Symmetric plot range required!'
