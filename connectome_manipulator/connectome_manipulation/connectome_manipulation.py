@@ -8,6 +8,7 @@
 import importlib
 import json
 import os
+import pandas as pd
 import resource
 import subprocess
 import time
@@ -160,8 +161,11 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
     create_new_file_from_template(os.path.join(workflow_path, workflow_file), template_file, config_replacements, skip_comments=False)
 
 
-def resource_profiling(enabled=False, description='', reset=False):
-    '''TODO: improve docstring'''
+def resource_profiling(enabled=False, description='', reset=False, csv_file=None):
+    '''Resources profiling (memory consumption, execution time) and writing to log file
+       Optional: If csv_file is provided, data is also written to a .csv file for
+                 better machine readability
+    '''
     if not enabled:
         return
 
@@ -184,13 +188,13 @@ def resource_profiling(enabled=False, description='', reset=False):
         resource_profiling.t_start = t_end
 
     if len(description) > 0:
-        description = ' [' + description + ']'
+        description_log = ' [' + description + ']'
 
-    field_width = 36 + max(len(description) - 14, 0)
+    field_width = 36 + max(len(description_log) - 14, 0)
 
     log_msg = '\n'
     log_msg = log_msg + '*' * field_width + '\n'
-    log_msg = log_msg + '* ' + 'RESOURCE PROFILING{}'.format(description).ljust(field_width - 4) + ' *' + '\n'
+    log_msg = log_msg + '* ' + 'RESOURCE PROFILING{}'.format(description_log).ljust(field_width - 4) + ' *' + '\n'
     log_msg = log_msg + '*' * field_width + '\n'
 
     log_msg = log_msg + '* ' + 'Max. memory usage (GB):' + '{:.3f}'.format(mem_curr).rjust(field_width - 27) + ' *' + '\n'
@@ -202,22 +206,45 @@ def resource_profiling(enabled=False, description='', reset=False):
         log_msg = log_msg + '*' * field_width + '\n'
 
         if t_tot > 3600:
-            t_tot = t_tot / 3600
+            t_tot_log = t_tot / 3600
             t_tot_unit = 'h'
         else:
+            t_tot_log = t_tot
             t_tot_unit = 's'
-        log_msg = log_msg + '* ' + f'Total time ({t_tot_unit}):        ' + '{:.3f}'.format(t_tot).rjust(field_width - 27) + ' *' + '\n'
+        log_msg = log_msg + '* ' + f'Total time ({t_tot_unit}):        ' + '{:.3f}'.format(t_tot_log).rjust(field_width - 27) + ' *' + '\n'
 
         if t_dur > 3600:
-            t_dur = t_dur / 3600
+            t_dur_log = t_dur / 3600
             t_dur_unit = 'h'
         else:
+            t_dur_log = t_dur
             t_dur_unit = 's'
-        log_msg = log_msg + '* ' + f'Elapsed time ({t_dur_unit}):      ' + '{:.3f}'.format(t_dur).rjust(field_width - 27) + ' *' + '\n'
+        log_msg = log_msg + '* ' + f'Elapsed time ({t_dur_unit}):      ' + '{:.3f}'.format(t_dur_log).rjust(field_width - 27) + ' *' + '\n'
 
     log_msg = log_msg + '*' * field_width + '\n'
 
     log.profiling(log_msg)
+
+    # Add entry to performance table and write to .csv file (optional)
+    if csv_file is not None:
+        if not hasattr(resource_profiling, 'perf_table') or reset:
+            resource_profiling.perf_table = pd.DataFrame([], columns=['label', 'i_split', 'N_split', 'mem_curr', 'mem_diff', 't_tot', 't_dur'])
+            resource_profiling.perf_table.index.name = 'id'
+            if not os.path.exists(os.path.split(csv_file)[0]):
+                os.makedirs(os.path.split(csv_file)[0])
+
+        label, *spec = description.split('-')
+        i_split = np.nan
+        N_split = np.nan
+
+        if len(spec) == 1:
+            spec = spec[0].split('/')
+            if len(spec) == 2:
+                i_split = spec[0]
+                N_split = spec[1]
+
+        resource_profiling.perf_table.loc[resource_profiling.perf_table.shape[0]] = [label, i_split, N_split, mem_curr, mem_diff, t_tot, t_dur]
+        resource_profiling.perf_table.to_csv(csv_file)
 
 
 def main(manip_config, do_profiling=False):
@@ -231,10 +258,11 @@ def main(manip_config, do_profiling=False):
             os.makedirs(output_path)
 
     # Initialize logger
-    log.logging_init(output_path, name=__name__.rsplit('.', maxsplit=1)[-1])
+    log_file = log.logging_init(output_path, name=__name__.rsplit('.', maxsplit=1)[-1])
 
     # Initialize profiler
-    resource_profiling(do_profiling, 'initial', reset=True)
+    csv_file = os.path.splitext(log_file)[0] + '.csv'
+    resource_profiling(do_profiling, 'initial', reset=True, csv_file=csv_file)
 
     # Load circuit
     log.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'SONATA (.json) config required!')
@@ -265,20 +293,20 @@ def main(manip_config, do_profiling=False):
         edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
         log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties between {len(split_ids)} neurons')
         N_syn_in.append(edges_table.shape[0])
-        resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}')
+        resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}', csv_file=csv_file)
 
         # Apply connectome manipulation
         aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
         edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
         log.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
         N_syn_out.append(edges_table_manip.shape[0])
-        resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}')
+        resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}', csv_file=csv_file)
 
         # Write back connectome to .parquet file
         parquet_file_manip = os.path.splitext(os.path.join(parquet_path, os.path.split(edges_file)[1]))[0] + f'_{manip_config["manip"]["name"]}' + (f'.{i_split:04d}' if N_split > 1 else '') + '.parquet'
         edges_to_parquet(edges_table_manip, parquet_file_manip)
         parquet_file_list.append(parquet_file_manip)
-        resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}')
+        resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
 
     log.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
 
@@ -344,4 +372,4 @@ def main(manip_config, do_profiling=False):
         if not manip_config.get('workflow_template') is None:
             create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
 
-    resource_profiling(do_profiling, 'final')
+    resource_profiling(do_profiling, 'final', csv_file=csv_file)

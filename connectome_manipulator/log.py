@@ -6,6 +6,12 @@ import sys
 
 
 PROFILING_LOG_LEVEL = logging.INFO + 5
+ASSERTION_LOG_LEVEL = logging.ERROR + 5
+
+def info(msg, *args, **kwargs):
+    '''Wrapper for info logging'''
+    return logging.info(msg, *args, **kwargs)
+
 
 def profiling(msg, *args, **kwargs):
     '''Wrapper for profiling logging'''
@@ -17,15 +23,15 @@ def warning(msg, *args, **kwargs):
     return logging.warning(msg, *args, **kwargs)
 
 
-def info(msg, *args, **kwargs):
-    '''Wrapper for info logging'''
-    return logging.info(msg, *args, **kwargs)
+def error(msg, *args, **kwargs):
+    '''Wrapper for error logging'''
+    return logging.error(msg, *args, **kwargs)
 
 
 def log_assert(cond, msg):
-    '''Add assert with logging'''
+    '''Assertion with logging'''
     if not cond:
-        logging.error(msg)
+        logging.log(ASSERTION_LOG_LEVEL, msg)
     assert cond, msg
 
 
@@ -43,5 +49,8 @@ def logging_init(output_path, name):
     stream_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 
-    # Add custom log level for profiling
+    # Add custom log levels
     logging.addLevelName(PROFILING_LOG_LEVEL, 'PROFILING')
+    logging.addLevelName(ASSERTION_LOG_LEVEL, 'ASSERTION')
+
+    return log_file
