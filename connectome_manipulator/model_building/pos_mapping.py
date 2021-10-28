@@ -19,7 +19,7 @@ from voxcell.nexus.voxelbrain import Atlas
 from connectome_manipulator.model_building import model_building
 
 
-def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name=None, **_):
+def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name=None, NN_only=False, **_):
     """Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) of a given nodes population."""
     # Get neuron positions
     if nodes_pop_name is None:
@@ -64,15 +64,22 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
     map_indices = flatmap.positions_to_indices(nrn_pos, keep_fraction=True) # Keep fractions within voxels => fraction x.5 corresponds to voxel center
     map_pos = np.floor(map_indices) + 0.5 # Voxel values assumed to correspond to voxel center
 
-    # Linear interpolation, if possible
-    flat_x_intpl = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices)
-    flat_y_intpl = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices)
-    flat_z_intpl = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices)
-
-    # Nearest-neighbor interpolation, otherwise
-    flat_x_intpl[np.isnan(flat_x_intpl)] = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices[np.isnan(flat_x_intpl)], method='nearest')
-    flat_y_intpl[np.isnan(flat_y_intpl)] = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices[np.isnan(flat_y_intpl)], method='nearest')
-    flat_z_intpl[np.isnan(flat_z_intpl)] = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices[np.isnan(flat_z_intpl)], method='nearest')
+    # Nearest-neighbor interpolation only (FASTER)
+    if NN_only:
+        print('WARNING: Using nearest-neighbor interpolation only!')
+        flat_x_intpl = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices, method='nearest')
+        flat_y_intpl = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices, method='nearest')
+        flat_z_intpl = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices, method='nearest')
+    else:
+        # Linear interpolation, if possible
+        flat_x_intpl = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices)
+        flat_y_intpl = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices)
+        flat_z_intpl = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices)
+    
+        # Nearest-neighbor interpolation, otherwise
+        flat_x_intpl[np.isnan(flat_x_intpl)] = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices[np.isnan(flat_x_intpl)], method='nearest')
+        flat_y_intpl[np.isnan(flat_y_intpl)] = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices[np.isnan(flat_y_intpl)], method='nearest')
+        flat_z_intpl[np.isnan(flat_z_intpl)] = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices[np.isnan(flat_z_intpl)], method='nearest')
 
     flat_pos = np.vstack((flat_x_intpl, flat_y_intpl, flat_z_intpl)).T
 
@@ -124,6 +131,14 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, model_inputs, model_params, 
     plt.savefig(out_fn)
 
     # Cell distances in atlas vs. flat space
+    max_plot = 10000
+    if len(nrn_ids) > max_plot:
+        print('WARNING: Using subsampling for distance plots!')
+        nrn_sel = np.random.choice(len(nrn_ids), max_plot)
+        nrn_ids = nrn_ids[nrn_sel]
+        nrn_pos = nrn_pos[nrn_sel, :]
+        nrn_pos_model = nrn_pos_model[nrn_sel, :]
+
     dist_mat_data = distance_matrix(nrn_pos, nrn_pos)
     dist_mat_model = distance_matrix(nrn_pos_model, nrn_pos_model)
 
