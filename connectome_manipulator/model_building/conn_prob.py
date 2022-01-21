@@ -269,9 +269,9 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_bins + 1) * bin_size_um
 
-    p_conn_dist, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat], [dist_bins])
+    p_conn_dist, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat], [dist_bins])
 
-    return {'p_conn_dist': p_conn_dist, 'dist_bins': dist_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_dist': p_conn_dist, 'count_conn': count_conn, 'count_all': count_all, 'dist_bins': dist_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
 def build_2nd_order(p_conn_dist, dist_bins, **_):
@@ -290,7 +290,7 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
             'model_params': {'a_opt': a_opt, 'b_opt': b_opt}}
 
 
-def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (2nd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -336,22 +336,45 @@ def plot_2nd_order(out_dir, p_conn_dist, dist_bins, src_cell_count, tgt_cell_cou
     print(f'INFO: Saving {out_fn}...')
     plt.savefig(out_fn)
 
+    # Data counts
+    plt.figure(figsize=(6, 4), dpi=300)
+    plt.bar(dist_bins[:-1] + bin_offset, count_all, width=1.5 * bin_offset, label='All pair count')
+    plt.bar(dist_bins[:-1] + bin_offset, count_conn, width=1.0 * bin_offset, label='Connection count')
+    plt.gca().set_yscale('log')
+    plt.grid()
+    plt.xlabel('Distance [$\\mu$m]')
+    plt.ylabel('Count')
+    plt.title(f'Distance-dependent connection counts (N = {src_cell_count}x{tgt_cell_count} cells)\n<Position mapping: {pos_map_file}>')
+    plt.legend()
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_counts.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
+
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   3rd order (bipolar distance-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
-def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, no_dist_mapping=False, **_):
     """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
+    src_nrn_pos_raw, tgt_nrn_pos_raw = get_neuron_positions([n.positions for n in nodes], [src_node_ids, tgt_node_ids]) # Raw positions w/o mapping
     pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    if pos_map is None:
+        src_nrn_pos = src_nrn_pos_raw
+        tgt_nrn_pos = tgt_nrn_pos_raw
+    else:
+        src_nrn_pos, tgt_nrn_pos = get_neuron_positions(pos_map, [src_node_ids, tgt_node_ids])
 
     # Compute distance matrix
-    dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
+    if no_dist_mapping: # Don't use position mapping for computing distances
+        dist_mat = compute_dist_matrix(src_nrn_pos_raw, tgt_nrn_pos_raw)
+    else: # Use position mapping for computing distances
+        dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
 
-    # Compute bipolar matrix (along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
+    # Compute bipolar matrix (always using position mapping, if provided; along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
     bip_mat = compute_bip_matrix(src_nrn_pos, tgt_nrn_pos)
 
     # Extract bipolar distance-dependent connection probabilities
@@ -366,7 +389,7 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_dist_bip': p_conn_dist_bip, 'dist_bins': dist_bins, 'bip_bins': bip_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_3rd_order(p_conn_dist_bip, dist_bins, _bip_bins, **_):
+def build_3rd_order(p_conn_dist_bip, dist_bins, **_):
     """Build 3rd order model (bipolar exp. distance-dependent conn. prob.)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
 
@@ -388,7 +411,7 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, _bip_bins, **_):
             'model_params': {'aN_opt': aN_opt, 'bN_opt': bN_opt, 'aP_opt': aP_opt, 'bP_opt': bP_opt}}
 
 
-def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, _bip_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (3rd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)

@@ -12,7 +12,7 @@ import connectome_manipulator.log as test_module
 
 def test_log_assert():
     msg = 'failing_assert_message'
-    with patch('logging.error') as patched:
+    with patch('logging.log') as patched:
         with pytest.raises(AssertionError, match=msg):
             test_module.log_assert(False, msg)
 
