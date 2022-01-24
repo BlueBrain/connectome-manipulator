@@ -38,5 +38,6 @@ def test_logging_init():
         # check that the file matches the naming policy
         assert re.match(rf'^{logname}.*\.log$', dir_listing[0])
 
-        # check that PROFILING log level exists
+        # check that PROFILING and ASSERTION log levels exist
         assert test_module.logging.getLevelName(test_module.logging.INFO + 5) == 'PROFILING'
+        assert test_module.logging.getLevelName(test_module.logging.ERROR + 5) == 'ASSERTION'

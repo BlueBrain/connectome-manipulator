@@ -11,3 +11,10 @@
 | __[/syn_addition.py](syn_addition.py)__ | __Synapse addition__ <br> Adds a certain number of synapses (e.g., total percentage, percentage per connection, ...) to existing connections between selected groups of neurons (layers, m-types, ...) by (i) duplicating existing synapses, (ii) deriving from existing synapses (duplicating and randomizing certain properties based on a model), or (iii) loading from an external connectome. <br> Optionally: Re-scaling gSyns (conductances) to keep sum of gSyns per connection constant. | ![Synapse addition](../../doc/source/images/syn_add.png "Synapse addition") |
 | __[/conn_rewiring.py](conn_rewiring.py)__ | __Connection rewiring__ <br> Rewiring of connections between pairs of neurons based on a given connection probability model and re-using existing synapses, (a) preserving #synapses/connections, (b) duplicating existing synapses to form new connections (and parametrizing them by randomly sampling synaptic property values from other existing synapses), and (c) removing unused synapses. <br> Optionally: Preserving in-degrees and #synapses/connections, without adding or deleting synapses. | ![Connection rewiring](../../doc/source/images/conn_rewire.png "Connection rewiring") |
 | | Algorithm: For each post-synaptic target neuron... <br> <br> ![Model-based connection rewiring](../../doc/source/images/conn_rewire_model.png "Model-based connection rewiring") | |
+
+## Note:
+In general, each connectome manipulation function must contain a definition of <code>apply(edges_table, nodes, aux_dict, ...)</code>:
+- The first three parameters are always: edges_table, nodes, aux_dict
+- aux_dict contains information about data splits; may also be used to pass global information from one split iteration to another
+- Other parameters may be added (optional)
+- Returns a manipulated edged_table
