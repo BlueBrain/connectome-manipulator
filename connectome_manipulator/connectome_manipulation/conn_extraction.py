@@ -18,6 +18,7 @@ def apply(edges_table, nodes, _aux_dict, target_name=None, node_sets_file=None):
         the cell target is not part of the circuit's intrinsic node sets."""
 
     if target_name is None:
+        log.info(f'No target name provided, returning empty connectome!')
         return edges_table.loc[[]].copy()
 
     # Load cell targets
