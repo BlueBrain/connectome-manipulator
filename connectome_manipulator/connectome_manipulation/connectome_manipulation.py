@@ -1,9 +1,9 @@
-'''TODO: improve description'''
-# Connectome manipulation:
-#   Main module for
-#   - loading a SONATA connectome using SNAP
-#   - applying manipulations to the connectome
-#   - writing back the manipulated connectome and a new circuit config
+"""
+Main module for connectome manipulations:
+  - Loads a SONATA connectome using SNAP
+  - Applies manipulation(s) to the connectome, as specified by the manipulation config dict
+  - Writes back the manipulated connectome to a SONATA edges file, together with a new circuit config
+"""
 
 import importlib
 import json
@@ -162,10 +162,9 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
 
 
 def resource_profiling(enabled=False, description='', reset=False, csv_file=None):  # pragma: no cover
-    """Resources profiling (memory consumption, execution time) and writing to log file
-
-    Optional: If csv_file is provided, data is also written to a .csv file for
-              better machine readability
+    """Resources profiling (memory consumption, execution time) and writing to log file.
+       Optional: If csv_file is provided, data is also written to a .csv file for
+                 better machine readability.
     """
     if not enabled:
         return
@@ -249,7 +248,9 @@ def resource_profiling(enabled=False, description='', reset=False, csv_file=None
 
 
 def main(manip_config, do_profiling=False):  # pragma: no cover
-    """Main entry point for circuit manipulations [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically into N disjoint parts of target neurons (OPTIONAL)]."""
+    """Main entry point for circuit manipulations.
+      [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
+       into N disjoint parts of target neurons (OPTIONAL)]."""
     # Set output path
     if manip_config.get('output_path') is None:
         output_path = manip_config['circuit_path'] # If no path provided, use circuit path for output
@@ -292,7 +293,7 @@ def main(manip_config, do_profiling=False):  # pragma: no cover
 
         # Load edge table containing all edge (=synapse) properties
         edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
-        log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties between {len(split_ids)} neurons')
+        log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties targeting {len(split_ids)} neurons')
         N_syn_in.append(edges_table.shape[0])
         resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}', csv_file=csv_file)
 
