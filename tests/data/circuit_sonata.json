@@ -3,6 +3,7 @@
     "manifest": {
         "$BASE_DIR": "./"
     },
+    "node_sets_file": "$BASE_DIR/node_sets.json",
     "networks": {
         "nodes": [
             {

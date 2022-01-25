@@ -1,0 +1,17 @@
+{
+  "LayerA": {
+    "layer": "LA"
+  },
+  "LayerB": {
+    "layer": "LB"
+  },
+  "LayerC": {
+    "layer": "LC"
+  },
+  "RegionA": {
+    "region": "RA"
+  },
+  "RegionB": {
+    "region": "RB"
+  }
+}

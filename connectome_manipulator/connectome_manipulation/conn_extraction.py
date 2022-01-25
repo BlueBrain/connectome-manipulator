@@ -7,6 +7,7 @@ Description: Extraction of a cell target, i.e., keeping only connections within 
 
 import json
 import numpy as np
+import os
 
 from connectome_manipulator import log
 

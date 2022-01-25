@@ -3,6 +3,7 @@
 | File | Description | Example |
 | :-- | :-- | :-- |
 | __[/no_manipulation.py](no_manipulation.py)__ | __No manipulation__ <br> This is just a dummy manipulation function performing no manipulation at all. This function is intended as a control condition to run the manipulation pipeline without actually manipulating the connectome. |  |
+| __[/conn_extraction.py](conn_extraction.py)__ | __Connection extraction__ <br> Extracts the connectome of a given cell target (i.e., a named group of neurons, a.k.a. node set), keeping only connections among these target cells. Cell targets intrinsic to a circuit or provided through an external SONATA node sets file containing lists of GIDs (.json) are supported. If no cell target is specified, an empty connectome file is returned. The nodes (cell) table is always kept unchanged. | ![Connection extraction](../../doc/source/images/conn_extraction.png "Connection extraction") |
 | __[/conn_removal.py](conn_removal.py)__ | __Connection removal__ <br> Removes a certain percentage of connections (i.e., all synapses belonging to a connection) between selected groups of neurons (layers, m-types, ...), optionally removing only connections within a certain range of #synapses/connection. | ![Connection removal](../../doc/source/images/conn_removal.png "Connection removal") |
 | __[/syn_removal.py](syn_removal.py)__ | __Synapse removal__ <br> Removes a certain percentage of synapses between selected groups of neurons (layers, m-types, ...), resulting in (a) reduced #synapses/connection or (b) removed connections (i.e., all synapses of a connection removed). | ![Synapse removal](../../doc/source/images/syn_removal.png "Synapse removal") |
 |                     | Optionally: <br> Keeping connections (i.e., at least 1 synapse/connection kept). | ![Synapse removal, keeping connections](../../doc/source/images/syn_removal_keepConn.png "Synapse removal, keeping connections") |
@@ -14,7 +15,7 @@
 
 ## Note:
 In general, each connectome manipulation function must contain a definition of <code>apply(edges_table, nodes, aux_dict, ...)</code>:
-- The first three parameters are always: edges_table, nodes, aux_dict
-- aux_dict contains information about data splits; may also be used to pass global information from one split iteration to another
+- The first three parameters are always: <code>edges_table</code>, <code>nodes</code>, <code>aux_dict</code>
+- <code>aux_dict</code> contains information about data splits; may also be used to pass global information from one split iteration to another
 - Other parameters may be added (optional)
-- Returns a manipulated edged_table
+- Returns a manipulated <code>edges_table</code>
