@@ -76,7 +76,7 @@ def edges_to_parquet(edges_table, output_file):
     edges_table.to_parquet(output_file, index=False)
 
 
-def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
+def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_parquet=False):
     """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!)."""
     log.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
     input_files = ' '.join(input_file_list)
@@ -90,6 +90,12 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files):
                             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     log.info(proc.communicate()[0].decode())
     log.log_assert(os.path.exists(output_file), 'Parquet conversion error - SONATA file not created successfully!')
+
+    # Delete temporary parquet files (optional)
+    if not keep_parquet:
+        log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s)')
+        for fn in input_file_list:
+            os.remove(fn)
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
@@ -247,7 +253,7 @@ def resource_profiling(enabled=False, description='', reset=False, csv_file=None
         resource_profiling.perf_table.to_csv(csv_file)
 
 
-def main(manip_config, do_profiling=False):  # pragma: no cover
+def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):  # pragma: no cover
     """Main entry point for circuit manipulations.
       [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
        into N disjoint parts of target neurons (OPTIONAL)]."""
@@ -291,30 +297,34 @@ def main(manip_config, do_profiling=False):  # pragma: no cover
     aux_dict = {} # Auxiliary dict to pass information from one split iteration to another
     for i_split, split_ids in enumerate(node_ids_split):
 
-        # Load edge table containing all edge (=synapse) properties
-        edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
-        log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties targeting {len(split_ids)} neurons')
-        N_syn_in.append(edges_table.shape[0])
-        resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}', csv_file=csv_file)
-
-        # Apply connectome manipulation
-        aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
-        edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
-        log.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
-        N_syn_out.append(edges_table_manip.shape[0])
-        resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}', csv_file=csv_file)
-
-        # Write back connectome to .parquet file
+        # Resume option: Don't recompute, if .parquet file of current split already exists
         parquet_file_manip = os.path.splitext(os.path.join(parquet_path, os.path.split(edges_file)[1]))[0] + f'_{manip_config["manip"]["name"]}' + (f'.{i_split:04d}' if N_split > 1 else '') + '.parquet'
-        edges_to_parquet(edges_table_manip, parquet_file_manip)
+        if do_resume and os.path.exists(parquet_file_manip):
+            log.info(f'Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})')
+        else:
+            # Load edge table containing all edge (=synapse) properties
+            edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
+            log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties targeting {len(split_ids)} neurons')
+            N_syn_in.append(edges_table.shape[0])
+            resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}', csv_file=csv_file)
+
+            # Apply connectome manipulation
+            aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
+            edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
+            log.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
+            N_syn_out.append(edges_table_manip.shape[0])
+            resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}', csv_file=csv_file)
+
+            # Write back connectome to .parquet file
+            edges_to_parquet(edges_table_manip, parquet_file_manip)
+            resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
         parquet_file_list.append(parquet_file_manip)
-        resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
 
     log.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
 
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
-    parquet_to_sonata(parquet_file_list, edges_file_manip, nodes, nodes_files)
+    parquet_to_sonata(parquet_file_list, edges_file_manip, nodes, nodes_files, keep_parquet)
 
     # Create new SONATA config (.JSON) from original config file
     edges_fn_manip = os.path.split(edges_file_manip)[1]
