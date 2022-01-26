@@ -70,6 +70,10 @@ As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are di
 
 > __Note 4:__ Synapse indices do not need to be unique across all manipulated edge tables, as synapse indices are not stored in the resulting SONATA connectome.
 
+> __Note 5:__ By default, all blocks are being processed and existing .parquet files will be overwritten. Optionally, processing can be resumed from an earlier (incomplete) run, re-using all .parquet files that already exist, instead of re-computing them.
+
+> __Note 6:__ By default, all .parquet files will be deleted after successfull completion, i.e., after the manipulated SONATA connectome file has been generated. Optionally, these temporary .parquet files can be kept as well.
+
 | ![Operation principle](doc/source/images/operation_principle.png "Operation principle of the 'Connectome manipulator', illustrating the block-based processing architecture.") |
 | :-: |
 | __Figure 2:__ Operation principle of the _Connectome manipulator_, illustrating the block-based processing architecture. |
