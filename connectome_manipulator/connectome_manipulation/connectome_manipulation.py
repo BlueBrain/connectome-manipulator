@@ -320,7 +320,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
             resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
         parquet_file_list.append(parquet_file_manip)
 
-    log.info(f'Total input/output synapse counts: {np.sum(N_syn_in)}/{np.sum(N_syn_out)} (Diff: {np.sum(N_syn_out) - np.sum(N_syn_in)})\n')
+    log.info(f'Total input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n')
 
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
