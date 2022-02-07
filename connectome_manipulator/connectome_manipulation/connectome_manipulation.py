@@ -20,15 +20,22 @@ from bluepysnap.circuit import Circuit
 from connectome_manipulator import log
 
 
-def load_circuit(sonata_config, N_split=1):
-    """Load SONATA circuit using SNAP."""
+def load_circuit(sonata_config, N_split=1, popul_name=None):
+    """Load given edges population of a SONATA circuit using SNAP."""
     # Load circuit
     log.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
     c = Circuit(sonata_config)
 
     # Select edge population [assuming exactly one edge population in given edges file (to be manipulated)]
-    log.log_assert(len(c.edges.population_names) == 1, 'Only a single edge population per file supported to be manipulated!')
-    edges = c.edges[c.edges.population_names[0]]
+    log.log_assert(len(c.edges.population_names) > 0, 'No edge population found!')
+    if popul_name is None:
+        if len(c.edges.population_names) == 1:
+            popul_name = c.edges.population_names[0] # Select the only existing population
+        else:
+            popul_name = 'default' # Use default name
+            log.warning(f'Multiple edges populations found - Trying to load "{popul_name}" population!')
+    log.log_assert(popul_name in c.edges.population_names, f'Population "{popul_name}" not found in edges file!')
+    edges = c.edges[popul_name]
     edges_file = c.config['networks']['edges'][0]['edges_file']
 
     # Select corresponding source/target nodes populations
@@ -132,7 +139,7 @@ def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_e
         config = json.load(file, object_hook=fct_mod)
 
     if rebase_dir is not None:
-        config['manifest'] = {'$ORIG_BASE_DIR': rebase_dir, **config['manifest']}
+        config['manifest'] = {'$ORIG_BASE_DIR': rebase_dir, **config['manifest'], '$BASE_DIR': '.'}
 
     with open(new_config_file, 'w') as f:
         json.dump(config, f, indent=2)
@@ -275,9 +282,14 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
     # Load circuit
     log.log_assert(os.path.splitext(manip_config['circuit_config'])[-1] == '.json', 'SONATA (.json) config required!')
     sonata_config = os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
+    with open(sonata_config, 'r') as file:
+        cfg_dict = json.load(file)
+        log.log_assert(cfg_dict['manifest']['$BASE_DIR'] == '.' or cfg_dict['manifest']['$BASE_DIR'] == os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]),
+                       'Base dir in SONATA config must point to root directory where config file is assumed!') # Otherwise, manipulated folder structure may not be consistent any more
     N_split = max(manip_config.get('N_split_nodes', 1), 1)
 
-    nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split)
+    popul_name = manip_config.get('population_name')
+    nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split, popul_name)
 
     log.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'Edges file not within circuit path!')
     edges_fn = os.path.split(edges_file)[1]
