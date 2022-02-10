@@ -14,11 +14,21 @@ import connectome_manipulator.connectome_manipulation.connectome_manipulation as
 
 
 def test_load_circuit():
+    # Check error handling if no edge population exists
+    with patch(f'connectome_manipulator.connectome_manipulation.connectome_manipulation.Circuit'
+               ) as patched:
+        patched.return_value = Mock(edges=Mock(population_names=[]))
+
+        expected_error = 'No edge population found!'
+        with pytest.raises(AssertionError, match=expected_error):
+            test_module.load_circuit('fake_config')
+
+    # Check error handling if more than one non-default populations exist and no population name is specified
     with patch(f'connectome_manipulator.connectome_manipulation.connectome_manipulation.Circuit'
                ) as patched:
         patched.return_value = Mock(edges=Mock(population_names=['name1', 'name2']))
 
-        expected_error = 'Only a single edge population per file supported to be manipulated!'
+        expected_error = 'Population "default" not found in edges file!'
         with pytest.raises(AssertionError, match=expected_error):
             test_module.load_circuit('fake_config')
 
@@ -151,7 +161,7 @@ def test_create_sonata_config():
 
         assert os.path.basename(res['networks']['edges'][0]['edges_file']) == new_edges
 
-        test_module.create_sonata_config(new_config_path, new_edges, config_path, orig_edges, rebase_dir=tempdir)
+        test_module.create_sonata_config(new_config_path, new_edges, config_path, orig_edges, orig_base_dir=os.path.split(config_path)[0])
         res = json_read(new_config_path)
         config = json_read(config_path)
 
@@ -159,8 +169,14 @@ def test_create_sonata_config():
         # To me it seems that the $BASE_DIR and $ORIG_BASE_DIR should be the other way around in manifest.
         # i.e., res['manifest']['$ORIG_BASE_DIR'] should equal to config['manifest']['$BASE_DIR']
         # Or maybe I misunderstood something
-        assert res['manifest']['$ORIG_BASE_DIR'] == tempdir
-        assert res['manifest']['$BASE_DIR'] == config['manifest']['$BASE_DIR']
+        # NOTE by chr-pok on 10/02/2022:
+        # Yes indeed, there was some confusion. "rebase_dir" was meant to contain the original dir from which
+        # to re-base the config. It has been renamed to "orig_base_dir" to avoid confusion.
+        assert res['manifest']['$BASE_DIR'] == '.'
+        if os.path.isabs(config['manifest']['$BASE_DIR']):
+            assert res['manifest']['$ORIG_BASE_DIR'] == config['manifest']['$BASE_DIR']
+        else:
+            assert res['manifest']['$ORIG_BASE_DIR'] == os.path.normpath(os.path.join(os.path.split(config_path)[0], config['manifest']['$BASE_DIR']))
         assert os.path.dirname(res['networks']['nodes'][0]['nodes_file']) == '$ORIG_BASE_DIR'
         assert os.path.dirname(res['networks']['edges'][0]['edges_file']) == '$BASE_DIR'
 

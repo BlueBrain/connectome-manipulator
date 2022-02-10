@@ -58,7 +58,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     tgt_node_ids = tgt_nodes.ids()
     node_ids_split = np.split(tgt_node_ids, np.cumsum([np.ceil(len(tgt_node_ids) / N_split).astype(int)] * (N_split - 1)))
 
-    return nodes, nodes_files, node_ids_split, edges, edges_file
+    return nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
 
 
 def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
@@ -125,21 +125,31 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
         file.write(content)
 
 
-def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, rebase_dir=None):
+def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, orig_base_dir=None, popul_name=None):
     """Create new SONATA config (.JSON) from original, incl. modifications."""
     log.info(f'Creating SONATA config {new_config_file}')
-    fct_rebase = lambda d: {k: v.replace('$BASE_DIR', '$ORIG_BASE_DIR') if isinstance(v, str) and 'edges' not in k.lower() else v
-                            for k, v in d.items()}
-    fct_rename = lambda d: {k: v.replace(orig_edges_fn, new_edges_fn) if isinstance(v, str) else v for k, v in d.items()}
-    if rebase_dir is None:
-        fct_mod = fct_rename
-    else:
-        fct_mod = lambda d: fct_rename(fct_rebase(d))
-    with open(orig_config_file, 'r') as file:
-        config = json.load(file, object_hook=fct_mod)
 
-    if rebase_dir is not None:
-        config['manifest'] = {'$ORIG_BASE_DIR': rebase_dir, **config['manifest'], '$BASE_DIR': '.'}
+    def fct_update(d):
+        if orig_base_dir is not None:
+            d = {k: v.replace('$BASE_DIR', '$ORIG_BASE_DIR') if isinstance(v, str) else v for k, v in d.items()}
+
+        if 'edges_file' in d.keys():
+            if popul_name is None or 'populations' not in d.keys() or ('populations' in d.keys() and popul_name in d['populations']):
+                if orig_base_dir is not None:
+                    if '$NETWORK_EDGES_DIR' in d['edges_file']:
+                        d['edges_file'] = d['edges_file'].replace('$NETWORK_EDGES_DIR', '$MANIP_NETWORK_EDGES_DIR')
+                    else:
+                        d['edges_file'] = d['edges_file'].replace('$ORIG_BASE_DIR', '$BASE_DIR')
+                d['edges_file'] = d['edges_file'].replace(orig_edges_fn, new_edges_fn)
+        return d
+    
+    with open(orig_config_file, 'r') as file:
+        config = json.load(file, object_hook=fct_update)
+
+    if orig_base_dir is not None:
+        config['manifest'] = {'$ORIG_BASE_DIR': orig_base_dir, **config['manifest'], '$BASE_DIR': '.'}
+        if '$NETWORK_EDGES_DIR' in config['manifest']:
+            config['manifest']['$MANIP_NETWORK_EDGES_DIR'] = config['manifest']['$NETWORK_EDGES_DIR'].replace('$ORIG_BASE_DIR', '$BASE_DIR')
 
     with open(new_config_file, 'w') as f:
         json.dump(config, f, indent=2)
@@ -284,12 +294,12 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
     sonata_config = os.path.join(manip_config['circuit_path'], manip_config['circuit_config'])
     with open(sonata_config, 'r') as file:
         cfg_dict = json.load(file)
-        log.log_assert(cfg_dict['manifest']['$BASE_DIR'] == '.' or cfg_dict['manifest']['$BASE_DIR'] == os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]),
-                       'Base dir in SONATA config must point to root directory where config file is assumed!') # Otherwise, manipulated folder structure may not be consistent any more
+        log.log_assert(os.path.normpath(cfg_dict['manifest']['$BASE_DIR']) == '.' or os.path.normpath(cfg_dict['manifest']['$BASE_DIR']) == os.path.normpath(os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0])),
+                       'Base dir in SONATA config must point to root directory of config file!') # Otherwise, manipulated folder structure may not be consistent any more
     N_split = max(manip_config.get('N_split_nodes', 1), 1)
 
-    popul_name = manip_config.get('population_name')
-    nodes, nodes_files, node_ids_split, edges, edges_file = load_circuit(sonata_config, N_split, popul_name)
+    popul_name_spec = manip_config.get('population_name')
+    nodes, nodes_files, node_ids_split, edges, edges_file, popul_name = load_circuit(sonata_config, N_split, popul_name_spec)
 
     log.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'Edges file not within circuit path!')
     edges_fn = os.path.split(edges_file)[1]
@@ -341,7 +351,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
     # Create new SONATA config (.JSON) from original config file
     edges_fn_manip = os.path.split(edges_file_manip)[1]
     sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
-    create_sonata_config(sonata_config_manip, edges_fn_manip, sonata_config, edges_fn, rebase_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None)
+    create_sonata_config(sonata_config_manip, edges_fn_manip, sonata_config, edges_fn, orig_base_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None, popul_name=popul_name)
 
     # Write manipulation config to JSON file
     json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
@@ -365,7 +375,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
         # Symbolic link for edges.sonata
         symlink_src = os.path.relpath(edges_file_manip, os.path.split(nrn_path_manip)[0])
         symlink_dst = os.path.join(os.path.split(nrn_path_manip)[0], os.path.splitext(edges_fn_manip)[0] + '.sonata')
-        if os.path.isfile(symlink_dst):
+        if os.path.isfile(symlink_dst) or os.path.islink(symlink_dst):
             os.remove(symlink_dst) # Remove if already exists
         os.symlink(symlink_src, symlink_dst)
         log.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
