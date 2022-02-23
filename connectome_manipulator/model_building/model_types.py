@@ -74,7 +74,7 @@ class AbstractModel(metaclass=ABCMeta):
         data_dict = self.get_data_dict()
         assert np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!'
         data_file = os.path.splitext(model_file)[0] + '.h5'
-        for idx, (key, df) in enumerate(data_dict):
+        for idx, (key, df) in enumerate(data_dict.items()):
             df.to_hdf(data_file, key, append=idx > 0)
         model_dict['data_keys'] = list(data_dict.keys())
 
@@ -86,11 +86,13 @@ class AbstractModel(metaclass=ABCMeta):
 
     def load_model(self, model_file):
         """Load model from file: Model dict from .json, model data (if any) from supplementary .h5 data file."""
+        assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
 
         # Load supplementary model data (if any) from .h5 data file [same name and folder as .json file]
         data_file = os.path.splitext(model_file)[0] + '.h5'
+        assert os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!'
         data_dict = {key: pd.read_hdf(data_file, key) for key in model_dict['data_keys']}
 
         return model_dict, data_dict
