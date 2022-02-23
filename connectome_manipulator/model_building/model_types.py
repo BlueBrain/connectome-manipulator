@@ -27,8 +27,14 @@ class AbstractModel(metaclass=ABCMeta):
         """Names of model data frames which are part of the model."""
         pass
 
+    @property
     @abstractmethod
-    def apply(self, **kwargs):
+    def input_names(self):
+        """Names of model inputs which are part of the model."""
+        pass
+
+    @abstractmethod
+    def get_model_output(self, **kwargs):
         """Abstract method for returning model output given its model inputs."""
         pass
     #
@@ -60,6 +66,15 @@ class AbstractModel(metaclass=ABCMeta):
         assert np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!'
         for d in self.data_names:
             setattr(self, d, data_dict.pop(d))
+
+    def apply(self, **kwargs):
+        """Main method for applying model, i.e., returning model output given its model inputs.
+           [Calls get_model_output() which must be implemented in specific model subclass!]"""
+        assert np.all([inp in kwargs for inp in self.input_names]), f'ERROR: Missing model inputs! Must contain input values for {set(self.input_names)}.'
+        inp_dict = {inp: kwargs.pop(inp) for inp in self.input_names}
+        if len(kwargs) > 0:
+            print(f'WARNING: Unused input(s): {set(kwargs.keys())}!')
+        return self.get_model_output(**inp_dict)
 
     def get_param_dict(self):
         """Return model parameters as dict."""
@@ -95,9 +110,12 @@ class AbstractModel(metaclass=ABCMeta):
             model_dict = jsonpickle.decode(f.read())
 
         # Load supplementary model data (if any) from .h5 data file [same name and folder as .json file]
-        data_file = os.path.splitext(model_file)[0] + '.h5'
-        assert os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!'
-        data_dict = {key: pd.read_hdf(data_file, key) for key in model_dict['data_keys']}
+        if len(model_dict['data_keys']) > 0:
+            data_file = os.path.splitext(model_file)[0] + '.h5'
+            assert os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!'
+            data_dict = {key: pd.read_hdf(data_file, key) for key in model_dict['data_keys']}
+        else:
+            data_dict = {}
 
         return model_dict, data_dict
 
@@ -109,9 +127,10 @@ class LinDelayModel(AbstractModel):
         -Delay min: delay_min (constant)
     """
 
-    # Names of model parameters and data frames which are part if this model
+    # Names of model inputs, parameters and data frames which are part if this model
     param_names = ['delay_mean_coefs', 'delay_std', 'delay_min']
     data_names = []
+    input_names = ['distance']
 
     def __init__(self, **kwargs):
         """Model initialization."""
@@ -134,9 +153,9 @@ class LinDelayModel(AbstractModel):
         """Get delay min for given distance (constant)."""
         return self.delay_min
 
-    def apply(self, **kwargs):
+    def get_model_output(self, **kwargs):
         """Draw distance-dependent delay values from truncated normal distribution [seeded through numpy]."""
-        d_mean = self.get_mean(kwargs['distance'])
-        d_std = self.get_std(kwargs['distance'])
-        d_min = self.get_min(kwargs['distance'])
+        d_mean = self.get_mean(np.array(kwargs['distance']))
+        d_std = self.get_std(np.array(kwargs['distance']))
+        d_min = self.get_min(np.array(kwargs['distance']))
         return truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
