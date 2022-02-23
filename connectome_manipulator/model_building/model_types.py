@@ -40,14 +40,19 @@ class AbstractModel(metaclass=ABCMeta):
     #
     ###########################################################################
 
+    @staticmethod
+    def get_model_type(model_file):
+        assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
+        with open(model_file, 'r') as f:
+            model_dict = jsonpickle.decode(f.read())
+        assert 'model' in model_dict, 'ERROR: Model type not found!'
+        return model_dict['model']
+
     def __init__(self, **kwargs):
         """Model initialization from file or kwargs."""
         if 'model_file' in kwargs: # Load model from file [must be of same type/class]
             model_file = kwargs.pop('model_file')
-            model_dict, data_dict = self.load_model(model_file)
-            assert 'model' in model_dict and model_dict['model'] == self.__class__.__name__, 'ERROR: Model type mismatch!'
-            self.init_params(model_dict)
-            self.init_data(data_dict)
+            self.load_model(model_file)
         else: # Initialize directly from kwargs
             self.init_params(kwargs)
             self.init_data(kwargs)
@@ -63,7 +68,7 @@ class AbstractModel(metaclass=ABCMeta):
     def init_data(self, data_dict):
         """Initialize data frames with supplementary model data from dict (removing used keys from dict)."""
         assert np.all([d in data_dict for d in self.data_names]), f'ERROR: Missing data for model initialization! Must contain initialization for {set(self.data_names)}.'
-        assert np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!'
+        assert np.all([isinstance(data_dict[d], pd.DataFrame) for d in self.data_names]), 'ERROR: Model data must be Pandas dataframes!'
         for d in self.data_names:
             setattr(self, d, data_dict.pop(d))
 
@@ -109,15 +114,21 @@ class AbstractModel(metaclass=ABCMeta):
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
 
+        assert 'model' in model_dict and model_dict.pop('model') == self.__class__.__name__, 'ERROR: Model type mismatch!'
+        self.init_params(model_dict)
+        data_keys = model_dict.pop('data_keys')
+        unused_params = [k for k in model_dict.keys() if k.find('__') != 0] # Unused paramters, excluding meta data ('__<name>') that may be included in file
+        if len(unused_params) > 0:
+            print(f'WARNING: Unused parameter(s) in model file: {set(unused_params)}!')
+
         # Load supplementary model data (if any) from .h5 data file [same name and folder as .json file]
-        if len(model_dict['data_keys']) > 0:
+        if len(data_keys) > 0:
             data_file = os.path.splitext(model_file)[0] + '.h5'
             assert os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!'
-            data_dict = {key: pd.read_hdf(data_file, key) for key in model_dict['data_keys']}
-        else:
-            data_dict = {}
-
-        return model_dict, data_dict
+            data_dict = {key: pd.read_hdf(data_file, key) for key in data_keys}
+            self.init_data(data_dict)
+            if len(data_dict) > 0:
+                print(f'WARNING: Unused data frame(s) in model data file: {set(data_dict.keys())}!')
 
 
 class LinDelayModel(AbstractModel):
