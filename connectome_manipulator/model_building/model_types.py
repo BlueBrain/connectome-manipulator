@@ -41,12 +41,18 @@ class AbstractModel(metaclass=ABCMeta):
     ###########################################################################
 
     @staticmethod
-    def get_model_type(model_file):
+    def model_from_file(model_file):
+        """Wrapper function to load model object from file."""
         assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
         assert 'model' in model_dict, 'ERROR: Model type not found!'
-        return model_dict['model']
+
+        model_type = model_dict['model']
+        model_class = getattr(sys.modules[__class__.__module__], model_type) # Get model subclass
+        model = model_class(model_file=model_file) # Initialize model object
+
+        return model
 
     def __init__(self, **kwargs):
         """Model initialization from file or kwargs."""
