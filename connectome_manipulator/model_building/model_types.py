@@ -37,25 +37,29 @@ class AbstractModel(metaclass=ABCMeta):
     def __init__(self, **kwargs):
         """Model initialization from file or kwargs."""
         if 'model_file' in kwargs: # Load model from file [must be of same type/class]
-            model_dict, data_dict = self.load_model(kwargs['model_file'])
+            model_file = kwargs.pop('model_file')
+            model_dict, data_dict = self.load_model(model_file)
             assert 'model' in model_dict and model_dict['model'] == self.__class__.__name__, 'ERROR: Model type mismatch!'
             self.init_params(model_dict)
             self.init_data(data_dict)
         else: # Initialize directly from kwargs
             self.init_params(kwargs)
             self.init_data(kwargs)
+        if len(kwargs) > 0:
+            print(f'WARNING: Unused parameter(s): {set(kwargs.keys())}!')
 
     def init_params(self, model_dict):
-        """Initialize model parameters from dict."""
-        assert np.all([p in model_dict for p in self.param_names]), 'ERROR: Missing parameters for model initialization!'
+        """Initialize model parameters from dict (removing used keys from dict)."""
+        assert np.all([p in model_dict for p in self.param_names]), f'ERROR: Missing parameters for model initialization! Must contain initialization for {set(self.param_names)}.'
         for p in self.param_names:
-            setattr(self, p, model_dict[p])
+            setattr(self, p, model_dict.pop(p))
 
     def init_data(self, data_dict):
-        """Initialize data frames with supplementary model data from dict."""
-        assert np.all([d in data_dict for d in self.data_names]), 'ERROR: Missing data for model initialization!'
+        """Initialize data frames with supplementary model data from dict (removing used keys from dict)."""
+        assert np.all([d in data_dict for d in self.data_names]), f'ERROR: Missing data for model initialization! Must contain initialization for {set(self.data_names)}.'
+        assert np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!'
         for d in self.data_names:
-            setattr(self, d, data_dict[d])
+            setattr(self, d, data_dict.pop(d))
 
     def get_param_dict(self):
         """Return model parameters as dict."""
