@@ -1,11 +1,13 @@
-'''TODO: improve description'''
-# Connectome model building
-#   Main module for
-#   - loading a SONATA connectome
-#   - extracting connectivity specific data
-#   - building a data-based model
-#   - storing the data and model to disk (to be used by the manipulation pipeline)
-#   - visualizing and comparing data and model
+"""
+Main module for model building:
+  - main(...): Main function for running model building, given a model building config dict
+    * Loads a SONATA connectome
+    * Extracts connectivity specific data
+    * Fits a model to data
+    * Stores the data and model to disk
+    * Visualizes and compares data and model
+  - create_model_config_per_pathway(...): Pathway-specific model building wrapper function
+"""
 
 import importlib
 import os.path
@@ -18,20 +20,21 @@ import numpy as np
 from bluepysnap.circuit import Circuit
 
 
-def get_model(model, model_inputs, model_params):
-    """Returns model function from string representation [so any model function can be saved to file]."""
-    input_str = ','.join(model_inputs + ['model_params=model_params']) # String representation of input variables
-    input_param_str = ','.join(model_inputs + list(model_params.keys())) # String representation of input variables and model parameters
-    model_param_str = ','.join(model_inputs + ['**model_params']) # String representation propagating model parameters
+# NOT USED ANY MORE
+# def get_model(model, model_inputs, model_params):
+#     """Returns model function from string representation [so any model function can be saved to file]."""
+#     input_str = ','.join(model_inputs + ['model_params=model_params']) # String representation of input variables
+#     input_param_str = ','.join(model_inputs + list(model_params.keys())) # String representation of input variables and model parameters
+#     model_param_str = ','.join(model_inputs + ['**model_params']) # String representation propagating model parameters
 
-    inner_model_str = f'lambda {input_param_str}: {model}'
-    full_model_str = f'lambda {input_str}: ({inner_model_str})({model_param_str})' # Use nested lambdas to bind local variables
+#     inner_model_str = f'lambda {input_param_str}: {model}'
+#     full_model_str = f'lambda {input_str}: ({inner_model_str})({model_param_str})' # Use nested lambdas to bind local variables
 
-    model_fct = eval(full_model_str) # Build function
+#     model_fct = eval(full_model_str) # Build function
 
-    # print(f'INFO: Model function: {inner_model_str}')
+#     # print(f'INFO: Model function: {inner_model_str}')
 
-    return model_fct
+#     return model_fct
 
 
 def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_src', dest_sel_key='sel_dest'):
@@ -165,22 +168,23 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
                 pickle.dump(data_dict, f)
 
         # Build model (or load from file)
-        model_file = os.path.join(model_dir, model_build_name + '.pickle')
-        if os.path.exists(model_file) and not force_rebuild:
-            # Load from file
-            print(f'INFO: Loading model from {model_file}')
-            with open(model_file, 'rb') as f:
-                model_dict = pickle.load(f)
-        else:
-            # Compute & save to file
-            t_start = time.time()
-            model_dict = comp_module.build(**data_dict, **comp_kwargs)
-            print(f'<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>')
-            print(f'INFO: Writing model to {model_file}')
-            if not os.path.exists(os.path.split(model_file)[0]):
-                os.makedirs(os.path.split(model_file)[0])
-            with open(model_file, 'wb') as f:
-                pickle.dump(model_dict, f)
+# TODO: TO BE REPLACED BY MODEL CLASS FUNCTIONALITY...
+#         model_file = os.path.join(model_dir, model_build_name + '.pickle')
+#         if os.path.exists(model_file) and not force_rebuild:
+#             # Load from file
+#             print(f'INFO: Loading model from {model_file}')
+#             with open(model_file, 'rb') as f:
+#                 model_dict = pickle.load(f)
+#         else:
+#             # Compute & save to file
+#             t_start = time.time()
+#             model_dict = comp_module.build(**data_dict, **comp_kwargs)
+#             print(f'<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>')
+#             print(f'INFO: Writing model to {model_file}')
+#             if not os.path.exists(os.path.split(model_file)[0]):
+#                 os.makedirs(os.path.split(model_file)[0])
+#             with open(model_file, 'wb') as f:
+#                 pickle.dump(model_dict, f)
 
         # Visualize data vs. model
         comp_module.plot(**data_dict, **model_dict, **comp_kwargs, out_dir=out_dir)

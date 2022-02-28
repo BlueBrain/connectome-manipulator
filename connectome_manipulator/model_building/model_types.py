@@ -37,6 +37,11 @@ class AbstractModel(metaclass=ABCMeta):
     def get_model_output(self, **kwargs):
         """Abstract method for returning model output given its model inputs."""
         pass
+
+    @abstractmethod
+    def get_model_str(self):
+        """Abstract method for returning a model string describing the model."""
+        pass
     #
     ###########################################################################
 
@@ -138,8 +143,8 @@ class AbstractModel(metaclass=ABCMeta):
 
 
 class LinDelayModel(AbstractModel):
-    """ Linear distance-dependent delay model:
-        -Delay mean: delay_mean_coefs[1] * dist + delay_mean_coefs[0] (linear)
+    """ Linear distance-dependent delay model [generative model]:
+        -Delay mean: delay_mean_coefs[1] * distance + delay_mean_coefs[0] (linear)
         -Delay std: delay_std (constant)
         -Delay min: delay_min (constant)
     """
@@ -176,3 +181,11 @@ class LinDelayModel(AbstractModel):
         d_std = self.get_std(np.array(kwargs['distance']))
         d_min = self.get_min(np.array(kwargs['distance']))
         return truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        model_str = f'<{self.__class__.__name__}>\n'
+        model_str = model_str + f'    Delay mean: {self.delay_mean_coefs[1]:.3f} * distance + {self.delay_mean_coefs[0]:.3f}\n'
+        model_str = model_str + f'    Delay std: {self.delay_std:.3f} (constant)\n'
+        model_str = model_str + f'    Delay min: {self.delay_min:.3f} (constant)\n'
+        return model_str
