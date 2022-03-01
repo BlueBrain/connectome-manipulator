@@ -188,5 +188,5 @@ class LinDelayModel(AbstractModel):
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'    Delay mean: {self.delay_mean_coefs[1]:.3f} * distance + {self.delay_mean_coefs[0]:.3f}\n'
         model_str = model_str + f'    Delay std: {self.delay_std:.3f} (constant)\n'
-        model_str = model_str + f'    Delay min: {self.delay_min:.3f} (constant)\n'
+        model_str = model_str + f'    Delay min: {self.delay_min:.3f} (constant)'
         return model_str

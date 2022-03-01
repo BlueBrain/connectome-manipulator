@@ -127,3 +127,21 @@ def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, mode
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
     print(f'INFO: Saving {out_fn}...')
     plt.savefig(out_fn)
+
+    # Visualize model output (generative model)
+    dist_centers = [np.mean(dist_bins[:2]), np.mean(dist_bins), np.mean(dist_bins[-2:])]
+    N = 1000 # Number of samples
+    plt.figure(figsize=(8, 4), dpi=300)
+    for didx, d in enumerate(dist_centers):
+        plt.subplot(1, len(dist_centers), didx + 1)
+        plt.hist(model.apply(distance=np.full(N, d)), bins=50)
+        plt.ylim(plt.ylim()) # Freeze limit
+        plt.title(f'{d:.0f} um')
+        plt.xlabel('Delay [ms]')
+        plt.ylabel('Count')
+    plt.suptitle('Delay distributions')
+    plt.tight_layout()
+
+    out_fn = os.path.abspath(os.path.join(out_dir, 'model_output.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
