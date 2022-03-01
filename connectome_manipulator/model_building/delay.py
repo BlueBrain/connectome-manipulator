@@ -75,7 +75,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     X = np.array(dist_bins[:-1][np.isfinite(dist_delays_mean)] + bin_offset, ndmin=2).T
     y = dist_delays_mean[np.isfinite(dist_delays_mean)]
     dist_delays_mean_fit = LinearRegression().fit(X, y)
-    delay_mean_coefs = [dist_delays_mean_model.coef_[0], dist_delays_mean_model.intercept_]
+    delay_mean_coefs = [dist_delays_mean_fit.intercept_, dist_delays_mean_fit.coef_[0]]
 
     # Std delay model (const)
     delay_std = np.mean(dist_delays_std)
@@ -85,9 +85,10 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
 
     # Create model
     model = model_types.LinDelayModel(delay_mean_coefs=delay_mean_coefs, delay_std=delay_std, delay_min=delay_min)
+    print('MODEL:', end=' ')
     print(model.get_model_str())
 
-    return 
+    return model
 
 
 def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, model, **_):

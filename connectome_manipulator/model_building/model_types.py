@@ -74,7 +74,8 @@ class AbstractModel(metaclass=ABCMeta):
         """Initialize model parameters from dict (removing used keys from dict)."""
         assert np.all([p in model_dict for p in self.param_names]), f'ERROR: Missing parameters for model initialization! Must contain initialization for {set(self.param_names)}.'
         for p in self.param_names:
-            setattr(self, p, model_dict.pop(p))
+            val = np.array(model_dict.pop(p)).tolist() # Convert to numpy and back to list, so that reduced to basic (non-numpy) data types
+            setattr(self, p, val)
 
     def init_data(self, data_dict):
         """Initialize data frames with supplementary model data from dict (removing used keys from dict)."""
@@ -169,11 +170,11 @@ class LinDelayModel(AbstractModel):
 
     def get_std(self, distance):
         """Get delay std for given distance (constant)."""
-        return self.delay_std
+        return np.full_like(distance, self.delay_std, dtype=type(self.delay_std))
 
     def get_min(self, distance):
         """Get delay min for given distance (constant)."""
-        return self.delay_min
+        return np.full_like(distance, self.delay_min, dtype=type(self.delay_min))
 
     def get_model_output(self, **kwargs):
         """Draw distance-dependent delay values from truncated normal distribution [seeded through numpy]."""
@@ -184,7 +185,7 @@ class LinDelayModel(AbstractModel):
 
     def get_model_str(self):
         """Return model string describing the model."""
-        model_str = f'<{self.__class__.__name__}>\n'
+        model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'    Delay mean: {self.delay_mean_coefs[1]:.3f} * distance + {self.delay_mean_coefs[0]:.3f}\n'
         model_str = model_str + f'    Delay std: {self.delay_std:.3f} (constant)\n'
         model_str = model_str + f'    Delay min: {self.delay_min:.3f} (constant)\n'
