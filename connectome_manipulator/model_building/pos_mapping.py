@@ -1,10 +1,9 @@
-'''TODO: improve description'''
-# Model building function
-#
-# Three functions need to be defined
-# (1) extract(...): extracting connectivity specific data
-# (2) build(...): building a data-based model
-# (3) plot(...): visualizing data vs. model
+"""
+Module for building position mapping model, consisting of three basic functions:
+  -extract(...): Extracts position mapping from atlas space to flat space of a given nodes population
+  -build(...): Build flat space position mapping (LUT) model of type "PosMapModel" from the data
+  -plot(...): Visualizes data vs. model output
+"""
 
 import os.path
 
@@ -16,7 +15,7 @@ from scipy.interpolate import griddata
 from scipy.spatial import distance_matrix
 from voxcell.nexus.voxelbrain import Atlas
 
-from connectome_manipulator.model_building import model_building
+from connectome_manipulator.model_building import model_types
 
 
 def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None, nodes_pop_name=None, NN_only=False, **_):
@@ -88,20 +87,20 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
 
 def build(nrn_ids, flat_pos, **_):
     """Build flat space position mapping model."""
-    flat_pos_model = pd.DataFrame(flat_pos, index=nrn_ids, columns=['x', 'y', 'z'])
-    assert np.all(np.isfinite(flat_pos_model)), 'ERROR: Flatmap interpolation error!'
+    flat_pos_table = pd.DataFrame(flat_pos, index=nrn_ids, columns=['x', 'y', 'z'])
+    assert np.all(np.isfinite(flat_pos_table)), 'ERROR: Position error!'
 
-    print(f'POSITION MODEL: flat space, {len(nrn_ids)} cells, x/y/z dimensions {flat_pos_model.x.max()-flat_pos_model.x.min():.1f} x {flat_pos_model.y.max()-flat_pos_model.y.min():.1f} x {flat_pos_model.z.max()-flat_pos_model.z.min():.1f}um')
+    # Create model
+    model = model_types.PosMapModel(pos_table=flat_pos_table)
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return {'model': 'flat_pos_model.loc[gids].to_numpy() if not gids is None else flat_pos_model.index.to_numpy()',
-            'model_inputs': ['gids'],
-            'model_params': {'flat_pos_model': flat_pos_model}}
+    return model
 
 
-def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, model_inputs, model_params, **_):  # pragma: no cover
+def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     """Visualize data vs. model."""
-    model_fct = model_building.get_model(model, model_inputs, model_params)
-    nrn_pos_model = model_fct(nrn_ids)
+    nrn_pos_model = model.apply(gids=nrn_ids)
 
     # 3D cell positions in atlas vs. flat space
     num_layers = len(np.unique(nrn_lay))

@@ -143,6 +143,39 @@ class AbstractModel(metaclass=ABCMeta):
                 print(f'WARNING: Unused data frame(s) in model data file: {set(data_dict.keys())}!')
 
 
+### MODEL TEMPLATE ###
+# class TemplateModel(AbstractModel):
+#     """ <Template> model:
+#         -Model details...
+#     """
+# 
+#     # Names of model inputs, parameters and data frames which are part if this model
+#     param_names = [...]
+#     data_names = [...]
+#     input_names = [...]
+# 
+#     def __init__(self, **kwargs):
+#         """Model initialization."""
+#         super().__init__(**kwargs)
+# 
+#         # Check parameters
+#         assert ...
+# 
+#     # <Additional access methods, if needed>
+#     ...
+# 
+#     def get_model_output(self, **kwargs):
+#         """Description..."""
+#         # MUST BE IMPLEMENTED
+#         return ...
+# 
+#     def get_model_str(self):
+#         """Return model string describing the model."""
+#         model_str = f'{self.__class__.__name__}\n'
+#         model_str = model_str + ...
+#         return model_str
+
+
 class LinDelayModel(AbstractModel):
     """ Linear distance-dependent delay model [generative model]:
         -Delay mean: delay_mean_coefs[1] * distance + delay_mean_coefs[0] (linear)
@@ -186,7 +219,39 @@ class LinDelayModel(AbstractModel):
     def get_model_str(self):
         """Return model string describing the model."""
         model_str = f'{self.__class__.__name__}\n'
-        model_str = model_str + f'    Delay mean: {self.delay_mean_coefs[1]:.3f} * distance + {self.delay_mean_coefs[0]:.3f}\n'
-        model_str = model_str + f'    Delay std: {self.delay_std:.3f} (constant)\n'
-        model_str = model_str + f'    Delay min: {self.delay_min:.3f} (constant)'
+        model_str = model_str + f'  Delay mean: {self.delay_mean_coefs[1]:.3f} * distance + {self.delay_mean_coefs[0]:.3f}\n'
+        model_str = model_str + f'  Delay std: {self.delay_std:.3f} (constant)\n'
+        model_str = model_str + f'  Delay min: {self.delay_min:.3f} (constant)'
+        return model_str
+
+
+class PosMapModel(AbstractModel):
+    """ Position mapping model, mapping one coordinate system to another for a given set of neurons:
+        -Mapped neuron position: pos_table.loc[gids] (lookup-table)
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = []
+    data_names = ['pos_table']
+    input_names = ['gids']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+    def get_gids(self):
+        """Return GIDs that are mapped within this model."""
+        return self.pos_table.index.values
+
+    def get_model_output(self, **kwargs):
+        """Returns (mapped) neuron positions for a given set of GIDs."""
+        gids = np.array(kwargs['gids'])
+        return self.pos_table.loc[gids].to_numpy()
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  Size: {self.pos_table.shape[0]} GIDs\n'
+        model_str = model_str + f'  Outputs: {self.pos_table.shape[1]} ({", ".join(self.pos_table.keys())})\n'
+        model_str = model_str +  '  Range: ' + ', '.join([f'{k}: {self.pos_table[k].min():.1f}..{self.pos_table[k].max():.1f}' for k in self.pos_table.keys()])
         return model_str
