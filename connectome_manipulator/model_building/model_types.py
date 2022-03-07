@@ -244,7 +244,7 @@ class PosMapModel(AbstractModel):
         return self.pos_table.index.values
 
     def get_model_output(self, **kwargs):
-        """Returns (mapped) neuron positions for a given set of GIDs."""
+        """Return (mapped) neuron positions for a given set of GIDs."""
         gids = np.array(kwargs['gids'])
         return self.pos_table.loc[gids].to_numpy()
 
@@ -254,4 +254,104 @@ class PosMapModel(AbstractModel):
         model_str = model_str + f'  Size: {self.pos_table.shape[0]} GIDs\n'
         model_str = model_str + f'  Outputs: {self.pos_table.shape[1]} ({", ".join(self.pos_table.keys())})\n'
         model_str = model_str +  '  Range: ' + ', '.join([f'{k}: {self.pos_table[k].min():.1f}..{self.pos_table[k].max():.1f}' for k in self.pos_table.keys()])
+        return model_str
+
+    
+class ConnPropsModel(AbstractModel):
+    """ Connection/synapse properties model for pairs of m-types [generative model]:
+        -Connection/synapse property values drawn from given distributions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = ['src_types', 'tgt_types', 'prop_names', 'prop_stats']
+    data_names = []
+    input_names = ['src_type', 'tgt_type']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        assert isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!'
+        assert 'n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing'
+        assert np.all(np.isin(self.prop_names, list(self.prop_stats.keys()))), 'ERROR: Property name/statistics mismatch!'
+        assert np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!'
+        assert np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!'
+        assert np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!'
+        assert np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!'
+        required_keys = ['type', 'mean', 'std'] # Required keys to be specified for each distribution
+        assert np.all([[[np.all(np.isin(required_keys, list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {required_keys})!'
+
+    def get_prop_names(self):
+        """Return list of connection/synapse property names."""
+        return self.prop_names
+
+    def get_src_types(self):
+        """Return list source (pre-synaptic) m-types."""
+        return self.src_types
+
+    def get_tgt_types(self):
+        """Return list target (post-synaptic) m-types."""
+        return self.tgt_types
+
+    def get_distr_props(self, prop_name, src_type, tgt_type):
+        """Return distribution type & properties (mean, std, ...)."""
+        return self.prop_stats[prop_name][src_type][tgt_type]
+
+    def draw(self, prop_name, src_type, tgt_type, size=1):
+        """Draw value(s) for given property name"""
+        stats_dict = self.prop_stats.get(prop_name)
+        distr_type = stats_dict[src_type][tgt_type].get('type')
+        if distr_type == 'constant':
+            drawn_values = np.full(size, stats_dict[src_type][tgt_type]['mean'])
+        elif distr_type == 'normal':
+            drawn_values = np.random.normal(loc=stats_dict[src_type][tgt_type]['mean'], scale=stats_dict[src_type][tgt_type]['std'], size=size)
+        elif distr_type == 'truncnorm':
+            min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
+            max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
+            drawn_values = truncnorm(a=(min_val - stats_dict[src_type][tgt_type]['mean']) / stats_dict[src_type][tgt_type]['std'],
+                                     b=(max_val - stats_dict[src_type][tgt_type]['mean']) / stats_dict[src_type][tgt_type]['std'],
+                                     loc=stats_dict[src_type][tgt_type]['mean'], scale=stats_dict[src_type][tgt_type]['std']).rvs(size=size)
+        elif distr_type == 'gamma':
+            drawn_values = np.random.gamma(shape=stats_dict[src_type][tgt_type]['mean']**2 / stats_dict[src_type][tgt_type]['std']**2,
+                                           scale=stats_dict[src_type][tgt_type]['std']**2 / stats_dict[src_type][tgt_type]['mean'], size=size)
+        elif distr_type == 'poisson':
+            drawn_values = np.random.poisson(lam=stats_dict[src_type][tgt_type]['mean'], size=size)
+        else:
+            assert False, f'ERROR: Distribution type "{distr_type}" not supported!'
+
+        # Apply upper/lower bounds (optional)
+        lower_bound = stats_dict[src_type][tgt_type].get('lower_bound')
+        upper_bound = stats_dict[src_type][tgt_type].get('upper_bound')
+        if lower_bound is not None:
+            drawn_values = np.maximum(drawn_values, lower_bound)
+        if upper_bound is not None:
+            drawn_values = np.minimum(drawn_values, upper_bound)
+
+        # Set data type (optional)
+        data_type = stats_dict[src_type][tgt_type].get('dtype')
+        if data_type is not None:
+            if data_type == 'int':
+                drawn_values = np.round(drawn_values).astype(data_type)
+            else:
+                drawn_values = drawn_values.astype(data_type)
+
+        return drawn_values
+
+    def get_model_output(self, **kwargs):
+        """Draw property values for a connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
+        syn_props = [p for p in self.prop_names if p != 'n_syn_per_conn']
+        n_syn = self.draw('n_syn_per_conn', kwargs['src_type'], kwargs['tgt_type'], 1)[0]
+        
+        df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
+        for p in syn_props:
+            df[p] = self.draw(p, kwargs['src_type'], kwargs['tgt_type'], n_syn)
+        return df
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        distr_types = {p: '/'.join(np.unique([[self.prop_stats[p][src][tgt]["type"] for src in self.src_types] for tgt in self.tgt_types])) for p in self.prop_names} # Extract distribution types
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  Connection/synapse property distributions between {len(self.src_types)}x{len(self.tgt_types)} M-types:\n'
+        model_str = model_str + '  ' + '; '.join([f'{p}: {distr_types[p]}' for p in self.prop_names])
         return model_str

@@ -1,10 +1,9 @@
-'''TODO: improve description'''
-# Model building function
-#
-# Three functions need to be defined
-# (1) extract(...): extracting connectivity specific data
-# (2) build(...): building a data-based model
-# (3) plot(...): visualizing data vs. model
+"""
+Module for building connection/synapse properties model, consisting of three basic functions:
+  -extract(...): Extracts statistics for connection/synaptic properties between samples of neurons for each pair of m-types
+  -build(...): Fit model distribution to data, incl. missing values interpolated at different levels of granularity
+  -plot(...): Visualizes extracted data vs. actual model output
+"""
 
 import os.path
 
@@ -12,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
 
-from connectome_manipulator.model_building import model_building
+from connectome_manipulator.model_building import model_types
 
 # TODO: Visualize and capture actual distributions of synaptic properties (incl. data type!)
 #       Visualize and capture correlations between synaptic properties
