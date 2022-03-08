@@ -263,7 +263,7 @@ class ConnPropsModel(AbstractModel):
     """
 
     # Names of model inputs, parameters and data frames which are part if this model
-    param_names = ['src_types', 'tgt_types', 'prop_names', 'prop_stats']
+    param_names = ['src_types', 'tgt_types', 'prop_stats']
     data_names = []
     input_names = ['src_type', 'tgt_type']
 
@@ -273,8 +273,8 @@ class ConnPropsModel(AbstractModel):
 
         # Check parameters
         assert isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!'
+        self.prop_names = self.prop_stats.keys()
         assert 'n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing'
-        assert np.all(np.isin(self.prop_names, list(self.prop_stats.keys()))), 'ERROR: Property name/statistics mismatch!'
         assert np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!'
         assert np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!'
         assert np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!'
@@ -298,27 +298,45 @@ class ConnPropsModel(AbstractModel):
         """Return distribution type & properties (mean, std, ...)."""
         return self.prop_stats[prop_name][src_type][tgt_type]
 
-    def draw(self, prop_name, src_type, tgt_type, size=1):
-        """Draw value(s) for given property name"""
-        stats_dict = self.prop_stats.get(prop_name)
-        distr_type = stats_dict[src_type][tgt_type].get('type')
+    def draw_from_distribution(self, distr_type, distr_mean, distr_std=None, distr_min=None, distr_max=None, size=1):
+        """Draw value(s) from given distribution"""
         if distr_type == 'constant':
-            drawn_values = np.full(size, stats_dict[src_type][tgt_type]['mean'])
+            drawn_values = np.full(size, distr_mean)
         elif distr_type == 'normal':
-            drawn_values = np.random.normal(loc=stats_dict[src_type][tgt_type]['mean'], scale=stats_dict[src_type][tgt_type]['std'], size=size)
+            assert distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!'
+            drawn_values = np.random.normal(loc=distr_mean, scale=distr_std, size=size)
         elif distr_type == 'truncnorm':
-            min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
-            max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
-            drawn_values = truncnorm(a=(min_val - stats_dict[src_type][tgt_type]['mean']) / stats_dict[src_type][tgt_type]['std'],
-                                     b=(max_val - stats_dict[src_type][tgt_type]['mean']) / stats_dict[src_type][tgt_type]['std'],
-                                     loc=stats_dict[src_type][tgt_type]['mean'], scale=stats_dict[src_type][tgt_type]['std']).rvs(size=size)
+            assert distr_mean is not None and distr_std is not None and distr_min is not None and distr_max is not None, 'ERROR: Distribution missing (required: mean/std/min/max)!'
+            drawn_values = truncnorm(a=(distr_min - distr_mean) / distr_std,
+                                     b=(distr_max - distr_mean) / distr_std,
+                                     loc=distr_mean, scale=distr_std).rvs(size=size)
         elif distr_type == 'gamma':
-            drawn_values = np.random.gamma(shape=stats_dict[src_type][tgt_type]['mean']**2 / stats_dict[src_type][tgt_type]['std']**2,
-                                           scale=stats_dict[src_type][tgt_type]['std']**2 / stats_dict[src_type][tgt_type]['mean'], size=size)
+            assert distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!'
+            drawn_values = np.random.gamma(shape=distr_mean**2 / distr_std**2,
+                                           scale=distr_std**2 / distr_mean, size=size)
         elif distr_type == 'poisson':
-            drawn_values = np.random.poisson(lam=stats_dict[src_type][tgt_type]['mean'], size=size)
+            assert distr_mean is not None, 'ERROR: Distribution parameter missing (required: mean)!'
+            drawn_values = np.random.poisson(lam=distr_mean, size=size)
         else:
             assert False, f'ERROR: Distribution type "{distr_type}" not supported!'
+        return drawn_values
+    
+    def draw(self, prop_name, src_type, tgt_type, size=1):
+        """Draw value(s) for given property name of a single connection"""
+        stats_dict = self.prop_stats.get(prop_name)
+
+        distr_type = stats_dict[src_type][tgt_type].get('type')
+        mean_val = stats_dict[src_type][tgt_type]['mean']
+        std_val = stats_dict[src_type][tgt_type]['std']
+        std_within = stats_dict[src_type][tgt_type].get('std-within', 0.0)
+        min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
+        max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
+
+        conn_mean = self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, 1) # Draw connection mean
+        if std_within > 0.0 and size > 0:
+            drawn_values = self.draw_from_distribution(distr_type, conn_mean, std_within, min_val, max_val, size) # Draw property values for synapses within connection
+        else:
+            drawn_values = np.full(size, conn_mean) # No within-connection variability
 
         # Apply upper/lower bounds (optional)
         lower_bound = stats_dict[src_type][tgt_type].get('lower_bound')
@@ -339,10 +357,10 @@ class ConnPropsModel(AbstractModel):
         return drawn_values
 
     def get_model_output(self, **kwargs):
-        """Draw property values for a connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
+        """Draw property values for one connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
         syn_props = [p for p in self.prop_names if p != 'n_syn_per_conn']
         n_syn = self.draw('n_syn_per_conn', kwargs['src_type'], kwargs['tgt_type'], 1)[0]
-        
+
         df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
         for p in syn_props:
             df[p] = self.draw(p, kwargs['src_type'], kwargs['tgt_type'], n_syn)
@@ -350,7 +368,7 @@ class ConnPropsModel(AbstractModel):
 
     def get_model_str(self):
         """Return model string describing the model."""
-        distr_types = {p: '/'.join(np.unique([[self.prop_stats[p][src][tgt]["type"] for src in self.src_types] for tgt in self.tgt_types])) for p in self.prop_names} # Extract distribution types
+        distr_types = {p: '/'.join(np.unique([[self.prop_stats[p][src][tgt]['type'] for src in self.src_types] for tgt in self.tgt_types])) for p in self.prop_names} # Extract distribution types
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  Connection/synapse property distributions between {len(self.src_types)}x{len(self.tgt_types)} M-types:\n'
         model_str = model_str + '  ' + '; '.join([f'{p}: {distr_types[p]}' for p in self.prop_names])

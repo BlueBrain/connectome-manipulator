@@ -13,11 +13,18 @@ import progressbar
 
 from connectome_manipulator.model_building import model_types
 
-# TODO: Visualize and capture actual distributions of synaptic properties (incl. data type!)
-#       Visualize and capture correlations between synaptic properties
+DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
+                           'normal': ['mean', 'std'],
+                           'truncnorm': ['mean', 'std', 'min', 'max'],
+                           'gamma': ['mean', 'std'],
+                           'poisson': ['mean']}
+
+# Ideas for improvement:
+#   *Detect actual distributions of synaptic properties (incl. data type!)
+#   *Capture correlations between synaptic properties
 
 
-def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, **_):
+def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, **_):
     """Extract statistics for synaptic properties between samples of neurons for each pair of m-types."""
     # Select edge population [assuming exactly one edge population in given edges file]
     assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
@@ -39,14 +46,16 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     syns_per_conn_data = {'mean': np.full((len(m_types[0]), len(m_types[1])), np.nan),
                           'std': np.full((len(m_types[0]), len(m_types[1])), np.nan),
                           'min': np.full((len(m_types[0]), len(m_types[1])), np.nan),
-                          'max': np.full((len(m_types[0]), len(m_types[1])), np.nan)}
+                          'max': np.full((len(m_types[0]), len(m_types[1])), np.nan),
+                          'hist': [[[] for j in range(len(m_types[1]))] for i in range(len(m_types[0]))]}
 
     # Statistics for synapse/connection properties
     conn_prop_data = {'mean': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value means across connections
                       'std': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value stds across connections
                       'std-within': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value stds across synapses within connections
                       'min': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value overall min
-                      'max': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan)} # Property value overall max
+                      'max': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value overall max
+                      'hist': [[[[] for k in range(len(syn_props))] for j in range(len(m_types[1]))] for i in range(len(m_types[0]))]} # Histogram of distribution
 
     # Extract statistics
     conn_counts = {'min': np.inf, 'max': -np.inf, 'sel': 0} # Count connections for reporting
@@ -73,6 +82,7 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             syns_per_conn_data['std'][sidx, tidx] = np.std(num_syn_per_conn[conn_sel])
             syns_per_conn_data['min'][sidx, tidx] = np.min(num_syn_per_conn[conn_sel])
             syns_per_conn_data['max'][sidx, tidx] = np.max(num_syn_per_conn[conn_sel])
+            syns_per_conn_data['hist'][sidx][tidx] = np.histogram(num_syn_per_conn[conn_sel], bins=hist_bins)
 
             means_within = np.full((len(conn_sel), len(syn_props)), np.nan)
             stds_within = np.full((len(conn_sel), len(syn_props)), np.nan)
@@ -89,13 +99,15 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             conn_prop_data['std-within'][sidx, tidx, :] = np.mean(stds_within, 0)
             conn_prop_data['min'][sidx, tidx, :] = np.min(mins_within, 0)
             conn_prop_data['max'][sidx, tidx, :] = np.max(maxs_within, 0)
+            for pidx in range(len(syn_props)):
+                conn_prop_data['hist'][sidx][tidx][pidx] = np.histogram(means_within[:, pidx], bins=hist_bins)
 
     print(f'INFO: Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.')
 
-    return {'syns_per_conn_data': syns_per_conn_data, 'conn_prop_data': conn_prop_data, 'm_types': m_types, 'm_type_class': m_type_class, 'm_type_layer': m_type_layer, 'syn_props': syn_props}
+    return {'syns_per_conn_data': syns_per_conn_data, 'conn_prop_data': conn_prop_data, 'm_types': m_types, 'm_type_class': m_type_class, 'm_type_layer': m_type_layer, 'syn_props': syn_props, 'hist_bins': hist_bins}
 
 
-def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_layer, syn_props, **_):
+def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_layer, syn_props, distr_types={}, data_types={}, data_bounds={}, **_):
     """Build model from data (lookup table with missing values interpolated at different levels of granularity)."""
     # Interpolate missing values in lookup tables
     syns_per_conn_model = {k: v.copy() for (k, v) in syns_per_conn_data.items()}
@@ -137,28 +149,54 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
 
     print(f'INFO: Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }')
 
-    # Create model dictionary (lookup-table)
-    prop_model_dict = {syn_props[p]: {m_types[0][s]: {m_types[1][t]: {k: conn_prop_model[k][s, t, p] for k in conn_prop_model.keys()} for t in range(len(m_types[1]))} for s in range(len(m_types[0]))} for p in range(len(syn_props))}
-    prop_model_dict.update({'n_syn_per_conn': {m_types[0][s]: {m_types[1][t]: {k: syns_per_conn_model[k][s, t] for k in syns_per_conn_model.keys()} for t in range(len(m_types[1]))} for s in range(len(m_types[0]))}})
+    # Create model properties dictionary
+    prop_model_dict = {}
+    for pidx, prop in enumerate(syn_props + ['n_syn_per_conn']):
+        prop_model_dict[prop] = {}
+        if not prop in distr_types:
+            print(f'WARNING: No distribution type for "{prop}" specified - Using "normal"!')
+        distr_type = distr_types.get(prop, 'normal')
+        assert distr_type in DISTRIBUTION_ATTRIBUTES, f'ERROR: Distribution type "{distr_type}" not supported!'
+        dtype = data_types.get(prop)
+        bounds = data_bounds.get(prop)
+        for sidx, src in enumerate(m_types[0]):
+            prop_model_dict[prop][src] = {}
+            for tidx, tgt in enumerate(m_types[1]):
+                attr_dict = {'type': distr_type}
+                distr_attr = DISTRIBUTION_ATTRIBUTES[distr_type]
+                if prop == 'n_syn_per_conn':
+                    attr_dict.update({attr: syns_per_conn_model[attr][sidx, tidx] for attr in distr_attr})
+                else:
+                    if np.any(conn_prop_model['std-within'][sidx, tidx, pidx] > 0.0):
+                        distr_attr = distr_attr + ['std-within']
+                    attr_dict.update({attr: conn_prop_model[attr][sidx, tidx, pidx] for attr in distr_attr})
+                if dtype is not None:
+                    attr_dict.update({'dtype': dtype})
+                if bounds is not None and hasattr(bounds, '__iter__') and len(bounds) == 2:
+                    if bounds[0] is not None:
+                        attr_dict.update({'lower_bound': bounds[0]})
+                    if bounds[1] is not None:
+                        attr_dict.update({'upper_bound': bounds[1]})
+                prop_model_dict[prop][src][tgt] = attr_dict
 
-    print(f'MODEL FIT for synapse/connection properties ({len(m_types[0])}x{len(m_types[1])} m-types):')
-    print(list(prop_model_dict.keys()))
+    # Create model
+    model = model_types.ConnPropsModel(src_types=m_types[0], tgt_types=m_types[1], prop_stats=prop_model_dict)
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return {'model': 'prop_model_dict.keys() if prop_name is None else prop_model_dict[prop_name][src_type][tgt_type][stat_type]',
-            'model_inputs': ['prop_name', 'src_type', 'tgt_type', 'stat_type'],
-            'model_params': {'prop_model_dict': prop_model_dict}}
+    return model
 
 
-def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, model_inputs, model_params, **_):
+def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, hist_bins, **_):
     """Visualize data vs. model."""
-    model_fct = model_building.get_model(model, model_inputs, model_params)
+    model_params = model.get_param_dict()
     prop_names = syn_props + ['n_syn_per_conn']
 
-    # Draw figure
+    # Plot data vs. model: property mean maps
     data_sel = 'mean' # Plot mean only
     for pidx, p in enumerate(prop_names):
         plt.figure(figsize=(8, 3), dpi=300)
-        for didx, data in enumerate([conn_prop_data[data_sel][:, :, pidx] if pidx < conn_prop_data[data_sel].shape[2] else syns_per_conn_data[data_sel], np.array([[model_fct(p, s, t, data_sel) for t in m_types[1]] for s in m_types[0]])]):
+        for didx, data in enumerate([conn_prop_data[data_sel][:, :, pidx] if pidx < conn_prop_data[data_sel].shape[2] else syns_per_conn_data[data_sel], np.array([[model_params['prop_stats'][p][s][t][data_sel] for t in m_types[1]] for s in m_types[0]])]):
             plt.subplot(1, 2, didx + 1)
             plt.imshow(data, interpolation='nearest', cmap='jet')
             plt.xticks(range(len(m_types[1])), m_types[0], rotation=90, fontsize=3)
@@ -167,6 +205,34 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
         plt.suptitle(p)
         plt.tight_layout()
 
-        out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model__{p}.png'))
+        out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_map__{p}.png'))
+        print(f'INFO: Saving {out_fn}...')
+        plt.savefig(out_fn)
+
+    # Plot data vs. model: Distribution histogram examples (generative model)
+    N = 1000 # Number of samples
+    conn_counts = [[np.sum(syns_per_conn_data['hist'][sidx][tidx][0]) if len(syns_per_conn_data['hist'][sidx][tidx]) > 0 else 0 for sidx in range(len(m_types[0]))] for tidx in range(len(m_types[1]))]
+    max_pathways = np.where(np.array(conn_counts) == np.max(conn_counts)) # Select pathway(s) with maximum number of connections (i.e., most robust statistics)
+    sidx, tidx = [max_pathways[i][0] for i in range(len(max_pathways))] # Select first of these pathways for plotting
+    src, tgt = [m_types[0][sidx], m_types[1][tidx]]
+    for pidx, p in enumerate(prop_names):
+        plt.figure(figsize=(5, 3), dpi=300)
+        if pidx < len(syn_props):
+            data_hist = conn_prop_data['hist'][sidx][tidx][pidx]
+        else:
+            data_hist = syns_per_conn_data['hist'][sidx][tidx]
+        plt.bar(data_hist[1][:-1], data_hist[0] / np.sum(data_hist[0]), align='edge', width=np.min(np.diff(data_hist[1])), label=f'Data (N={np.max(conn_counts)})')
+        model_data = np.hstack([model.draw(prop_name=p, src_type=src, tgt_type=tgt) for n in range(N)])
+        model_hist = np.histogram(model_data, bins=hist_bins)
+        plt.step(model_hist[1], np.hstack([model_hist[0][0], model_hist[0]]) / np.sum(model_hist[0]), where='pre', color='tab:orange', label=f'Model (N={N})')
+        plt.grid()
+        plt.gca().set_axisbelow(True)
+        plt.title(f'{src} to {tgt}', fontweight='bold')
+        plt.xlabel(p)
+        plt.ylabel('Density')
+        plt.legend()
+        plt.tight_layout()
+
+        out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_hist__{p}.png'))
         print(f'INFO: Saving {out_fn}...')
         plt.savefig(out_fn)
