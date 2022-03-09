@@ -21,7 +21,7 @@ DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
 
 # Ideas for improvement:
 #   *Detect actual distributions of synaptic properties (incl. data type!)
-#   *Capture correlations between synaptic properties
+#   *Capture cross-correlations between synaptic properties
 
 
 def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, **_):
@@ -89,10 +89,10 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             mins_within = np.full((len(conn_sel), len(syn_props)), np.nan)
             maxs_within = np.full((len(conn_sel), len(syn_props)), np.nan)
             for cidx, c in enumerate(conn_sel):
-                means_within[cidx, :] = np.mean(edges_sel.loc[syn_conn_idx == c, syn_props], 0)
-                stds_within[cidx, :] = np.std(edges_sel.loc[syn_conn_idx == c, syn_props], 0)
-                mins_within[cidx, :] = np.min(edges_sel.loc[syn_conn_idx == c, syn_props], 0)
-                maxs_within[cidx, :] = np.max(edges_sel.loc[syn_conn_idx == c, syn_props], 0)
+                means_within[cidx, :] = np.mean(edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0, dtype=np.float64) # [float64 required, otherwise rounding problems!!!]
+                stds_within[cidx, :] = np.std(edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0, dtype=np.float64)
+                mins_within[cidx, :] = np.min(edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0).astype(np.float64)
+                maxs_within[cidx, :] = np.max(edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0).astype(np.float64)
 
             conn_prop_data['mean'][sidx, tidx, :] = np.mean(means_within, 0)
             conn_prop_data['std'][sidx, tidx, :] = np.std(means_within, 0)
@@ -192,22 +192,22 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
     model_params = model.get_param_dict()
     prop_names = syn_props + ['n_syn_per_conn']
 
-    # Plot data vs. model: property mean maps
-    data_sel = 'mean' # Plot mean only
-    for pidx, p in enumerate(prop_names):
-        plt.figure(figsize=(8, 3), dpi=300)
-        for didx, data in enumerate([conn_prop_data[data_sel][:, :, pidx] if pidx < conn_prop_data[data_sel].shape[2] else syns_per_conn_data[data_sel], np.array([[model_params['prop_stats'][p][s][t][data_sel] for t in m_types[1]] for s in m_types[0]])]):
-            plt.subplot(1, 2, didx + 1)
-            plt.imshow(data, interpolation='nearest', cmap='jet')
-            plt.xticks(range(len(m_types[1])), m_types[0], rotation=90, fontsize=3)
-            plt.yticks(range(len(m_types[1])), m_types[0], rotation=0, fontsize=3)
-            plt.colorbar()
-        plt.suptitle(p)
-        plt.tight_layout()
+    # Plot data vs. model: property maps
+    for stat_sel in ['mean', 'std']:
+        for pidx, p in enumerate(prop_names):
+            plt.figure(figsize=(8, 3), dpi=300)
+            for didx, data in enumerate([conn_prop_data[stat_sel][:, :, pidx] if pidx < conn_prop_data[stat_sel].shape[2] else syns_per_conn_data[stat_sel], np.array([[model_params['prop_stats'][p][s][t][stat_sel] for t in m_types[1]] for s in m_types[0]])]):
+                plt.subplot(1, 2, didx + 1)
+                plt.imshow(data, interpolation='nearest', cmap='jet')
+                plt.xticks(range(len(m_types[1])), m_types[0], rotation=90, fontsize=3)
+                plt.yticks(range(len(m_types[1])), m_types[0], rotation=0, fontsize=3)
+                plt.colorbar()
+            plt.suptitle(f'{p} ({stat_sel})')
+            plt.tight_layout()
 
-        out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_map__{p}.png'))
-        print(f'INFO: Saving {out_fn}...')
-        plt.savefig(out_fn)
+            out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_map_{stat_sel}__{p}.png'))
+            print(f'INFO: Saving {out_fn}...')
+            plt.savefig(out_fn)
 
     # Plot data vs. model: Distribution histogram examples (generative model)
     N = 1000 # Number of samples
