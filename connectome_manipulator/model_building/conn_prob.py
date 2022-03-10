@@ -1,10 +1,9 @@
-'''TODO: improve description'''
-# Model building function
-#
-# Three functions need to be defined
-# (1) extract(...): extracting connectivity specific data
-# (2) build(...): building a data-based model
-# (3) plot(...): visualizing data vs. model
+"""
+Module for building connection probability models of different orders, consisting of three basic functions:
+  -extract(...): Extracts connection probability between samples of neurons
+  -build(...): Fits a connection probability model to data
+  -plot(...): Visualizes extracted data vs. actual model output
+"""
 
 import itertools
 import os.path
@@ -19,7 +18,7 @@ from scipy.sparse import csr_matrix
 from scipy.spatial import distance_matrix
 from sklearn.ensemble import RandomForestRegressor
 
-from connectome_manipulator.model_building import model_building
+from connectome_manipulator.model_building import model_types
 
 
 JET = plt.cm.get_cmap('jet')
