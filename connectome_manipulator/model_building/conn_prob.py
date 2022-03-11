@@ -534,6 +534,17 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
                       'model_inputs': model_inputs,
                       'model_params': {'interp_fct': scipy.interpolate.interpn, 'dx_pos': dx_pos, 'dy_pos': dy_pos, 'dz_pos': dz_pos, 'p_conn_offset': p_conn_offset}}
 
+#         # TODO: "ConnProb4thOrderLinInterpnModel" model integration
+#         # Example code:
+#         x_val = np.arange(-5, 6) # Bin centers
+#         y_val = np.arange(-3, 4) # Bin centers
+#         z_val = np.arange(-4, 5) # Bin centers
+#         p = np.round(10 * np.random.rand(len(x_val), len(y_val), len(z_val))) / 10 # p_conn_offset
+#         names = ['dx', 'dy', 'dz']
+#         index = pd.MultiIndex.from_product([x_val, y_val, z_val], names=names)
+#         df = pd.DataFrame(p.flatten(), index=index, columns=['p'])
+#         mod = model_types.ConnProb4thOrderLinInterpnModel(p_conn_table=df)
+
     elif model_specs.get('name') == 'RandomForestRegressor':
 
         # Random Forest Regressor model

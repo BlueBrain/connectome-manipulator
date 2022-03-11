@@ -7,6 +7,7 @@ import jsonpickle
 import numpy as np
 import os
 import pandas as pd
+from scipy.interpolate import interpn
 from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 import sys
@@ -412,7 +413,7 @@ class ConnProb1stOrderModel(AbstractModel):
         return model_str
 
 
-class ConnProb2ndOrderModel(AbstractModel):
+class ConnProb2ndOrderExpModel(AbstractModel):
     """ 2nd order connection probability model (exponential distance-dependent):
         -Returns (distance-dependent) connection probabilities for given source/target neuron positions
     """
@@ -457,7 +458,7 @@ class ConnProb2ndOrderModel(AbstractModel):
         return model_str
 
 
-class ConnProb3rdOrderModel(AbstractModel):
+class ConnProb3rdOrderExpModel(AbstractModel):
     """ 3rd order connection probability model (bipolar exponential distance-dependent):
         -Returns (bipolar distance-dependent) connection probabilities for given source/target neuron positions
     """
@@ -492,8 +493,10 @@ class ConnProb3rdOrderModel(AbstractModel):
 
     @staticmethod
     def compute_bip_matrix(src_pos, tgt_pos, bip_coord=2):
-        """Computes bipolar matrix between pairs of neurons along specified coordinate axis (default: 2..z-axis).
-           (POST-synaptic neuron below (delta < 0) or above (delta > 0) PRE-synaptic neuron)"""
+        """Computes bipolar matrix between pairs of neurons along specified coordinate axis (default: 2..z-axis),
+           defined as sign of target (POST-synaptic) minus source (PRE-synaptic) coordinate value
+           (i.e., POST-synaptic neuron below (delta < 0) or above (delta > 0) PRE-synaptic neuron assuming
+            axis values increasing from lower to upper layers)"""
         bip_mat = np.sign(np.diff(np.meshgrid(src_pos[:, bip_coord], tgt_pos[:, bip_coord], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in specified coordinate
         return bip_mat
 
@@ -514,5 +517,142 @@ class ConnProb3rdOrderModel(AbstractModel):
         model_str = model_str + f'  p_conn(d, delta) = {self.scale_N:.3f} * exp(-{self.exponent_N:.3f} * d) if delta < 0\n'
         model_str = model_str + f'                     {self.scale_P:.3f} * exp(-{self.exponent_P:.3f} * d) if delta > 0\n'
         model_str = model_str + f'                     AVERAGE OF BOTH MODELS  if delta == 0\n'
-        model_str = model_str + f'  d...distance, delta...difference in {coord_str} coordinate'
+        model_str = model_str + f'  d...distance, delta...difference (tgt minus src) in {coord_str} coordinate'
+        return model_str
+
+
+class ConnProb4thOrderLinInterpnModel(AbstractModel):
+    """ 4th order connection probability model (offset-dependent, linearly interpolated):
+        -Returns (offset-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = []
+    data_names = ['p_conn_table']
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        assert len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (dx, dy, dz) required!'
+        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+
+        self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data offsets from multi-index
+        self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only single value from interpolation)
+
+    def data_points(self):
+        """Return data offsets."""
+        return self.data_points
+
+    def get_prob_data(self):
+        """Return connection probability data."""
+        return self.p_data
+
+    def get_conn_prob(self, dx, dy, dz):
+        """Return (offset-dependent) connection probability, linearly interpolating between data points."""
+        data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
+        inp_sel = [val for idx, val in enumerate([np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        return p_conn
+
+    @staticmethod
+    def compute_offset_matrices(src_pos, tgt_pos):
+        """Computes dx/dy/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing='ij'), axis=0)[0, :, :] # Relative difference in x coordinate
+        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing='ij'), axis=0)[0, :, :] # Relative difference in y coordinate
+        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing='ij'), axis=0)[0, :, :] # Relative difference in z coordinate
+        return dx_mat, dy_mat, dz_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        dx_mat, dy_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        return self.get_conn_prob(dx_mat, dy_mat, dz_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        inp_names = np.array(['dx', 'dy', 'dz'])
+        inp_str = ', '.join(inp_names[self.data_dim_sel])
+        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i])}..{np.max(self.data_points[i])}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
+        model_str = model_str +  '  dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
+        return model_str
+
+
+class ConnProb5thOrderLinInterpnModel(AbstractModel):
+    """ 5th order connection probability model (position- & offset-dependent, linearly interpolated):
+        -Returns (position- & offset-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = []
+    data_names = ['p_conn_table']
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        assert len(self.p_conn_table.index.levels) == 6, 'ERROR: Data frame with 6 index levels (x, y, z, dx, dy, dz) required!'
+        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+
+        self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data positions & offsets from multi-index
+        self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only single value from interpolation)
+
+    def data_points(self):
+        """Return data offsets."""
+        return self.data_points
+
+    def get_prob_data(self):
+        """Return connection probability data."""
+        return self.p_data
+
+    def get_conn_prob(self, x, y, z, dx, dy, dz):
+        """Return (position- & offset-dependent) connection probability, linearly interpolating between data points."""
+        data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
+        inp_sel = [val for idx, val in enumerate([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        return p_conn
+
+    @staticmethod
+    def compute_position_matrices(src_pos, tgt_pos):
+        """Computes x/y/z position matrices of src/PRE neurons (src/PRE neuron positions repeated over tgt/POST neuron number)."""
+        x_mat, y_mat, z_mat = [np.tile(src_pos[:, i:i + 1], [1, tgt_pos.shape[0]]) for i in range(src_pos.shape[1])]
+        return x_mat, y_mat, z_mat
+
+    @staticmethod
+    def compute_offset_matrices(src_pos, tgt_pos):
+        """Computes dx/dy/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing='ij'), axis=0)[0, :, :] # Relative difference in x coordinate
+        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing='ij'), axis=0)[0, :, :] # Relative difference in y coordinate
+        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing='ij'), axis=0)[0, :, :] # Relative difference in z coordinate
+        return dx_mat, dy_mat, dz_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        x_mat, y_mat, z_mat = self.compute_position_matrices(src_pos, tgt_pos)
+        dx_mat, dy_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        return self.get_conn_prob(x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        inp_names = np.array(['x', 'y', 'z', 'dx', 'dy', 'dz'])
+        inp_str = ', '.join(inp_names[self.data_dim_sel])
+        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i])}..{np.max(self.data_points[i])}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
+        model_str = model_str +  '  x/y/z...src position, dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
         return model_str
