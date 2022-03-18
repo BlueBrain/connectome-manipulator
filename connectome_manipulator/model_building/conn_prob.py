@@ -11,6 +11,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import progressbar
 import scipy.interpolate
 from scipy.optimize import curve_fit
@@ -218,24 +219,24 @@ def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, **_):
 
 def build_1st_order(p_conn, **_):
     """Build 1st order model (Erdos-Renyi, capturing average conn. prob.)."""
-    p_conn_model = p_conn # Constant model
 
-    print(f'MODEL FIT: p_conn_model()  = {p_conn_model:.3f}')
+    # Create model
+    model = model_types.ConnProb1stOrderModel(p_conn=p_conn)
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return {'model': 'p',
-            'model_inputs': [],
-            'model_params': {'p': p_conn_model}}
+    return model
 
 
-def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, model_inputs, model_params, **_):  # pragma: no cover
+def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):  # pragma: no cover
     """Visualize data vs. model (1st order)."""
-    model_str = f'f(x) = {model_params["p"]:.3f}'
-    model_fct = model_building.get_model(model, model_inputs, model_params)
+    model_params = model.get_param_dict()
+    model_str = f'f(x) = {model_params["p_conn"]:.3f}'
 
     # Draw figure
     plt.figure(figsize=(6, 4), dpi=300)
     plt.bar(0.5, p_conn, width=1, facecolor='tab:blue', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
-    plt.plot([-0.5, 1.5], np.ones(2) * model_fct(), '--', color='tab:red', label=f'Model: {model_str}')
+    plt.plot([-0.5, 1.5], np.ones(2) * model.get_conn_prob(), '--', color='tab:red', label=f'Model: {model_str}')
     plt.text(0.5, 0.99 * p_conn, f'p = {p_conn:.3f}', color='k', ha='center', va='top')
     plt.xticks([])
     plt.ylabel('Conn. prob.')
@@ -282,27 +283,28 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
     y = p_conn_dist[np.isfinite(p_conn_dist)]
     (a_opt, b_opt), _ = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
 
-    print(f'MODEL FIT: f(x) = {a_opt:.3f} * exp(-{b_opt:.3f} * x)')
+    # Create model
+    model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return {'model': 'a_opt * np.exp(-b_opt * np.array(d))',
-            'model_inputs': ['d'],
-            'model_params': {'a_opt': a_opt, 'b_opt': b_opt}}
+    return model
 
 
-def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_cell_count, tgt_cell_count, model, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (2nd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
-    model_str = f'f(x) = {model_params["a_opt"]:.3f} * exp(-{model_params["b_opt"]:.3f} * x)'
-    model_fct = model_building.get_model(model, model_inputs, model_params)
+    model_params = model.get_param_dict()
+    model_str = f'f(x) = {model_params["scale"]:.3f} * exp(-{model_params["exponent"]:.3f} * x)'
 
     plt.figure(figsize=(12, 4), dpi=300)
 
     # Data vs. model
     plt.subplot(1, 2, 1)
     plt.plot(dist_bins[:-1] + bin_offset, p_conn_dist, '.-', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
-    plt.plot(dist_model, model_fct(dist_model), '--', label='Model: ' + model_str)
+    plt.plot(dist_model, model.get_conn_prob(dist_model), '--', label='Model: ' + model_str)
     plt.grid()
     plt.xlabel('Distance [$\\mu$m]')
     plt.ylabel('Conn. prob.')
@@ -317,7 +319,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
     dz = np.linspace(plot_range, -plot_range, 201)
     xv, zv = np.meshgrid(dx, dz)
     vdist = np.sqrt(xv**2 + zv**2)
-    pdist = model_fct(vdist)
+    pdist = model.get_conn_prob(vdist)
     plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=HOT, vmin=0.0)
     for r in r_markers:
         plt.gca().add_patch(plt.Circle((0, 0), r, edgecolor='w', linestyle='--', fill=False))
@@ -398,26 +400,23 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, **_):
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
     (aN_opt, bN_opt), _ = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
     (aP_opt, bP_opt), _ = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
-    # TODO(gevaert): if this is needed, use function
-    # opt_model = lambda d, dz: np.select([np.array(dz) < 0, np.array(dz) > 0, np.array(dz) == 0], [aN_opt * np.exp(-bN_opt * np.array(d)), aP_opt * np.exp(-bP_opt * np.array(d)), 0.5 * (aN_opt * np.exp(-bN_opt * np.array(d)) + aP_opt * np.exp(-bP_opt * np.array(d)))])
 
-    print(f'BIPOLAR MODEL FIT: f(x, dz) = {aN_opt:.3f} * exp(-{bN_opt:.3f} * x) if dz < 0')
-    print(f'                              {aP_opt:.3f} * exp(-{bP_opt:.3f} * x) if dz > 0')
-    print('                              AVERAGE OF BOTH MODELS  if dz == 0')
+    # Create model
+    model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return {'model': 'np.select([np.array(dz) < 0, np.array(dz) > 0, np.array(dz) == 0], [aN_opt * np.exp(-bN_opt * np.array(d)), aP_opt * np.exp(-bP_opt * np.array(d)), 0.5 * (aN_opt * np.exp(-bN_opt * np.array(d)) + aP_opt * np.exp(-bP_opt * np.array(d)))])',
-            'model_inputs': ['d', 'dz'],
-            'model_params': {'aN_opt': aN_opt, 'bN_opt': bN_opt, 'aP_opt': aP_opt, 'bP_opt': bP_opt}}
+    return model
 
 
-def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell_count, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell_count, model, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (3rd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
-    model_strN = f'{model_params["aN_opt"]:.3f} * exp(-{model_params["bN_opt"]:.3f} * x)'
-    model_strP = f'{model_params["aP_opt"]:.3f} * exp(-{model_params["bP_opt"]:.3f} * x)'
-    model_fct = model_building.get_model(model, model_inputs, model_params)
+    model_params = model.get_param_dict()
+    model_strN = f'{model_params["scale_N"]:.3f} * exp(-{model_params["exponent_N"]:.3f} * x)'
+    model_strP = f'{model_params["scale_P"]:.3f} * exp(-{model_params["exponent_P"]:.3f} * x)'
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -426,8 +425,8 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
     bip_dist = np.concatenate((-dist_bins[:-1][::-1] - bin_offset, [0.0], dist_bins[:-1] + bin_offset))
     bip_data = np.concatenate((p_conn_dist_bip[::-1, 0], [np.nan], p_conn_dist_bip[:, 1]))
     plt.plot(bip_dist, bip_data, '.-', label=f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
-    plt.plot(-dist_model, model_fct(dist_model, np.sign(-dist_model)), '--', label='Model: ' + model_strN)
-    plt.plot(dist_model, model_fct(dist_model, np.sign(dist_model)), '--', label='Model: ' + model_strP)
+    plt.plot(-dist_model, model.get_conn_prob(dist_model, np.sign(-dist_model)), '--', label='Model: ' + model_strN)
+    plt.plot(dist_model, model.get_conn_prob(dist_model, np.sign(dist_model)), '--', label='Model: ' + model_strP)
     plt.grid()
     plt.xlabel('sign($\\Delta$z) * Distance [$\\mu$m]')
     plt.ylabel('Conn. prob.')
@@ -442,7 +441,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
     dz = np.linspace(plot_range, -plot_range, 201)
     xv, zv = np.meshgrid(dx, dz)
     vdist = np.sqrt(xv**2 + zv**2)
-    pdist = model_fct(vdist, np.sign(zv))
+    pdist = model.get_conn_prob(vdist, np.sign(zv))
     plt.imshow(pdist, interpolation='bilinear', extent=(-plot_range, plot_range, -plot_range, plot_range), cmap=HOT, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     for r in r_markers:
@@ -525,51 +524,40 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
 
     model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation':
+    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        # Linear interpolation model => Removing dimensions with only single value from interpolation
         assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
 
-        model_dict = {'model': 'np.maximum(interp_fct([pos for pos, sel in zip([dx_pos, dy_pos, dz_pos], np.array(p_conn_offset.shape) > 1) if sel], np.squeeze(p_conn_offset), np.array([pos for pos, sel in zip([np.array(dx), np.array(dy), np.array(dz)], np.array(p_conn_offset.shape) > 1) if sel]).T, method="linear", bounds_error=False, fill_value=None), 0)',
-                      'model_inputs': model_inputs,
-                      'model_params': {'interp_fct': scipy.interpolate.interpn, 'dx_pos': dx_pos, 'dy_pos': dy_pos, 'dz_pos': dz_pos, 'p_conn_offset': p_conn_offset}}
+        # Create model
+        index = pd.MultiIndex.from_product([dx_pos, dy_pos, dz_pos], names=model_inputs)
+        df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=['p'])
+        model = model_types.ConnProb4thOrderLinInterpnModel(p_conn_table=df)
 
-#         # TODO: "ConnProb4thOrderLinInterpnModel" model integration
-#         # Example code:
-#         x_val = np.arange(-5, 6) # Bin centers
-#         y_val = np.arange(-3, 4) # Bin centers
-#         z_val = np.arange(-4, 5) # Bin centers
-#         p = np.round(10 * np.random.rand(len(x_val), len(y_val), len(z_val))) / 10 # p_conn_offset
-#         names = ['dx', 'dy', 'dz']
-#         index = pd.MultiIndex.from_product([x_val, y_val, z_val], names=names)
-#         df = pd.DataFrame(p.flatten(), index=index, columns=['p'])
-#         mod = model_types.ConnProb4thOrderLinInterpnModel(p_conn_table=df)
+    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
 
-    elif model_specs.get('name') == 'RandomForestRegressor':
+        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
 
-        # Random Forest Regressor model
-        dxv, dyv, dzv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
-        data_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
-        data_val = p_conn_offset.flatten()
+#         dxv, dyv, dzv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
+#         data_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
+#         data_val = p_conn_offset.flatten()
 
-        offset_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
-        offset_regr_model.fit(data_pos, data_val)
+#         offset_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
+#         offset_regr_model.fit(data_pos, data_val)
 
-        model_dict = {'model': 'np.maximum(offset_regr_model.predict(np.array([np.array(dx), np.array(dy), np.array(dz)]).T), 0)',
-                      'model_inputs': model_inputs,
-                      'model_params': {'offset_regr_model': offset_regr_model}}
+#         # Create model
+#         model = model_types...
 
     else:
         assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
 
-    print(f'OFFSET MODEL: f(dx, dy, dz) ~ {model_specs.get("name")} {model_specs.get("kwargs", {})}')
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return model_dict
+    return model
 
 
-def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (4th order)."""
-    model_fct = model_building.get_model(model, model_inputs, model_params)
 
     dx_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
     dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
@@ -582,7 +570,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     dxv, dyv, dzv = np.meshgrid(dx_pos_model, dy_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T # Regular grid
     # model_pos = np.random.uniform(low=[dx_bins[0], dy_bins[0], dz_bins[0]], high=[dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
-    model_val = model_fct(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
+    model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
     model_val_xyz = model_val.reshape([len(dx_pos_model), len(dy_pos_model), len(dz_pos_model)])
 
     # 3D connection probability (data vs. model)
@@ -597,7 +585,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     for pidx in range(num_p_bins):
         p_sel_idx = np.where(np.logical_and(p_conn_offset > p_bins[pidx], p_conn_offset <= p_bins[pidx + 1]))
         plt.plot(dx_bins[p_sel_idx[0]] + dx_bin_offset, dy_bins[p_sel_idx[1]] + dy_bin_offset, dz_bins[p_sel_idx[2]] + dz_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
-    ax.view_init(30, 60)
+#     ax.view_init(30, 60)
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
     ax.set_zlim((dz_bins[0], dz_bins[-1]))
@@ -612,7 +600,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     for pidx in range(num_p_bins):
         p_sel_idx = np.logical_and(model_val > p_bins[pidx], model_val <= p_bins[pidx + 1])
         plt.plot(model_pos[p_sel_idx, 0], model_pos[p_sel_idx, 1], model_pos[p_sel_idx, 2], '.', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
-    ax.view_init(30, 60)
+#     ax.view_init(30, 60)
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
     ax.set_zlim((dz_bins[0], dz_bins[-1]))
@@ -785,40 +773,40 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
 
     model_inputs = ['x', 'y', 'z', 'dx', 'dy', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation':
+    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        # Linear interpolation model => Removing dimensions with only single value from interpolation
         assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
 
-        model_dict = {'model': 'np.maximum(interp_fct([pos for pos, sel in zip([x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos], np.array(p_conn_position.shape) > 1) if sel], np.squeeze(p_conn_position), np.array([pos for pos, sel in zip([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)], np.array(p_conn_position.shape) > 1) if sel]).T, method="linear", bounds_error=False, fill_value=None), 0)',
-                      'model_inputs': model_inputs,
-                      'model_params': {'interp_fct': scipy.interpolate.interpn, 'x_pos': x_pos, 'y_pos': y_pos, 'z_pos': z_pos, 'dx_pos': dx_pos, 'dy_pos': dy_pos, 'dz_pos': dz_pos, 'p_conn_position': p_conn_position}}
+        # Create model
+        index = pd.MultiIndex.from_product([x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos], names=model_inputs)
+        df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=['p'])
+        model = model_types.ConnProb5thOrderLinInterpnModel(p_conn_table=df)
 
-    elif model_specs.get('name') == 'RandomForestRegressor':
+    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
 
-        # Random Forest Regressor model
-        xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos, indexing='ij')
-        data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
-        data_val = p_conn_position.flatten()
+        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
 
-        position_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
-        position_regr_model.fit(data_pos, data_val)
+#         xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos, indexing='ij')
+#         data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
+#         data_val = p_conn_position.flatten()
 
-        model_dict = {'model': 'np.maximum(position_regr_model.predict(np.array([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)]).T), 0)',
-                      'model_inputs': model_inputs,
-                      'model_params': {'position_regr_model': position_regr_model}}
+#         position_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
+#         position_regr_model.fit(data_pos, data_val)
+
+#         # Create model
+#         model = model_types...
 
     else:
         assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
 
-    print(f'POSITION MODEL: f(x, y, z, dx, dy, dz) ~ {model_specs.get("name")} {model_specs.get("kwargs", {})}')
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
 
-    return model_dict
+    return model
 
 
-def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, model_inputs, model_params, pos_map_file=None, **_):  # pragma: no cover
+def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (5th order)."""
-    model_fct = model_building.get_model(model, model_inputs, model_params)
 
     x_bin_offset = 0.5 * np.diff(x_bins[:2])[0]
     y_bin_offset = 0.5 * np.diff(y_bins[:2])[0]
@@ -839,7 +827,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
     xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos_model, y_pos_model, z_pos_model, dx_pos_model, dy_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T # Regular grid
     # model_pos = np.random.uniform(low=[x_bins[0], y_bins[0], z_bins[0], dx_bins[0], dy_bins[0], dz_bins[0]], high=[x_bins[-1], y_bins[-1], z_bins[-1], dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(x_bins) * len(y_bins) * len(z_bins), len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
-    model_val = model_fct(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2], model_pos[:, 3], model_pos[:, 4], model_pos[:, 5])
+    model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2], model_pos[:, 3], model_pos[:, 4], model_pos[:, 5])
     model_val_xyz = model_val.reshape([len(x_pos_model), len(y_pos_model), len(z_pos_model), len(dx_pos_model), len(dy_pos_model), len(dz_pos_model)])
 
     # 3D connection probability (data vs. model)
@@ -903,7 +891,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.figure(figsize=(12, 6), dpi=300)
                 # (Data)
                 plt.subplot(2, 3, 1)
-                plt.imshow(np.max(p_conn_sel, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(p_conn_sel, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(p_conn_sel, 1)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -912,7 +900,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.colorbar(label='Max. conn. prob.')
 
                 plt.subplot(2, 3, 2)
-                plt.imshow(np.max(p_conn_sel, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(p_conn_sel, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(p_conn_sel, 0)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -922,7 +910,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.title('Data')
 
                 plt.subplot(2, 3, 3)
-                plt.imshow(np.max(p_conn_sel, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(p_conn_sel, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(p_conn_sel, 2)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -932,7 +920,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 
                 # (Model)
                 plt.subplot(2, 3, 4)
-                plt.imshow(np.max(model_val_sel, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(model_val_sel, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 1)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -941,7 +929,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.colorbar(label='Max. conn. prob.')
 
                 plt.subplot(2, 3, 5)
-                plt.imshow(np.max(model_val_sel, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(model_val_sel, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 0)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -951,7 +939,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.title('Model')
 
                 plt.subplot(2, 3, 6)
-                plt.imshow(np.max(model_val_sel, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0)
+                plt.imshow(np.max(model_val_sel, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 2)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()

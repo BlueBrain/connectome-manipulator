@@ -429,7 +429,7 @@ class ConnProb2ndOrderExpModel(AbstractModel):
 
         # Check parameters
         assert 0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!'
-        assert self.exponent >= 0.0, 'ERROR: "Exponent" must not be negative!'
+        assert self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!'
 
     def get_conn_prob(self, distance):
         """Return (distance-dependent) connection probability."""
@@ -541,7 +541,7 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
-        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only single value from interpolation)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only a single data point from interpolation)
 
     def data_points(self):
         """Return data offsets."""
@@ -552,7 +552,7 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         return self.p_data
 
     def get_conn_prob(self, dx, dy, dz):
-        """Return (offset-dependent) connection probability, linearly interpolating between data points."""
+        """Return (offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
@@ -579,7 +579,7 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         """Return model string describing the model."""
         inp_names = np.array(['dx', 'dy', 'dz'])
         inp_str = ', '.join(inp_names[self.data_dim_sel])
-        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i])}..{np.max(self.data_points[i])}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i]):.2f}..{np.max(self.data_points[i]):.2f}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
         model_str = model_str +  '  dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
@@ -606,7 +606,7 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data positions & offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
-        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only single value from interpolation)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only a single data point from interpolation)
 
     def data_points(self):
         """Return data offsets."""
@@ -617,7 +617,7 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         return self.p_data
 
     def get_conn_prob(self, x, y, z, dx, dy, dz):
-        """Return (position- & offset-dependent) connection probability, linearly interpolating between data points."""
+        """Return (position- & offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
@@ -651,7 +651,7 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         """Return model string describing the model."""
         inp_names = np.array(['x', 'y', 'z', 'dx', 'dy', 'dz'])
         inp_str = ', '.join(inp_names[self.data_dim_sel])
-        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i])}..{np.max(self.data_points[i])}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i]):.2f}..{np.max(self.data_points[i]):.2f}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
         model_str = model_str +  '  x/y/z...src position, dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
