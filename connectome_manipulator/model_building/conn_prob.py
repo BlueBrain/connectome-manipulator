@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import progressbar
 import scipy.interpolate
+from scipy.ndimage import gaussian_filter
 from scipy.optimize import curve_fit
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance_matrix
@@ -510,18 +511,31 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_offset': p_conn_offset, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, **_):
+def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
 
-    dx_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
-    dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
-    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    bin_sizes = [np.diff(dx_bins[:2])[0], np.diff(dy_bins[:2])[0], np.diff(dz_bins[:2])[0]]
+
+    dx_bin_offset = 0.5 * bin_sizes[0]
+    dy_bin_offset = 0.5 * bin_sizes[1]
+    dz_bin_offset = 0.5 * bin_sizes[2]
 
     dx_pos = dx_bins[:-1] + dx_bin_offset # Positions at bin centers
     dy_pos = dy_bins[:-1] + dy_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Apply Gaussian smoothing filter to data points (optional)
+    if smoothing_sigma_um is not None:
+        if not isinstance(smoothing_sigma_um, list):
+            smoothing_sigma_um = [smoothing_sigma_um] * 3 # Same value for all coordinates
+        else:
+            assert len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!'
+        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+        sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
+        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        p_conn_offset = gaussian_filter(p_conn_offset, sigmas, mode='constant')
 
     model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
@@ -584,7 +598,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax = fig.add_subplot(1, 2, 1, projection='3d')
     for pidx in range(num_p_bins):
         p_sel_idx = np.where(np.logical_and(p_conn_offset > p_bins[pidx], p_conn_offset <= p_bins[pidx + 1]))
-        plt.plot(dx_bins[p_sel_idx[0]] + dx_bin_offset, dy_bins[p_sel_idx[1]] + dy_bin_offset, dz_bins[p_sel_idx[2]] + dz_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
+        plt.plot(dx_bins[p_sel_idx[0]] + dx_bin_offset, dy_bins[p_sel_idx[1]] + dy_bin_offset, dz_bins[p_sel_idx[2]] + dz_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.01 + 0.99 * pidx / (num_p_bins - 1), markeredgecolor='none')
 #     ax.view_init(30, 60)
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
@@ -599,7 +613,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax = fig.add_subplot(1, 2, 2, projection='3d')
     for pidx in range(num_p_bins):
         p_sel_idx = np.logical_and(model_val > p_bins[pidx], model_val <= p_bins[pidx + 1])
-        plt.plot(model_pos[p_sel_idx, 0], model_pos[p_sel_idx, 1], model_pos[p_sel_idx, 2], '.', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
+        plt.plot(model_pos[p_sel_idx, 0], model_pos[p_sel_idx, 1], model_pos[p_sel_idx, 2], '.', color=p_colors[pidx, :], alpha=0.01 + 0.99 * pidx / (num_p_bins - 1), markeredgecolor='none')
 #     ax.view_init(30, 60)
     ax.set_xlim((dx_bins[0], dx_bins[-1]))
     ax.set_ylim((dy_bins[0], dy_bins[-1]))
@@ -752,25 +766,40 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     return {'p_conn_position': p_conn_position, 'x_bins': x_bins, 'y_bins': y_bins, 'z_bins': z_bins, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, model_specs=None, **_):
+def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
-    x_bin_offset = 0.5 * np.diff(x_bins[:2])[0]
-    y_bin_offset = 0.5 * np.diff(y_bins[:2])[0]
-    z_bin_offset = 0.5 * np.diff(z_bins[:2])[0]
+
+    bin_sizes = [ np.diff(x_bins[:2])[0],  np.diff(y_bins[:2])[0],  np.diff(z_bins[:2])[0],
+                 np.diff(dx_bins[:2])[0], np.diff(dy_bins[:2])[0], np.diff(dz_bins[:2])[0]]
+
+    x_bin_offset = 0.5 * bin_sizes[0]
+    y_bin_offset = 0.5 * bin_sizes[1]
+    z_bin_offset = 0.5 * bin_sizes[2]
 
     x_pos = x_bins[:-1] + x_bin_offset # Positions at bin centers
     y_pos = y_bins[:-1] + y_bin_offset # Positions at bin centers
     z_pos = z_bins[:-1] + z_bin_offset # Positions at bin centers
 
-    dx_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
-    dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
-    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    dx_bin_offset = 0.5 * bin_sizes[3]
+    dy_bin_offset = 0.5 * bin_sizes[4]
+    dz_bin_offset = 0.5 * bin_sizes[5]
 
     dx_pos = dx_bins[:-1] + dx_bin_offset # Positions at bin centers
     dy_pos = dy_bins[:-1] + dy_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Apply Gaussian smoothing filter to data points (optional)
+    if smoothing_sigma_um is not None:
+        if not isinstance(smoothing_sigma_um, list):
+            smoothing_sigma_um = [smoothing_sigma_um] * 6 # Same value for all coordinates
+        else:
+            assert len(smoothing_sigma_um) == 6, 'ERROR: Smoothing sigma for 6 dimensions required!'
+        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+        sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
+        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
 
     model_inputs = ['x', 'y', 'z', 'dx', 'dy', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
@@ -848,7 +877,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 ax = fig.add_subplot(1, 2, 1, projection='3d')
                 for pidx in range(num_p_bins):
                     p_sel_idx = np.where(np.logical_and(p_conn_sel > p_bins[pidx], p_conn_sel <= p_bins[pidx + 1]))
-                    plt.plot(dx_bins[p_sel_idx[0]] + dx_bin_offset, dy_bins[p_sel_idx[1]] + dy_bin_offset, dz_bins[p_sel_idx[2]] + dz_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
+                    plt.plot(dx_bins[p_sel_idx[0]] + dx_bin_offset, dy_bins[p_sel_idx[1]] + dy_bin_offset, dz_bins[p_sel_idx[2]] + dz_bin_offset, 'o', color=p_colors[pidx, :], alpha=0.01 + 0.99 * pidx / (num_p_bins - 1), markeredgecolor='none')
                 ax.view_init(30, 60)
                 ax.set_xlim((dx_bins[0], dx_bins[-1]))
                 ax.set_ylim((dy_bins[0], dy_bins[-1]))
@@ -863,7 +892,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 ax = fig.add_subplot(1, 2, 2, projection='3d')
                 for pidx in range(num_p_bins):
                     p_sel_idx = np.where(np.logical_and(model_val_sel > p_bins[pidx], model_val_sel <= p_bins[pidx + 1]))
-                    plt.plot(dx_pos_model[p_sel_idx[0]].T, dy_pos_model[p_sel_idx[1]].T, dz_pos_model[p_sel_idx[2]].T, '.', color=p_colors[pidx, :], alpha=0.1 + 0.9 * (pidx + 1) / num_p_bins, markeredgecolor='none')
+                    plt.plot(dx_pos_model[p_sel_idx[0]].T, dy_pos_model[p_sel_idx[1]].T, dz_pos_model[p_sel_idx[2]].T, '.', color=p_colors[pidx, :], alpha=0.01 + 0.99 * pidx / (num_p_bins - 1), markeredgecolor='none')
                 ax.view_init(30, 60)
                 ax.set_xlim((dx_bins[0], dx_bins[-1]))
                 ax.set_ylim((dy_bins[0], dy_bins[-1]))
