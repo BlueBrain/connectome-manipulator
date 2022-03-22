@@ -8,21 +8,21 @@ from utils import setup_tempdir, TEST_DATA_DIR
 import connectome_manipulator.model_building.model_building as test_module
 
 
-def test_get_model():
-    model = '(lambda a,b,c,d: (a,b,c,d))(test_arg_1, test_arg_2, test_kwarg_1, test_kwarg_2)'
-    model_inputs = ['test_arg_1', 'test_arg_2']
-    model_params = {'test_kwarg_1': 'value_1', 'test_kwarg_2': 'value_2'}
+# def test_get_model():
+#     model = '(lambda a,b,c,d: (a,b,c,d))(test_arg_1, test_arg_2, test_kwarg_1, test_kwarg_2)'
+#     model_inputs = ['test_arg_1', 'test_arg_2']
+#     model_params = {'test_kwarg_1': 'value_1', 'test_kwarg_2': 'value_2'}
 
-    res = test_module.get_model(model, model_inputs, model_params)
-    assert isinstance(res, types.FunctionType)
+#     res = test_module.get_model(model, model_inputs, model_params)
+#     assert isinstance(res, types.FunctionType)
 
-    args = ['test_value_1', 'test_value_2']
-    assert_array_equal(res(*args), args + list(model_params.values()))
+#     args = ['test_value_1', 'test_value_2']
+#     assert_array_equal(res(*args), args + list(model_params.values()))
 
-    # NOTE by herttuai on 08/10/2021:
-    # Is it intentional that kwargs are given as (kwargs) and not (**kwargs)?
-    kwargs = {'test_kwarg_1': 'test_value_3', 'test_kwarg_2': 'test_value_4'}
-    assert_array_equal(res(*args, kwargs), args + list(kwargs.values()))
+#     # NOTE by herttuai on 08/10/2021:
+#     # Is it intentional that kwargs are given as (kwargs) and not (**kwargs)?
+#     kwargs = {'test_kwarg_1': 'test_value_3', 'test_kwarg_2': 'test_value_4'}
+#     assert_array_equal(res(*args, kwargs), args + list(kwargs.values()))
 
 
 def test_create_model_config_per_pathway():

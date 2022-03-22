@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import pandas as pd
 import pytest
 from bluepysnap import Circuit
 from mock import Mock, patch
@@ -8,6 +9,7 @@ from numpy.testing import assert_array_equal
 
 from utils import TEST_DATA_DIR, setup_tempdir
 import connectome_manipulator.model_building.conn_prob as test_module
+from connectome_manipulator.model_building import model_types
 
 
 def get_random_pos_matrix(n_row=None):
@@ -77,26 +79,20 @@ def test_plot():
 
 
 def test_load_pos_mapping_model():
-    keys = ('model', 'model_inputs', 'model_params')
-    mock_pickle = Mock(return_value={k: '' for k in keys})
 
-    with patch('connectome_manipulator.model_building.model_building.get_model') as mock_get_model,\
-            patch('pickle.load', mock_pickle):
+    test_module.load_pos_mapping_model(None)
 
-        test_module.load_pos_mapping_model(None)
-        mock_get_model.assert_not_called()
+    with setup_tempdir(__name__) as tempdir:
+        filepath = os.path.join(tempdir, 'fake.json')
 
-        with setup_tempdir(__name__) as tempdir:
-            filepath = os.path.join(tempdir, 'fake.pickle')
-
-            with pytest.raises(AssertionError, match='Position mapping model file not found!'):
-                test_module.load_pos_mapping_model(filepath)
-
-            with open(filepath, 'w') as fd:
-                fd.write('')
-
+        with pytest.raises(AssertionError, match='Position mapping model file not found!'):
             test_module.load_pos_mapping_model(filepath)
-            mock_get_model.assert_called()
+
+        # Create dummy position mapping model
+        pos_model = model_types.PosMapModel(pos_table=pd.DataFrame(np.random.rand(10, 3), columns=['x', 'y', 'z']))
+        pos_model.save_model(os.path.split(filepath)[0], os.path.splitext(os.path.split(filepath)[1])[0])
+
+        test_module.load_pos_mapping_model(filepath)
 
 
 def test_get_neuron_positions():
@@ -108,6 +104,9 @@ def test_get_neuron_positions():
 
     res = test_module.get_neuron_positions(functions, range(3))
     assert_array_equal(res, [0.1, 2, 8])
+
+    res = test_module.get_neuron_positions(functions, [np.arange(3)] * 3)
+    assert_array_equal(res, [[0.1, 1.1, 2.1], [0, 2, 4], [0, 1, 8]])
 
     res = test_module.get_neuron_positions(lambda x: x + 1, range(3))
     assert_array_equal(res, range(1, 4))

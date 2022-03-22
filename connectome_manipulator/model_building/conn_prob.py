@@ -108,17 +108,18 @@ def plot(order, **kwargs):
 ###################################################################################################
 
 def load_pos_mapping_model(pos_map_file):
-    """Load a position mapping model from file."""
+    """Load a position mapping model from file (incl. access function)."""
     if pos_map_file is None:
         pos_map = None
+        pos_acc = None
     else:
         assert os.path.exists(pos_map_file), 'Position mapping model file not found!'
         print(f'Loading position mapping model from {pos_map_file}')
-        with open(pos_map_file, 'rb') as f:
-            pos_map_dict = pickle.load(f)
-        pos_map = model_building.get_model(pos_map_dict['model'], pos_map_dict['model_inputs'], pos_map_dict['model_params'])
+        pos_map = model_types.AbstractModel.model_from_file(pos_map_file)
+        assert pos_map.input_names == ['gids'], 'ERROR: Position mapping model error (must take "gids" as input)!'
+        pos_acc = lambda gids: pos_map.apply(gids=gids) # Access function
 
-    return pos_map
+    return pos_map, pos_acc
 
 
 def get_neuron_positions(pos_fct, node_ids_list):
@@ -258,8 +259,8 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):
 def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
     """Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
-    pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute distance matrix
     dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
@@ -363,12 +364,12 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     src_nrn_pos_raw, tgt_nrn_pos_raw = get_neuron_positions([n.positions for n in nodes], [src_node_ids, tgt_node_ids]) # Raw positions w/o mapping
-    pos_map = load_pos_mapping_model(pos_map_file)
-    if pos_map is None:
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    if pos_acc is None:
         src_nrn_pos = src_nrn_pos_raw
         tgt_nrn_pos = tgt_nrn_pos_raw
     else:
-        src_nrn_pos, tgt_nrn_pos = get_neuron_positions(pos_map, [src_node_ids, tgt_node_ids])
+        src_nrn_pos, tgt_nrn_pos = get_neuron_positions(pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute distance matrix
     if no_dist_mapping: # Don't use position mapping for computing distances
@@ -473,8 +474,8 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
 def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
     """Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
-    pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute dx/dy/dz offset matrices
     dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
@@ -709,8 +710,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
     """Extract position-dependent connection probability (5th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
-    pos_map = load_pos_mapping_model(pos_map_file)
-    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_map is None else pos_map, [src_node_ids, tgt_node_ids])
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute PRE position & POST-PRE offset matrices
     x_mat, y_mat, z_mat = compute_position_matrices(src_nrn_pos, tgt_nrn_pos)
