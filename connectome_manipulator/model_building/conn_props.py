@@ -193,6 +193,7 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
     prop_names = syn_props + ['n_syn_per_conn']
 
     # Plot data vs. model: property maps
+    title_str = ['Data', 'Model']
     for stat_sel in ['mean', 'std']:
         for pidx, p in enumerate(prop_names):
             plt.figure(figsize=(8, 3), dpi=300)
@@ -202,7 +203,8 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
                 plt.xticks(range(len(m_types[1])), m_types[0], rotation=90, fontsize=3)
                 plt.yticks(range(len(m_types[1])), m_types[0], rotation=0, fontsize=3)
                 plt.colorbar()
-            plt.suptitle(f'{p} ({stat_sel})')
+                plt.title(title_str[didx])
+            plt.suptitle(f'{p} ({stat_sel})', fontweight='bold')
             plt.tight_layout()
 
             out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_map_{stat_sel}__{p}.png'))

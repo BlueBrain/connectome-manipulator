@@ -273,8 +273,20 @@ class ConnPropsModel(AbstractModel):
         """Model initialization."""
         super().__init__(**kwargs)
 
-        # Check parameters
+        def dict_conv(data):
+            """ Recursively convert numpy to basic data types, to have a clean JSON file """
+            if isinstance(data, dict):
+                return {k: dict_conv(v) for k, v in data.items()}
+            elif isinstance(data, list) or isinstance(data, tuple):
+                return [dict_conv(d) for d in data]
+            elif hasattr(data, 'tolist'): # Convert numpy types
+                return data.tolist()
+            else:
+                return data
+
+        # Check & convert parameters
         assert isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!'
+        self.prop_stats = dict_conv(self.prop_stats) # Convert dict to basic data types
         self.prop_names = self.prop_stats.keys()
         assert 'n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing'
         assert np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!'
