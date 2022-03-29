@@ -11,6 +11,7 @@ import numpy as np
 from scipy.spatial import distance_matrix
 
 from connectome_manipulator import log
+from connectome_manipulator.access_functions import get_node_ids
 
 
 def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0):
@@ -22,8 +23,8 @@ def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0)
     if pair_gids is None:
         log.info('Sampling pairs of neurons for axon rewiring...')
 
-        gids1 = nodes[0].ids(sel_grp1)
-        gids2 = nodes[0].ids(sel_grp2)
+        gids1 = get_node_ids(nodes[0], sel_grp1)
+        gids2 = get_node_ids(nodes[0], sel_grp2)
         log.log_assert(len(np.intersect1d(gids1, gids2)) == 0, 'Overlapping groups of neurons not supported!')
 
         sclass1 = nodes[0].get(gids1, properties='synapse_class').unique()

@@ -21,6 +21,7 @@ from scipy.spatial import distance_matrix
 from sklearn.ensemble import RandomForestRegressor
 
 from connectome_manipulator.model_building import model_types
+from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
 
 JET = plt.cm.get_cmap('jet')
@@ -32,16 +33,15 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     print(f'INFO: Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)...')
 
     # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
     tgt_nodes = edges.target
     nodes = [src_nodes, tgt_nodes]
 
-    node_ids_src = src_nodes.ids(sel_src)
-    node_ids_dest = tgt_nodes.ids(sel_dest)
+    node_ids_src = get_node_ids(src_nodes, sel_src)
+    node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
 
     if not kwargs.get('pos_map_file') is None:
         assert (src_nodes.name == tgt_nodes.name) or (src_nodes.ids().min() > tgt_nodes.ids().max()) or (src_nodes.ids().max() < tgt_nodes.ids().min()), 'ERROR: Position mapping only supported for same source/taget node population or non-overlapping id ranges!'

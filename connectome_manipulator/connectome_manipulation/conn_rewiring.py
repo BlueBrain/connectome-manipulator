@@ -15,6 +15,7 @@ from scipy.stats import truncnorm
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import conn_prob, model_building
+from connectome_manipulator.access_functions import get_node_ids
 
 
 def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, keep_indegree=True, gen_method=None, amount_pct=100.0):
@@ -79,7 +80,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
 
     # Determine source/target nodes for rewiring
     stats_dict = {} # Keep track of statistics
-    src_class = nodes[0].get(sel_src, properties='synapse_class')
+    src_node_ids = get_node_ids(nodes[0], sel_src)
+    src_class = nodes[0].get(src_node_ids, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
     log.log_assert(len(src_node_ids) > 0, f'No {syn_class} source nodes found!')
     syn_sel_idx_src = np.isin(edges_table['@source_node'], src_node_ids)
@@ -88,7 +90,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     if model_order >= 2:
         src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
 
-    tgt_node_ids = nodes[1].ids(sel_dest)
+    tgt_node_ids = get_node_ids(nodes[1], sel_dest)
     num_tgt_total = len(tgt_node_ids)
     tgt_node_ids = np.intersect1d(tgt_node_ids, aux_dict['split_ids']) # Only select target nodes that are actually in current split of edges_table
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)

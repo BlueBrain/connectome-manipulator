@@ -13,20 +13,20 @@ import progressbar
 from sklearn.linear_model import LinearRegression
 
 from connectome_manipulator.model_building import model_types
+from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
 
 def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None, sample_size=None, **_):
     """Extract distance-dependent synaptic delays between samples of neurons."""
     # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
     tgt_nodes = edges.target
 
-    node_ids_src = src_nodes.ids(sel_src)
-    node_ids_dest = tgt_nodes.ids(sel_dest)
+    node_ids_src = get_node_ids(src_nodes, sel_src)
+    node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
 
     if sample_size is None or sample_size <= 0:
         sample_size = np.inf # Select all nodes

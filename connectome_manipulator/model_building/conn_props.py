@@ -12,6 +12,7 @@ import numpy as np
 import progressbar
 
 from connectome_manipulator.model_building import model_types
+from connectome_manipulator.access_functions import get_edges_population
 
 DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
                            'normal': ['mean', 'std'],
@@ -20,6 +21,7 @@ DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
                            'poisson': ['mean']}
 
 # Ideas for improvement:
+#   *Restrict to given node set!!
 #   *Detect actual distributions of synaptic properties (incl. data type!)
 #   *Capture cross-correlations between synaptic properties
 
@@ -27,8 +29,7 @@ DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
 def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, **_):
     """Extract statistics for synaptic properties between samples of neurons for each pair of m-types."""
     # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source

@@ -12,14 +12,15 @@ import numpy as np
 from connectome_manipulator import log
 from connectome_manipulator.connectome_manipulation.helper_functions import (
     get_gsyn_sum_per_conn, rescale_gsyn_per_conn)
+from connectome_manipulator.access_functions import get_node_ids
 
 
 def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct=100.0, keep_conns=False, rescale_gsyn=False):
     """Remove percentage of randomly selected synapses according to certain cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn) and rescaling g_syns to keep sum of g_syns per connection constant (unless there is no synapse per connection left)."""
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
 
-    gids_src = nodes[0].ids(sel_src)
-    gids_dest = nodes[1].ids(sel_dest)
+    gids_src = get_node_ids(nodes[0], sel_src)
+    gids_dest = get_node_ids(nodes[1], sel_dest)
 
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest)) # All potential synapses to be removed
 

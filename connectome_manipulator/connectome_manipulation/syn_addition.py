@@ -20,6 +20,7 @@ from connectome_manipulator import log
 from connectome_manipulator.connectome_manipulation.helper_functions import (
     get_gsyn_sum_per_conn, rescale_gsyn_per_conn)
 from connectome_manipulator.model_building import model_building
+from connectome_manipulator.access_functions import get_node_ids
 
 
 def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, rescale_gsyn=False, method='duplicate', props_model_file=None, ext_edges_config_file=None):
@@ -38,8 +39,8 @@ def apply(edges_table, nodes, aux_dict, amount, sel_src=None, sel_dest=None, res
     #         [NYI] randomize ... Fully randomized parameterization, based on model-based distributions
 
     # Select connections to add synapses to
-    gids_src = nodes[0].ids(sel_src)
-    gids_dest = nodes[1].ids(sel_dest)
+    gids_src = get_node_ids(nodes[0], sel_src)
+    gids_dest = get_node_ids(nodes[1], sel_dest)
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest))
     num_syn = np.sum(syn_sel_idx)
 

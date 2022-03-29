@@ -11,6 +11,7 @@ import numpy as np
 from scipy.spatial import distance_matrix
 
 from connectome_manipulator import log
+from connectome_manipulator.access_functions import get_node_ids
 
 
 def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
@@ -22,7 +23,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
     if pair_gids is None:
         log.info('INFO: Sampling pairs of neurons for axon shuffling...')
 
-        gids = nodes[0].ids(sel_grp)
+        gids = get_node_ids(nodes[0], sel_grp)
 
         sclass = nodes[0].get(gids, properties='synapse_class').unique()
         log.log_assert(len(sclass) == 1, 'Multiple synapse classes found!')

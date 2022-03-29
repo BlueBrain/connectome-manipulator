@@ -18,6 +18,7 @@ import numpy as np
 from bluepysnap.circuit import Circuit
 
 from connectome_manipulator import log
+from connectome_manipulator.access_functions import get_edges_population
 
 
 def load_circuit(sonata_config, N_split=1, popul_name=None):
@@ -26,16 +27,8 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     log.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
     c = Circuit(sonata_config)
 
-    # Select edge population [assuming exactly one edge population in given edges file (to be manipulated)]
-    log.log_assert(len(c.edges.population_names) > 0, 'No edge population found!')
-    if popul_name is None:
-        if len(c.edges.population_names) == 1:
-            popul_name = c.edges.population_names[0] # Select the only existing population
-        else:
-            popul_name = 'default' # Use default name
-            log.warning(f'Multiple edges populations found - Trying to load "{popul_name}" population!')
-    log.log_assert(popul_name in c.edges.population_names, f'Population "{popul_name}" not found in edges file!')
-    edges = c.edges[popul_name]
+    # Select edge population
+    edges = get_edges_population(c, popul_name)
     edges_file = c.config['networks']['edges'][0]['edges_file']
 
     # Select corresponding source/target nodes populations
@@ -382,7 +375,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
 
         # Create BlueConfig for manipulated circuit
         blue_config_manip = os.path.join(output_path, os.path.splitext(manip_config['blue_config_to_update'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['blue_config_to_update'])[1])
-        config_replacement = {nrn_path: symlink_dst,
+        config_replacement = {nrn_path: symlink_dst, # BETTER (???): nrn_path_manip
                               circ_path_entry: f'CircuitPath {output_path}'}
         create_new_file_from_template(blue_config_manip, blue_config, config_replacement)
 
