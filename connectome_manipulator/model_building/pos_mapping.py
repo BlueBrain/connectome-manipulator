@@ -5,7 +5,7 @@ Module for building position mapping model, consisting of three basic functions:
   -plot(...): Visualizes data vs. model output
 """
 
-import os.path
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np

@@ -51,6 +51,7 @@ class AbstractModel(metaclass=ABCMeta):
     def model_from_file(model_file):
         """Wrapper function to load model object from file."""
         assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
+        assert os.path.splitext(model_file)[1] == '.json', f'ERROR: Model file must be of type ".json"!'
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
         assert 'model' in model_dict, 'ERROR: Model type not found!'
@@ -245,6 +246,10 @@ class PosMapModel(AbstractModel):
         """Return GIDs that are mapped within this model."""
         return self.pos_table.index.values
 
+    def get_coord_names(self):
+        """Return coordinate names of this model."""
+        return list(self.pos_table.columns)
+
     def get_model_output(self, **kwargs):
         """Return (mapped) neuron positions for a given set of GIDs."""
         gids = np.array(kwargs['gids'])
@@ -253,9 +258,9 @@ class PosMapModel(AbstractModel):
     def get_model_str(self):
         """Return model string describing the model."""
         model_str = f'{self.__class__.__name__}\n'
-        model_str = model_str + f'  Size: {self.pos_table.shape[0]} GIDs\n'
-        model_str = model_str + f'  Outputs: {self.pos_table.shape[1]} ({", ".join(self.pos_table.keys())})\n'
-        model_str = model_str +  '  Range: ' + ', '.join([f'{k}: {self.pos_table[k].min():.1f}..{self.pos_table[k].max():.1f}' for k in self.pos_table.keys()])
+        model_str = model_str + f'  Size: {len(self.get_gids())} GIDs ({np.min(self.get_gids())}..{np.max(self.get_gids())})\n'
+        model_str = model_str + f'  Outputs: {len(self.get_coord_names())} ({", ".join(self.get_coord_names())})\n'
+        model_str = model_str +  '  Range: ' + ', '.join([f'{k}: {self.pos_table[k].min():.1f}..{self.pos_table[k].max():.1f}' for k in self.get_coord_names()])
         return model_str
 
     
