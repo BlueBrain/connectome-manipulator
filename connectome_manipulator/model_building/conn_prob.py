@@ -53,16 +53,23 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
     node_ids_dest_sel = node_ids_dest[np.random.permutation([True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest))]
 
-    if order == 1:
+    if not isinstance(order, str):
+        order = str(order)
+
+    if order == '1':
         return extract_1st_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
-    elif order == 2:
+    elif order == '2':
         return extract_2nd_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
-    elif order == 3:
+    elif order == '3':
         return extract_3rd_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
-    elif order == 4:
+    elif order == '4':
         return extract_4th_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
-    elif order == 5:
+    elif order == '4R':
+        return extract_4th_order_reduced(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
+    elif order == '5':
         return extract_5th_order(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
+    elif order == '5R':
+        return extract_5th_order_reduced(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     else:
         assert False, f'ERROR: Order-{order} data extraction not supported!'
 
@@ -71,16 +78,23 @@ def build(order, **kwargs):
     """Build connection probability model from data."""
     print(f'INFO: Running order-{order} model building...')
 
-    if order == 1:
+    if not isinstance(order, str):
+        order = str(order)
+
+    if order == '1':
         return build_1st_order(**kwargs)
-    elif order == 2:
+    elif order == '2':
         return build_2nd_order(**kwargs)
-    elif order == 3:
+    elif order == '3':
         return build_3rd_order(**kwargs)
-    elif order == 4:
+    elif order == '4':
         return build_4th_order(**kwargs)
-    elif order == 5:
+    elif order.upper() == '4R':
+        return build_4th_order_reduced(**kwargs)
+    elif order == '5':
         return build_5th_order(**kwargs)
+    elif order == '5R':
+        return build_5th_order_reduced(**kwargs)
     else:
         assert False, f'ERROR: Order-{order} model building not supported!'
 
@@ -89,16 +103,23 @@ def plot(order, **kwargs):
     """Visualize data vs. model."""
     print(f'INFO: Running order-{order} data/model visualization...')
 
-    if order == 1:
+    if not isinstance(order, str):
+        order = str(order)
+
+    if order == '1':
         return plot_1st_order(**kwargs)
-    elif order == 2:
+    elif order == '2':
         return plot_2nd_order(**kwargs)
-    elif order == 3:
+    elif order == '3':
         return plot_3rd_order(**kwargs)
-    elif order == 4:
+    elif order == '4':
         return plot_4th_order(**kwargs)
-    elif order == 5:
+    elif order == '4R':
+        return plot_4th_order_reduced(**kwargs)
+    elif order == '5':
         return plot_5th_order(**kwargs)
+    elif order == '5R':
+        return plot_5th_order_reduced(**kwargs)
     else:
         assert False, f'ERROR: Order-{order} data/model visualization not supported!'
 
@@ -134,35 +155,39 @@ def get_neuron_positions(pos_fct, node_ids_list):
     return nrn_pos
 
 
-def compute_dist_matrix(src_nrn_pos, tgt_nrn_pos):
-    """Computes distance matrix between pairs of neurons."""
-    dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-    dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
+# def compute_dist_matrix(src_nrn_pos, tgt_nrn_pos):
+#     """Computes distance matrix between pairs of neurons."""
+#     dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
+#     dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
 
-    return dist_mat
-
-
-def compute_bip_matrix(src_nrn_pos, tgt_nrn_pos):
-    """Computes bipolar matrix between pairs of neurons (along z-axis; POST-synaptic neuron below (delta_z < 0) or above (delta_z > 0) PRE-synaptic neuron)."""
-    bip_mat = np.sign(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in z coordinate
-
-    return bip_mat
+#     return dist_mat
 
 
-def compute_offset_matrices(src_nrn_pos, tgt_nrn_pos):
-    """Computes dx/dy/dz offset matrices between pairs of neurons (POST minus PRE position)."""
-    dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
-    dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
-    dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
+# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
+# def compute_bip_matrix(src_nrn_pos, tgt_nrn_pos):
+#     """Computes bipolar matrix between pairs of neurons (along z-axis; POST-synaptic neuron below (delta_z < 0) or above (delta_z > 0) PRE-synaptic neuron)."""
+#     bip_mat = np.sign(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in z coordinate
 
-    return dx_mat, dy_mat, dz_mat
+#     return bip_mat
 
 
-def compute_position_matrices(src_nrn_pos, tgt_nrn_pos):
-    """Computes x/y/z position matrices (PRE neuron positions repeated over POST neuron number)."""
-    x_mat, y_mat, z_mat = [np.tile(src_nrn_pos[:, i:i + 1], [1, tgt_nrn_pos.shape[0]]) for i in range(src_nrn_pos.shape[1])]
+# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
+# def compute_offset_matrices(src_nrn_pos, tgt_nrn_pos):
+#     """Computes dx/dy/dz offset matrices between pairs of neurons (POST minus PRE position)."""
+#     dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
+#     dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
+#     dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
 
-    return x_mat, y_mat, z_mat
+#     return dx_mat, dy_mat, dz_mat
+
+
+# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
+# def compute_position_matrices(src_nrn_pos, tgt_nrn_pos):
+#     """Computes x/y/z position matrices (PRE neuron positions repeated over POST neuron number)."""
+#     x_mat, y_mat, z_mat = [np.tile(src_nrn_pos[:, i:i + 1], [1, tgt_nrn_pos.shape[0]]) for i in range(src_nrn_pos.shape[1])]
+
+#     return x_mat, y_mat, z_mat
 
 
 def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins):
@@ -201,6 +226,35 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     p_conn[np.isnan(p_conn)] = 0.0
 
     return p_conn, count_conn, count_all
+
+
+def get_value_ranges(max_range, num_coords, pos_range=False):
+    """Returns ranges of values for given max. ranges (strictly positive incl. zero, symmetric around zero, or arbitrary)"""
+    if np.isscalar(pos_range):
+        pos_range = [pos_range for i in range(num_coords)]
+    else:
+        assert len(pos_range) == num_coords, f'ERROR: pos_range must have {num_coords} elements!'
+
+    if np.isscalar(max_range):
+        max_range = [max_range for i in range(num_coords)]
+    else:
+        assert len(max_range) == num_coords, f'ERROR: max_range must have {num_coords} elements!'
+
+    val_ranges = []
+    for ridx, (r, p) in enumerate(zip(max_range, pos_range)):
+        if np.isscalar(r):
+            assert r > 0.0, f'ERROR: Maximum range of coord {ridx} must be larger than 0!'
+            if p: # Positive range
+                val_ranges.append([0, r])
+            else: # Symmetric range
+                val_ranges.append([-r, r])
+        else: # Arbitrary range
+            assert len(r) == 2 and r[0] < r[1], f'ERROR: Range of coord {ridx} invalid!'
+            if p:
+                assert r[0] == 0, f'ERROR: Range of coord {ridx} must include 0!'
+            val_ranges.append(r)
+
+    return val_ranges
 
 
 ###################################################################################################
@@ -263,11 +317,12 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute distance matrix
-    dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
+    dist_mat = model_types.ConnProb2ndOrderExpModel.compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
 
     # Extract distance-dependent connection probabilities
     if max_range_um is None:
         max_range_um = np.nanmax(dist_mat)
+    assert max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!'
     num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_bins + 1) * bin_size_um
 
@@ -373,16 +428,17 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
 
     # Compute distance matrix
     if no_dist_mapping: # Don't use position mapping for computing distances
-        dist_mat = compute_dist_matrix(src_nrn_pos_raw, tgt_nrn_pos_raw)
+        dist_mat = model_types.ConnProb3rdOrderExpModel.compute_dist_matrix(src_nrn_pos_raw, tgt_nrn_pos_raw)
     else: # Use position mapping for computing distances
-        dist_mat = compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
+        dist_mat = model_types.ConnProb3rdOrderExpModel.compute_dist_matrix(src_nrn_pos, tgt_nrn_pos)
 
     # Compute bipolar matrix (always using position mapping, if provided; along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
-    bip_mat = compute_bip_matrix(src_nrn_pos, tgt_nrn_pos)
+    bip_mat = model_types.ConnProb3rdOrderExpModel.compute_bip_matrix(src_nrn_pos, tgt_nrn_pos)
 
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
         max_range_um = np.nanmax(dist_mat)
+    assert max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!'
     num_dist_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_dist_bins + 1) * bin_size_um
     bip_bins = [np.min(bip_mat), 0, np.max(bip_mat)]
@@ -478,18 +534,13 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute dx/dy/dz offset matrices
-    dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
+    dx_mat, dy_mat, dz_mat = model_types.ConnProb4thOrderLinInterpnModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
 
     # Extract offset-dependent connection probabilities
     if max_range_um is None:
         dx_range, dy_range, dz_range = zip([np.nanmin(dx_mat), np.nanmin(dy_mat), np.nanmin(dz_mat)], [np.nanmax(dx_mat), np.nanmax(dy_mat), np.nanmax(dz_mat)])
-    elif np.isscalar(max_range_um): # Single scalar range value to be used for all dimensions
-        assert max_range_um > 0.0, 'ERROR: Maximum range must be larger than 0um!'
-        dx_range = dy_range = dz_range = [-max_range_um, max_range_um]
-    else: # Three values for x/y/z dimensions
-        assert len(max_range_um) == 3, 'ERROR: Maximum range in x/y/z dimension expected!'
-        assert np.all([r > 0.0 for r in max_range_um]), 'ERROR: Maximum range must be larger than 0um!'
-        dx_range, dy_range, dz_range = zip([-r for r in max_range_um], max_range_um)
+    else:
+        dx_range, dy_range, dz_range = get_value_ranges(max_range_um, 3, pos_range=False)
 
     if np.isscalar(bin_size_um): # Single scalar range value to be used for all dimensions
         assert bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
@@ -700,6 +751,142 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 
 
 ###################################################################################################
+# Generative models for circuit connectivity:
+#   Reduced 4th order (offset-dependent), modified from [Gal et al. 2020]
+#     => Radial/axial offsets only
+#     => Position mapping model (flatmap) supported
+#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#                    and optionally, 'kwargs' may be provided
+###################################################################################################
+
+def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+    """Extract offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons."""
+    # Get neuron positions (incl. position mapping, if provided)
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
+
+    # Compute dr/dz offset matrices
+    dr_mat, dz_mat = model_types.ConnProb4thOrderLinInterpnReducedModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
+
+    # Extract offset-dependent connection probabilities
+    if max_range_um is None:
+        dr_range, dz_range = zip([0, np.nanmin(dz_mat)], [np.nanmax(dr_mat), np.nanmax(dz_mat)])
+    else:
+        dr_range, dz_range = get_value_ranges(max_range_um, 2, pos_range=[True, False])
+
+    if np.isscalar(bin_size_um): # Single scalar range value to be used for all dimensions
+        assert bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        bin_size_dr = bin_size_dz = bin_size_um
+    else: # Two values for r/z directions
+        assert len(bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!'
+        assert np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        bin_size_dr, bin_size_dz = bin_size_um
+
+    num_bins_dr = np.ceil((dr_range[1] - dr_range[0]) / bin_size_dr).astype(int)
+    num_bins_dz = np.ceil((dz_range[1] - dz_range[0]) / bin_size_dz).astype(int)
+
+    dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
+    dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
+
+    p_conn_offset, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dr_mat, dz_mat], [dr_bins, dz_bins])
+
+    return {'p_conn_offset': p_conn_offset, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+
+
+def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+    """Build reduced 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
+    if model_specs is None:
+        model_specs = {'name': 'LinearInterpolation'}
+
+    bin_sizes = [np.diff(dr_bins[:2])[0], np.diff(dz_bins[:2])[0]]
+
+    dr_bin_offset = 0.5 * bin_sizes[0]
+    dz_bin_offset = 0.5 * bin_sizes[1]
+
+    dr_pos = dr_bins[:-1] + dr_bin_offset # Positions at bin centers
+    dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Apply Gaussian smoothing filter to data points (optional)
+    if smoothing_sigma_um is not None:
+        if not isinstance(smoothing_sigma_um, list):
+            smoothing_sigma_um = [smoothing_sigma_um] * 2 # Same value for all coordinates
+        else:
+            assert len(smoothing_sigma_um) == 2, 'ERROR: Smoothing sigma for 2 dimensions required!'
+        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+        sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
+        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        p_reflect = np.vstack([p_conn_offset[::-1, :], p_conn_offset]) # Mirror along radial axis at dr==0, to avoid edge effect
+        p_reflect = gaussian_filter(p_reflect, sigmas, mode='constant')
+        p_conn_offset = p_reflect[p_conn_offset.shape[0]:, :] # Cut original part of the data
+
+    model_inputs = ['dr', 'dz'] # Must be the same for all interpolation types!
+    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+
+        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+
+        # Create model
+        index = pd.MultiIndex.from_product([dr_pos, dz_pos], names=model_inputs)
+        df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=['p'])
+        model = model_types.ConnProb4thOrderLinInterpnReducedModel(p_conn_table=df)
+
+    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+
+    else:
+        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
+
+    return model
+
+
+def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+    """Visualize data vs. model (4th order reduced)."""
+
+    dr_bin_offset = 0.5 * np.diff(dr_bins[:2])[0]
+    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+
+    model_ovsampl = 8 # Model oversampling factor (per dimension)
+    model_extention = 10 # Model extention (#bins per dimension)
+    dr_pos_model = np.linspace(dr_bins[0], dr_bins[-1] + dr_bin_offset * 2 * model_extention, (len(dr_bins) + model_extention - 1) * model_ovsampl + 1)
+    dz_pos_model = np.linspace(dz_bins[0] - dz_bin_offset * 2 * model_extention, dz_bins[-1] + dz_bin_offset * 2 * model_extention, (len(dz_bins) + 2 * model_extention - 1) * model_ovsampl + 1)
+    drv, dzv = np.meshgrid(dr_pos_model, dz_pos_model, indexing='ij')
+    model_pos = np.array([drv.flatten(), dzv.flatten()]).T # Regular grid
+    model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1])
+    model_val = model_val.reshape([len(dr_pos_model), len(dz_pos_model)])
+
+    # Connection probability (data vs. model)
+    fig = plt.figure(figsize=(12, 4), dpi=300)
+    # (Data)
+    assert dr_bins[0] == 0, 'ERROR: Radial bin range error!'
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.hstack([p_conn_offset.T[:, ::-1], p_conn_offset.T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+    plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\\Delta$r [$\\mu$m]')
+    plt.ylabel('$\\Delta$z [$\\mu$m]')
+    plt.colorbar(label='Conn. prob.')
+    plt.title(f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
+
+    # (Model)
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.hstack([model_val.T[:, ::-1], model_val.T]), interpolation='nearest', extent=(-dr_pos_model[-1], dr_pos_model[-1], dz_pos_model[-1], dz_pos_model[0]), cmap=HOT, vmin=0.0)
+    plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
+    plt.gca().invert_yaxis()
+    plt.xlabel('$\\Delta$r [$\\mu$m]')
+    plt.ylabel('$\\Delta$z [$\\mu$m]')
+    plt.colorbar(label='Conn. prob.')
+    plt.title(f'Model: {model_specs.get("name")}')
+
+    plt.suptitle(f'Reduced offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)
+
+
+###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   5th order (position-dependent)
 #     => Position mapping model (flatmap) supported
@@ -714,8 +901,8 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
 
     # Compute PRE position & POST-PRE offset matrices
-    x_mat, y_mat, z_mat = compute_position_matrices(src_nrn_pos, tgt_nrn_pos)
-    dx_mat, dy_mat, dz_mat = compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
+    x_mat, y_mat, z_mat = model_types.ConnProb5thOrderLinInterpnModel.compute_position_matrices(src_nrn_pos, tgt_nrn_pos)
+    dx_mat, dy_mat, dz_mat = model_types.ConnProb5thOrderLinInterpnModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
 
     # Extract position- & offset-dependent connection probabilities
     x_range, y_range, z_range = zip(np.minimum(np.nanmin(src_nrn_pos, 0), np.nanmin(tgt_nrn_pos, 0)), np.maximum(np.nanmax(src_nrn_pos, 0), np.nanmax(tgt_nrn_pos, 0)))
@@ -738,13 +925,8 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
 
     if offset_max_range_um is None:
         dx_range, dy_range, dz_range = zip([np.nanmin(dx_mat), np.nanmin(dy_mat), np.nanmin(dz_mat)], [np.nanmax(dx_mat), np.nanmax(dy_mat), np.nanmax(dz_mat)])
-    elif np.isscalar(offset_max_range_um): # Single scalar range value to be used for all dimensions
-        assert offset_max_range_um > 0.0, 'ERROR: Maximum range must be larger than 0um!'
-        dx_range = dy_range = dz_range = [-offset_max_range_um, offset_max_range_um]
-    else: # Three values for x/y/z dimensions
-        assert len(offset_max_range_um) == 3, 'ERROR: Maximum range in x/y/z dimension expected!'
-        assert np.all([r > 0.0 for r in offset_max_range_um]), 'ERROR: Maximum range must be larger than 0um!'
-        dx_range, dy_range, dz_range = zip([-r for r in offset_max_range_um], offset_max_range_um)
+    else:
+        dx_range, dy_range, dz_range = get_value_ranges(offset_max_range_um, 3, pos_range=False)
 
     if np.isscalar(offset_bin_size_um): # Single scalar range value to be used for all dimensions
         assert offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
@@ -982,3 +1164,159 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_2d_x{ix}y{iy}z{iz}.png'))
                 print(f'INFO: Saving {out_fn}...')
                 plt.savefig(out_fn)
+
+
+###################################################################################################
+# Generative models for circuit connectivity:
+#   Reduced 5th order (position-dependent), modified from [Gal et al. 2020]
+#     => Axial position only
+#     => Radial/axial offsets only
+#     => Position mapping model (flatmap) supported
+#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#                    and optionally, 'kwargs' may be provided
+###################################################################################################
+
+def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
+    """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
+    # Get neuron positions (incl. position mapping, if provided)
+    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions([n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids])
+
+    # Compute PRE position & POST-PRE offset matrices
+    z_mat = model_types.ConnProb5thOrderLinInterpnReducedModel.compute_position_matrix(src_nrn_pos, tgt_nrn_pos)
+    dr_mat, dz_mat = model_types.ConnProb5thOrderLinInterpnReducedModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
+
+    # Extract position- & offset-dependent connection probabilities
+    z_range = [np.minimum(np.nanmin(src_nrn_pos[:, 2]), np.nanmin(tgt_nrn_pos[:, 2])), np.maximum(np.nanmax(src_nrn_pos[:, 2]), np.nanmax(tgt_nrn_pos[:, 2]))]
+
+    assert np.isscalar(position_bin_size_um) and position_bin_size_um > 0.0, 'ERROR: Position bin size must be a scalar larger than 0um!'
+    bin_size_z = position_bin_size_um
+    num_bins_z = np.ceil((z_range[1] - z_range[0]) / bin_size_z).astype(int)
+    z_bins = np.arange(0, num_bins_z + 1) * bin_size_z + z_range[0]
+
+    if offset_max_range_um is None:
+        dr_range, dz_range = zip([np.nanmin(dr_mat), np.nanmin(dz_mat)], [np.nanmax(dr_mat), np.nanmax(dz_mat)])
+    else:
+        dr_range, dz_range = get_value_ranges(offset_max_range_um, 2, pos_range=[True, False])
+
+    if np.isscalar(offset_bin_size_um): # Single scalar range value to be used for all dimensions
+        assert offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        bin_size_dr = bin_size_dz = offset_bin_size_um
+    else: # Two values for r/z dimensions
+        assert len(offset_bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!'
+        assert np.all([b > 0.0 for b in offset_bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        bin_size_dr, bin_size_dz = offset_bin_size_um
+
+    num_bins_dr = np.ceil((dr_range[1] - dr_range[0]) / bin_size_dr).astype(int)
+    num_bins_dz = np.ceil((dz_range[1] - dz_range[0]) / bin_size_dz).astype(int)
+
+    dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
+    dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
+
+    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [z_mat, dr_mat, dz_mat], [z_bins, dr_bins, dz_bins])
+
+    return {'p_conn_position': p_conn_position, 'z_bins': z_bins, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+
+
+def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+    """Build reduced 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
+    if model_specs is None:
+        model_specs = {'name': 'LinearInterpolation'}
+
+    bin_sizes = [np.diff(z_bins[:2])[0], np.diff(dr_bins[:2])[0], np.diff(dz_bins[:2])[0]]
+
+    z_bin_offset = 0.5 * bin_sizes[0]
+    z_pos = z_bins[:-1] + z_bin_offset # Positions at bin centers
+
+    dr_bin_offset = 0.5 * bin_sizes[1]
+    dz_bin_offset = 0.5 * bin_sizes[2]
+
+    dr_pos = dr_bins[:-1] + dr_bin_offset # Positions at bin centers
+    dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Apply Gaussian smoothing filter to data points (optional)
+    if smoothing_sigma_um is not None:
+        if not isinstance(smoothing_sigma_um, list):
+            smoothing_sigma_um = [smoothing_sigma_um] * 3 # Same value for all coordinates
+        else:
+            assert len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!'
+        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+        sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
+        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
+
+    model_inputs = ['z', 'dr', 'dz'] # Must be the same for all interpolation types!
+    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+
+        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+
+        # Create model
+        index = pd.MultiIndex.from_product([z_pos, dr_pos, dz_pos], names=model_inputs)
+        df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=['p'])
+        model = model_types.ConnProb5thOrderLinInterpnReducedModel(p_conn_table=df)
+
+    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+
+    else:
+        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+
+    print('MODEL:', end=' ')
+    print(model.get_model_str())
+
+    return model
+
+
+def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+    """Visualize data vs. model (5th order reduced)."""
+
+    z_bin_offset = 0.5 * np.diff(z_bins[:2])[0]
+    z_pos_model = z_bins[:-1] + z_bin_offset # Positions at bin centers
+
+    dr_bin_offset = 0.5 * np.diff(dr_bins[:2])[0]
+    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+
+    model_ovsampl = 8 # Model oversampling factor (per dimension)
+    model_extention = 10 # Model extention (#bins per dimension)
+    dr_pos_model = np.linspace(dr_bins[0], dr_bins[-1] + dr_bin_offset * 2 * model_extention, (len(dr_bins) + model_extention - 1) * model_ovsampl + 1)
+    dz_pos_model = np.linspace(dz_bins[0] - dz_bin_offset * 2 * model_extention, dz_bins[-1] + dz_bin_offset * 2 * model_extention, (len(dz_bins) + 2 * model_extention - 1) * model_ovsampl + 1)
+    zv, drv, dzv = np.meshgrid(z_pos_model, dr_pos_model, dz_pos_model, indexing='ij')
+    model_pos = np.array([zv.flatten(), drv.flatten(), dzv.flatten()]).T # Regular grid
+    model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
+    model_val = model_val.reshape([len(z_pos_model), len(dr_pos_model), len(dz_pos_model)])
+
+    # Connection probability (data vs. model)
+    p_max = np.max(p_conn_position)
+    p_max_model = np.max(model_val)
+    fig = plt.figure(figsize=(12, 4 * len(z_pos_model)), dpi=300)
+    for zidx, zval in enumerate(z_pos_model):
+        # (Data)
+        assert dr_bins[0] == 0, 'ERROR: Radial bin range error!'
+        plt.subplot(len(z_pos_model), 2, zidx * 2 + 1)
+        plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=p_max)
+        plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
+        plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
+        plt.gca().invert_yaxis()
+        plt.xlabel('$\\Delta$r [$\\mu$m]')
+        plt.ylabel('$\\Delta$z [$\\mu$m]')
+        plt.colorbar(label='Conn. prob.')
+        if zidx == 0:
+            plt.title(f'Data: N = {src_cell_count}x{tgt_cell_count} cells')
+
+        # (Model)
+        plt.subplot(len(z_pos_model), 2, zidx * 2 + 2)
+        plt.imshow(np.hstack([np.squeeze(model_val[zidx, ::-1, :]).T, np.squeeze(model_val[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_pos_model[-1], dr_pos_model[-1], dz_pos_model[-1], dz_pos_model[0]), cmap=HOT, vmin=0.0, vmax=p_max_model)
+        plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
+        plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
+        plt.gca().invert_yaxis()
+        plt.xlabel('$\\Delta$r [$\\mu$m]')
+        plt.ylabel('$\\Delta$z [$\\mu$m]')
+        plt.colorbar(label='Conn. prob.')
+        if zidx == 0:
+            plt.title(f'Model: {model_specs.get("name")}')
+
+    plt.suptitle(f'Reduced position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>')
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
+    print(f'INFO: Saving {out_fn}...')
+    plt.savefig(out_fn)

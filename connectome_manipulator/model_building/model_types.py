@@ -573,6 +573,7 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
         return p_conn
 
     @staticmethod
@@ -596,10 +597,109 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         """Return model string describing the model."""
         inp_names = np.array(['dx', 'dy', 'dz'])
         inp_str = ', '.join(inp_names[self.data_dim_sel])
-        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i]):.2f}..{np.max(self.data_points[i]):.2f}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        range_str = ', '.join([f'{inp_names[i]}({len(self.p_conn_table.index.levels[i])}): {np.min(self.p_conn_table.index.levels[i]):.2f}..{np.max(self.p_conn_table.index.levels[i]):.2f}' for i in range(self.p_conn_table.index.nlevels) if self.data_dim_sel[i]])
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
         model_str = model_str +  '  dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
+        return model_str
+
+
+class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
+    """ Reduced 4th order connection probability model (offset-dependent in radial/axial direction, linearly interpolated):
+        -Returns (offset-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = []
+    data_names = ['p_conn_table']
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        assert len(self.p_conn_table.index.levels) == 2, 'ERROR: Data frame with 2 index levels (dr, dz) required!'
+        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+
+        self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data offsets from multi-index
+        self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only a single data point from interpolation)
+
+        # Mirror around dr == 0, so that smooth interpolation for dr towards 0
+        if self.data_dim_sel[0]:
+            self.data_points[0] = [-d for d in self.data_points[0][::-1]] + self.data_points[0]
+            self.p_data = np.vstack([self.p_data[::-1, :], self.p_data])
+
+    def data_points(self):
+        """Return data offsets."""
+        return self.data_points
+
+    def get_prob_data(self):
+        """Return connection probability data."""
+        return self.p_data
+
+    def get_conn_prob(self, dr, dz):
+        """Return (offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
+        data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
+        inp_sel = [val for idx, val in enumerate([np.array(dr), np.array(dz)]) if self.data_dim_sel[idx]]
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
+
+        # FIX 1: Disable extrapolation
+        # => Safest solution! Cut at edges possible, so range should be increased in that case
+        # => Generate WARNING, if max. value around edges not close to zero!
+        # [hole at mirror line (dr == 0) => FIXED by mirror data!]
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
+
+        # FIX 2: Set corners (invalid) to zero => Still artifacts possible, if no smoothing is used!!
+# #         idx_invalid = []
+# #         for inp_idx, inp_val in enumerate(inp_sel):
+# #             idx_invalid.append(np.logical_or(inp_val < np.min(data_sel[inp_idx]), inp_val > np.max(data_sel[inp_idx])))
+# #         idx_invalid = np.all(idx_invalid, 0)
+#         idx_invalid = np.logical_and(inp_sel[0] > np.max(data_sel[0]), np.logical_or(inp_sel[1] < np.min(data_sel[1]), inp_sel[1] > np.max(data_sel[1])))
+#         p_conn[idx_invalid] = 0.0
+
+#         # FIX 3: Nearest-neighbor extrapolation => Bad behavior, if values at edges are non-zero!
+#         p_conn = interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=np.nan).T
+#         p_conn_nn = interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="nearest", bounds_error=False, fill_value=None).T
+#         p_conn[np.isnan(p_conn)] = p_conn_nn[np.isnan(p_conn)]
+#         p_conn = np.minimum(np.maximum(p_conn, 0.0), 1.0)
+
+        # FIX 4: Just set to zero, if outside range of values (+ some tolerance)
+        # Not yet tested
+
+        # FIX 5: Disable extrapolation, but set additional well-defined border around
+        # Not yet tested
+
+        return p_conn
+
+    @staticmethod
+    def compute_offset_matrices(src_pos, tgt_pos):
+        """Computes dr/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing='ij'), axis=0)[0, :, :] # Relative difference in x coordinate
+        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing='ij'), axis=0)[0, :, :] # Relative difference in y coordinate
+        dr_mat = np.sqrt(dx_mat**2 + dy_mat**2) # Relative offset in x/y plane (Euclidean distance)
+        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing='ij'), axis=0)[0, :, :] # Relative difference in z coordinate
+        return dr_mat, dz_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        return self.get_conn_prob(dr_mat, dz_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        inp_names = np.array(['dr', 'dz'])
+        inp_str = ', '.join(inp_names[self.data_dim_sel])
+        range_str = ', '.join([f'{inp_names[i]}({len(self.p_conn_table.index.levels[i])}): {np.min(self.p_conn_table.index.levels[i]):.2f}..{np.max(self.p_conn_table.index.levels[i]):.2f}' for i in range(self.p_conn_table.index.nlevels) if self.data_dim_sel[i]])
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
+        model_str = model_str +  '  dr/dz...radial/axial position offset (tgt minus src)'
         return model_str
 
 
@@ -638,6 +738,7 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
         return p_conn
 
     @staticmethod
@@ -668,8 +769,95 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         """Return model string describing the model."""
         inp_names = np.array(['x', 'y', 'z', 'dx', 'dy', 'dz'])
         inp_str = ', '.join(inp_names[self.data_dim_sel])
-        range_str = ', '.join([f'{inp_names[i]}: {np.min(self.data_points[i]):.2f}..{np.max(self.data_points[i]):.2f}' for i in range(len(self.data_points)) if self.data_dim_sel[i]])
+        range_str = ', '.join([f'{inp_names[i]}({len(self.p_conn_table.index.levels[i])}): {np.min(self.p_conn_table.index.levels[i]):.2f}..{np.max(self.p_conn_table.index.levels[i]):.2f}' for i in range(self.p_conn_table.index.nlevels) if self.data_dim_sel[i]])
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
         model_str = model_str +  '  x/y/z...src position, dx/dy/dz...position offset (tgt minus src) in x/y/z dimension'
+        return model_str
+
+
+class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
+    """ Reduced 5th order connection probability model (position-dependent in axial direction & offset-dependent in radial/axial direction, linearly interpolated):
+        -Returns (position- & offset-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = []
+    data_names = ['p_conn_table']
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        assert len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (z, dr, dz) required!'
+        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+
+        self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data positions & offsets from multi-index
+        self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
+        self.data_dim_sel = np.array(self.p_data.shape) > 1 # Select data dimensions to be interpolated (removing dimensions with only a single data point from interpolation)
+
+        # Mirror around dr == 0, so that smooth interpolation for dr towards 0
+        if self.data_dim_sel[1]:
+            self.data_points[1] = [-d for d in self.data_points[1][::-1]] + self.data_points[1]
+            self.p_data = np.hstack([self.p_data[:, ::-1, :], self.p_data])
+
+    def data_points(self):
+        """Return data offsets."""
+        return self.data_points
+
+    def get_prob_data(self):
+        """Return connection probability data."""
+        return self.p_data
+
+    def get_conn_prob(self, z, dr, dz):
+        """Return (position- & offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
+        data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
+        inp_sel = [val for idx, val in enumerate([np.array(z), np.array(dr), np.array(dz)]) if self.data_dim_sel[idx]]
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
+
+        # FIX 1: Disable extrapolation
+        # => Safest solution! Cut at edges possible, so range should be increased in that case
+        # => Generate WARNING, if max. value around edges not close to zero!
+        # [hole at mirror line (dr == 0) => FIXED by mirror data!]
+        # TODO: Extrapolation outside z range to be handled (different z binning required?!)
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
+
+        return p_conn
+
+    @staticmethod
+    def compute_position_matrix(src_pos, tgt_pos):
+        """Computes z position matrix of src/PRE neurons (src/PRE neuron positions repeated over tgt/POST neuron number)."""
+        z_mat = np.tile(src_pos[:, 2:3], [1, tgt_pos.shape[0]])
+        return z_mat
+
+    @staticmethod
+    def compute_offset_matrices(src_pos, tgt_pos):
+        """Computes dr/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing='ij'), axis=0)[0, :, :] # Relative difference in x coordinate
+        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing='ij'), axis=0)[0, :, :] # Relative difference in y coordinate
+        dr_mat = np.sqrt(dx_mat**2 + dy_mat**2) # Relative offset in x/y plane (Euclidean distance)
+        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing='ij'), axis=0)[0, :, :] # Relative difference in z coordinate
+        return dr_mat, dz_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        z_mat = self.compute_position_matrix(src_pos, tgt_pos)
+        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        return self.get_conn_prob(z_mat, dr_mat, dz_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        inp_names = np.array(['z', 'dr', 'dz'])
+        inp_str = ', '.join(inp_names[self.data_dim_sel])
+        range_str = ', '.join([f'{inp_names[i]}({len(self.p_conn_table.index.levels[i])}): {np.min(self.p_conn_table.index.levels[i]):.2f}..{np.max(self.p_conn_table.index.levels[i]):.2f}' for i in range(self.p_conn_table.index.nlevels) if self.data_dim_sel[i]])
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n'
+        model_str = model_str +  '  z...axial src position, dr/dz...radial/axial position offset (tgt minus src)'
         return model_str
