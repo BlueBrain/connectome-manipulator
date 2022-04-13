@@ -629,17 +629,29 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
     return model
 
 
-def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):  # pragma: no cover
     """Visualize data vs. model (4th order)."""
 
     dx_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
     dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
     dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
 
-    model_ovsampl = 4 # Model oversampling factor (per dimension)
-    dx_pos_model = np.linspace(dx_bins[0], dx_bins[-1], (len(dx_bins) - 1) * model_ovsampl + 1)
-    dy_pos_model = np.linspace(dy_bins[0], dy_bins[-1], (len(dy_bins) - 1) * model_ovsampl + 1)
-    dz_pos_model = np.linspace(dz_bins[0], dz_bins[-1], (len(dz_bins) - 1) * model_ovsampl + 1)
+    # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
+    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
+    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    dx_bin_size_model = np.diff(dx_bins[:2])[0] / plot_model_ovsampl
+    dy_bin_size_model = np.diff(dy_bins[:2])[0] / plot_model_ovsampl
+    dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
+    dx_bins_model = np.arange(dx_bins[0] - plot_model_extsn * dx_bin_size_model * plot_model_ovsampl, dx_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dx_bin_size_model, dx_bin_size_model)
+    dy_bins_model = np.arange(dy_bins[0] - plot_model_extsn * dy_bin_size_model * plot_model_ovsampl, dy_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dy_bin_size_model, dy_bin_size_model)
+    dz_bins_model = np.arange(dz_bins[0] - plot_model_extsn * dz_bin_size_model * plot_model_ovsampl, dz_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dz_bin_size_model, dz_bin_size_model)
+
+    # Sample positions (at bin centers)
+    dx_pos_model = dx_bins_model[:-1] + 0.5 * dx_bin_size_model
+    dy_pos_model = dy_bins_model[:-1] + 0.5 * dy_bin_size_model
+    dz_pos_model = dz_bins_model[:-1] + 0.5 * dz_bin_size_model
+
+    # Model probability at sample positions
     dxv, dyv, dzv = np.meshgrid(dx_pos_model, dy_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T # Regular grid
     # model_pos = np.random.uniform(low=[dx_bins[0], dy_bins[0], dz_bins[0]], high=[dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
@@ -693,8 +705,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.figure(figsize=(12, 6), dpi=300)
     # (Data)
     plt.subplot(2, 3, 1)
-    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='none',
-               extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+    plt.imshow(np.max(p_conn_offset, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -723,7 +734,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 
     # (Model)
     plt.subplot(2, 3, 4)
-    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 1).T, interpolation='none', extent=(dx_bins_model[0], dx_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -732,7 +743,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.colorbar(label='Max. conn. prob.')
 
     plt.subplot(2, 3, 5)
-    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 0).T, interpolation='none', extent=(dy_bins_model[0], dy_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -742,7 +753,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.title('Model')
 
     plt.subplot(2, 3, 6)
-    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0)
+    plt.imshow(np.max(model_val_xyz, 2).T, interpolation='none', extent=(dx_bins_model[0], dx_bins_model[-1], dy_bins_model[-1], dy_bins_model[0]), cmap=HOT, vmin=0.0)
     plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
     plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
     plt.gca().invert_yaxis()
@@ -848,16 +859,22 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
     return model
 
 
-def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):  # pragma: no cover
     """Visualize data vs. model (4th order reduced)."""
 
-    dr_bin_offset = 0.5 * np.diff(dr_bins[:2])[0]
-    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
+    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
+    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    dr_bin_size_model = np.diff(dr_bins[:2])[0] / plot_model_ovsampl
+    dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
+    dr_bins_model = np.arange(dr_bins[0], dr_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dr_bin_size_model, dr_bin_size_model)
+    dz_bins_model = np.arange(dz_bins[0] - plot_model_extsn * dz_bin_size_model * plot_model_ovsampl, dz_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dz_bin_size_model, dz_bin_size_model)
 
-    model_ovsampl = 8 # Model oversampling factor (per dimension)
-    model_extention = 10 # Model extention (#bins per dimension)
-    dr_pos_model = np.linspace(dr_bins[0], dr_bins[-1] + dr_bin_offset * 2 * model_extention, (len(dr_bins) + model_extention - 1) * model_ovsampl + 1)
-    dz_pos_model = np.linspace(dz_bins[0] - dz_bin_offset * 2 * model_extention, dz_bins[-1] + dz_bin_offset * 2 * model_extention, (len(dz_bins) + 2 * model_extention - 1) * model_ovsampl + 1)
+    # Sample positions (at bin centers)
+    dr_pos_model = dr_bins_model[:-1] + 0.5 * dr_bin_size_model
+    dz_pos_model = dz_bins_model[:-1] + 0.5 * dz_bin_size_model
+
+    # Model probability at sample positions
     drv, dzv = np.meshgrid(dr_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([drv.flatten(), dzv.flatten()]).T # Regular grid
     model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1])
@@ -878,7 +895,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
 
     # (Model)
     plt.subplot(1, 2, 2)
-    plt.imshow(np.hstack([model_val.T[:, ::-1], model_val.T]), interpolation='nearest', extent=(-dr_pos_model[-1], dr_pos_model[-1], dz_pos_model[-1], dz_pos_model[0]), cmap=HOT, vmin=0.0)
+    plt.imshow(np.hstack([model_val.T[:, ::-1], model_val.T]), interpolation='nearest', extent=(-dr_bins_model[-1], dr_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0)
     plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
     plt.gca().invert_yaxis()
     plt.xlabel('$\\Delta$r [$\\mu$m]')
@@ -1027,7 +1044,7 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
     return model
 
 
-def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):  # pragma: no cover
     """Visualize data vs. model (5th order)."""
 
     x_bin_offset = 0.5 * np.diff(x_bins[:2])[0]
@@ -1042,10 +1059,22 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
     dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
     dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
 
-    model_ovsampl = 4 # Model oversampling factor (per dimension)
-    dx_pos_model = np.linspace(dx_bins[0], dx_bins[-1], (len(dx_bins) - 1) * model_ovsampl + 1)
-    dy_pos_model = np.linspace(dy_bins[0], dy_bins[-1], (len(dy_bins) - 1) * model_ovsampl + 1)
-    dz_pos_model = np.linspace(dz_bins[0], dz_bins[-1], (len(dz_bins) - 1) * model_ovsampl + 1)
+    # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
+    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
+    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    dx_bin_size_model = np.diff(dx_bins[:2])[0] / plot_model_ovsampl
+    dy_bin_size_model = np.diff(dy_bins[:2])[0] / plot_model_ovsampl
+    dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
+    dx_bins_model = np.arange(dx_bins[0] - plot_model_extsn * dx_bin_size_model * plot_model_ovsampl, dx_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dx_bin_size_model, dx_bin_size_model)
+    dy_bins_model = np.arange(dy_bins[0] - plot_model_extsn * dy_bin_size_model * plot_model_ovsampl, dy_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dy_bin_size_model, dy_bin_size_model)
+    dz_bins_model = np.arange(dz_bins[0] - plot_model_extsn * dz_bin_size_model * plot_model_ovsampl, dz_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dz_bin_size_model, dz_bin_size_model)
+
+    # Sample positions (at bin centers)
+    dx_pos_model = dx_bins_model[:-1] + 0.5 * dx_bin_size_model
+    dy_pos_model = dy_bins_model[:-1] + 0.5 * dy_bin_size_model
+    dz_pos_model = dz_bins_model[:-1] + 0.5 * dz_bin_size_model
+
+    # Model probability at sample positions
     xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos_model, y_pos_model, z_pos_model, dx_pos_model, dy_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T # Regular grid
     # model_pos = np.random.uniform(low=[x_bins[0], y_bins[0], z_bins[0], dx_bins[0], dy_bins[0], dz_bins[0]], high=[x_bins[-1], y_bins[-1], z_bins[-1], dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(x_bins) * len(y_bins) * len(z_bins), len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
@@ -1142,7 +1171,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 
                 # (Model)
                 plt.subplot(2, 3, 4)
-                plt.imshow(np.max(model_val_sel, 1).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 1)) == 0.0 else None)
+                plt.imshow(np.max(model_val_sel, 1).T, interpolation='none', extent=(dx_bins_model[0], dx_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 1)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -1151,7 +1180,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.colorbar(label='Max. conn. prob.')
 
                 plt.subplot(2, 3, 5)
-                plt.imshow(np.max(model_val_sel, 0).T, interpolation='none', extent=(dy_bins[0], dy_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 0)) == 0.0 else None)
+                plt.imshow(np.max(model_val_sel, 0).T, interpolation='none', extent=(dy_bins_model[0], dy_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 0)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -1161,7 +1190,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.title('Model')
 
                 plt.subplot(2, 3, 6)
-                plt.imshow(np.max(model_val_sel, 2).T, interpolation='none', extent=(dx_bins[0], dx_bins[-1], dy_bins[-1], dy_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 2)) == 0.0 else None)
+                plt.imshow(np.max(model_val_sel, 2).T, interpolation='none', extent=(dx_bins_model[0], dx_bins_model[-1], dy_bins_model[-1], dy_bins_model[0]), cmap=HOT, vmin=0.0, vmax=0.1 if np.max(np.max(model_val_sel, 2)) == 0.0 else None)
                 plt.plot(plt.xlim(), np.zeros(2), 'w', linewidth=0.5)
                 plt.plot(np.zeros(2), plt.ylim(), 'w', linewidth=0.5)
                 plt.gca().invert_yaxis()
@@ -1186,7 +1215,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
+def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):
     """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -1280,19 +1309,25 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_spe
     return model
 
 
-def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, **_):  # pragma: no cover
+def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, src_cell_count, tgt_cell_count, model_specs, model, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):  # pragma: no cover
     """Visualize data vs. model (5th order reduced)."""
 
     z_bin_offset = 0.5 * np.diff(z_bins[:2])[0]
     z_pos_model = z_bins[:-1] + z_bin_offset # Positions at bin centers
 
-    dr_bin_offset = 0.5 * np.diff(dr_bins[:2])[0]
-    dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
+    # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
+    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
+    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    dr_bin_size_model = np.diff(dr_bins[:2])[0] / plot_model_ovsampl
+    dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
+    dr_bins_model = np.arange(dr_bins[0], dr_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dr_bin_size_model, dr_bin_size_model)
+    dz_bins_model = np.arange(dz_bins[0] - plot_model_extsn * dz_bin_size_model * plot_model_ovsampl, dz_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dz_bin_size_model, dz_bin_size_model)
 
-    model_ovsampl = 8 # Model oversampling factor (per dimension)
-    model_extention = 10 # Model extention (#bins per dimension)
-    dr_pos_model = np.linspace(dr_bins[0], dr_bins[-1] + dr_bin_offset * 2 * model_extention, (len(dr_bins) + model_extention - 1) * model_ovsampl + 1)
-    dz_pos_model = np.linspace(dz_bins[0] - dz_bin_offset * 2 * model_extention, dz_bins[-1] + dz_bin_offset * 2 * model_extention, (len(dz_bins) + 2 * model_extention - 1) * model_ovsampl + 1)
+    # Sample positions (at bin centers)
+    dr_pos_model = dr_bins_model[:-1] + 0.5 * dr_bin_size_model
+    dz_pos_model = dz_bins_model[:-1] + 0.5 * dz_bin_size_model
+
+    # Model probability at sample positions
     zv, drv, dzv = np.meshgrid(z_pos_model, dr_pos_model, dz_pos_model, indexing='ij')
     model_pos = np.array([zv.flatten(), drv.flatten(), dzv.flatten()]).T # Regular grid
     model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
@@ -1318,7 +1353,7 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
 
         # (Model)
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 2)
-        plt.imshow(np.hstack([np.squeeze(model_val[zidx, ::-1, :]).T, np.squeeze(model_val[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_pos_model[-1], dr_pos_model[-1], dz_pos_model[-1], dz_pos_model[0]), cmap=HOT, vmin=0.0, vmax=p_max_model)
+        plt.imshow(np.hstack([np.squeeze(model_val[zidx, ::-1, :]).T, np.squeeze(model_val[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins_model[-1], dr_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0, vmax=p_max_model)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
         plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
         plt.gca().invert_yaxis()
