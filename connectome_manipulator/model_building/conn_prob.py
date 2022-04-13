@@ -233,11 +233,15 @@ def get_value_ranges(max_range, num_coords, pos_range=False):
     if np.isscalar(pos_range):
         pos_range = [pos_range for i in range(num_coords)]
     else:
+        if num_coords == 1: # Special case
+            pos_range = [pos_range]
         assert len(pos_range) == num_coords, f'ERROR: pos_range must have {num_coords} elements!'
 
     if np.isscalar(max_range):
         max_range = [max_range for i in range(num_coords)]
     else:
+        if num_coords == 1: # Special case
+            max_range = [max_range]
         assert len(max_range) == num_coords, f'ERROR: max_range must have {num_coords} elements!'
 
     val_ranges = []
@@ -254,7 +258,10 @@ def get_value_ranges(max_range, num_coords, pos_range=False):
                 assert r[0] == 0, f'ERROR: Range of coord {ridx} must include 0!'
             val_ranges.append(r)
 
-    return val_ranges
+    if num_coords == 1: # Special case
+        return val_ranges[0]
+    else:
+        return val_ranges
 
 
 ###################################################################################################
@@ -894,7 +901,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
+def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
     """Extract position-dependent connection probability (5th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -905,8 +912,11 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     dx_mat, dy_mat, dz_mat = model_types.ConnProb5thOrderLinInterpnModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
 
     # Extract position- & offset-dependent connection probabilities
-    x_range, y_range, z_range = zip(np.minimum(np.nanmin(src_nrn_pos, 0), np.nanmin(tgt_nrn_pos, 0)), np.maximum(np.nanmax(src_nrn_pos, 0), np.nanmax(tgt_nrn_pos, 0)))
-
+    if position_max_range_um is None:
+        x_range, y_range, z_range = zip(np.minimum(np.nanmin(src_nrn_pos, 0), np.nanmin(tgt_nrn_pos, 0)), np.maximum(np.nanmax(src_nrn_pos, 0), np.nanmax(tgt_nrn_pos, 0)))
+    else:
+        x_range, y_range, z_range = get_value_ranges(position_max_range_um, 3, pos_range=False)
+    
     if np.isscalar(position_bin_size_um): # Single scalar range value to be used for all dimensions
         assert position_bin_size_um > 0.0, 'ERROR: Position bin size must be larger than 0um!'
         bin_size_x = bin_size_y = bin_size_z = position_bin_size_um
@@ -1176,7 +1186,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
+def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
     """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -1187,7 +1197,10 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
     dr_mat, dz_mat = model_types.ConnProb5thOrderLinInterpnReducedModel.compute_offset_matrices(src_nrn_pos, tgt_nrn_pos)
 
     # Extract position- & offset-dependent connection probabilities
-    z_range = [np.minimum(np.nanmin(src_nrn_pos[:, 2]), np.nanmin(tgt_nrn_pos[:, 2])), np.maximum(np.nanmax(src_nrn_pos[:, 2]), np.nanmax(tgt_nrn_pos[:, 2]))]
+    if position_max_range_um is None:
+        z_range = [np.minimum(np.nanmin(src_nrn_pos[:, 2]), np.nanmin(tgt_nrn_pos[:, 2])), np.maximum(np.nanmax(src_nrn_pos[:, 2]), np.nanmax(tgt_nrn_pos[:, 2]))]
+    else:
+        z_range = get_value_ranges(position_max_range_um, 1, pos_range=False)
 
     assert np.isscalar(position_bin_size_um) and position_bin_size_um > 0.0, 'ERROR: Position bin size must be a scalar larger than 0um!'
     bin_size_z = position_bin_size_um

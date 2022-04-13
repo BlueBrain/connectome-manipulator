@@ -12,6 +12,10 @@ from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 import sys
 
+P_TH_ABS = 0.01 # Absolute probability threshold
+P_TH_REL = 0.1 # Relative probability threshold
+
+
 class AbstractModel(metaclass=ABCMeta):
     """Abstract base class for different types of models."""
 
@@ -572,8 +576,22 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         """Return (offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
-        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
-        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
+
+        ### p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### BUG: Extrapolation artifacts under some circumstances [ACCS-37]
+
+        # FIX: Don't use extrapolation, but set to zero instead
+        #      + check that probability values at borders are sufficiently small, so that no (big) jumps at borders
+        #        (otherwise, sampling range should be increased)
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
+
+        # Check max. probability at boders (at dimensions that are actually interpolated)
+        p_border = 0.0
+        for dim in np.where(self.data_dim_sel)[0]:
+            p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
+        if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
+            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+
         return p_conn
 
     @staticmethod
@@ -643,34 +661,21 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         """Return (offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(dr), np.array(dz)]) if self.data_dim_sel[idx]]
-        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
-        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
 
-        # FIX 1: Disable extrapolation
-        # => Safest solution! Cut at edges possible, so range should be increased in that case
-        # => Generate WARNING, if max. value around edges not close to zero!
-        # [hole at mirror line (dr == 0) => FIXED by mirror data!]
+        ### p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### BUG: Extrapolation artifacts under some circumstances [ACCS-37]
+
+        # FIX: Don't use extrapolation, but set to zero instead
+        #      + check that probability values at borders are sufficiently small, so that no (big) jumps at borders
+        #        (otherwise, sampling range should be increased)
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
 
-        # FIX 2: Set corners (invalid) to zero => Still artifacts possible, if no smoothing is used!!
-# #         idx_invalid = []
-# #         for inp_idx, inp_val in enumerate(inp_sel):
-# #             idx_invalid.append(np.logical_or(inp_val < np.min(data_sel[inp_idx]), inp_val > np.max(data_sel[inp_idx])))
-# #         idx_invalid = np.all(idx_invalid, 0)
-#         idx_invalid = np.logical_and(inp_sel[0] > np.max(data_sel[0]), np.logical_or(inp_sel[1] < np.min(data_sel[1]), inp_sel[1] > np.max(data_sel[1])))
-#         p_conn[idx_invalid] = 0.0
-
-#         # FIX 3: Nearest-neighbor extrapolation => Bad behavior, if values at edges are non-zero!
-#         p_conn = interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=np.nan).T
-#         p_conn_nn = interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="nearest", bounds_error=False, fill_value=None).T
-#         p_conn[np.isnan(p_conn)] = p_conn_nn[np.isnan(p_conn)]
-#         p_conn = np.minimum(np.maximum(p_conn, 0.0), 1.0)
-
-        # FIX 4: Just set to zero, if outside range of values (+ some tolerance)
-        # Not yet tested
-
-        # FIX 5: Disable extrapolation, but set additional well-defined border around
-        # Not yet tested
+        # Check max. probability at boders (at dimensions that are actually interpolated)
+        p_border = 0.0
+        for dim in np.where(self.data_dim_sel)[0]:
+            p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
+        if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
+            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
@@ -737,8 +742,22 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         """Return (position- & offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(x), np.array(y), np.array(z), np.array(dx), np.array(dy), np.array(dz)]) if self.data_dim_sel[idx]]
-        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
-        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
+
+        ### p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### BUG: Extrapolation artifacts under some circumstances [ACCS-37]
+
+        # FIX: Don't use extrapolation, but set to zero instead
+        #      + check that probability values at borders are sufficiently small, so that no (big) jumps at borders
+        #        (otherwise, sampling range should be increased)
+        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
+
+        # Check max. probability at boders (at dimensions that are actually interpolated)
+        p_border = 0.0
+        for dim in np.where(self.data_dim_sel)[0]:
+            p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
+        if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
+            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+
         return p_conn
 
     @staticmethod
@@ -815,15 +834,21 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         """Return (position- & offset-dependent) connection probability, linearly interpolating between data points (except dimensions with a single data point)."""
         data_sel = [val for idx, val in enumerate(self.data_points) if self.data_dim_sel[idx]]
         inp_sel = [val for idx, val in enumerate([np.array(z), np.array(dr), np.array(dz)]) if self.data_dim_sel[idx]]
-        p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
-        ### FIX ME: Artifacts through extrapolation!! [ACCS-37]
+        
+        ### p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=None), 0.0), 1.0).T
+        ### BUG: Extrapolation artifacts under some circumstances [ACCS-37]
 
-        # FIX 1: Disable extrapolation
-        # => Safest solution! Cut at edges possible, so range should be increased in that case
-        # => Generate WARNING, if max. value around edges not close to zero!
-        # [hole at mirror line (dr == 0) => FIXED by mirror data!]
-        # TODO: Extrapolation outside z range to be handled (different z binning required?!)
+        # FIX: Don't use extrapolation, but set to zero instead
+        #      + check that probability values at borders are sufficiently small, so that no (big) jumps at borders
+        #        (otherwise, sampling range should be increased)
         p_conn = np.minimum(np.maximum(interpn(data_sel, np.squeeze(self.p_data), np.array(inp_sel).T, method="linear", bounds_error=False, fill_value=0.0), 0.0), 1.0).T
+
+        # Check max. probability at boders (at dimensions that are actually interpolated)
+        p_border = 0.0
+        for dim in np.where(self.data_dim_sel)[0]:
+            p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
+        if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
+            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
