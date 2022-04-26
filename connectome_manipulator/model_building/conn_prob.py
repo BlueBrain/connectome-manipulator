@@ -48,6 +48,8 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
 
     if sample_size is None or sample_size <= 0:
         sample_size = np.inf # Select all nodes
+    else:
+        print('WARNING: Sub-sampling neurons! Consider running model building with a different random sub-samples!')
     sample_size_src = min(sample_size, len(node_ids_src))
     sample_size_dest = min(sample_size, len(node_ids_dest))
     node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
@@ -190,7 +192,7 @@ def get_neuron_positions(pos_fct, node_ids_list):
 #     return x_mat, y_mat, z_mat
 
 
-def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins):
+def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins, min_count_per_bin=None):
     """Extract D-dimensional conn. prob. dependent on D property matrices between source-target pairs of neurons within given range of bins."""
     num_dep = len(dep_matrices)
     assert len(dep_bins) == num_dep, 'ERROR: Dependencies/bins mismatch!'
@@ -224,6 +226,14 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
         count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
     p_conn = np.array(count_conn / count_all)
     p_conn[np.isnan(p_conn)] = 0.0
+
+    # Check bin counts below threshold and ignore
+    if min_count_per_bin is None:
+        min_count_per_bin = 0 # No threshold
+    bad_bins = np.logical_and(count_all > 0, count_all < min_count_per_bin)
+    if np.sum(bad_bins) > 0:
+        print(f'WARNING: Found {np.sum(bad_bins)} of {count_all.size} ({100.0 * np.sum(bad_bins) / count_all.size:.1f}%) bins with less than th={min_count_per_bin} pairs of neurons ... IGNORING! (Consider increasing sample size and/or bin size and/or smoothing!)')
+        p_conn[bad_bins] = 0.0
 
     return p_conn, count_conn, count_all
 
@@ -269,9 +279,9 @@ def get_value_ranges(max_range, num_coords, pos_range=False):
 #   1st order model (Erdos-Renyi)
 ###################################################################################################
 
-def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, **_):
+def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, min_count_per_bin=10, **_):
     """Extract average connection probability (1st order) from a sample of pairs of neurons."""
-    p_conn, conn_count, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [], [])
+    p_conn, conn_count, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [], [], min_count_per_bin)
 
     src_cell_count = len(src_node_ids)
     tgt_cell_count = len(tgt_node_ids)
@@ -317,7 +327,7 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):
 #   2nd order (distance-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
-def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, min_count_per_bin=10, **_):
     """Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -333,7 +343,7 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_bins + 1) * bin_size_um
 
-    p_conn_dist, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat], [dist_bins])
+    p_conn_dist, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat], [dist_bins], min_count_per_bin)
 
     return {'p_conn_dist': p_conn_dist, 'count_conn': count_conn, 'count_all': count_all, 'dist_bins': dist_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
@@ -422,7 +432,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
 #   3rd order (bipolar distance-dependent) => Position mapping model (flatmap) supported
 ###################################################################################################
 
-def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, no_dist_mapping=False, **_):
+def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, no_dist_mapping=False, min_count_per_bin=10, **_):
     """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     src_nrn_pos_raw, tgt_nrn_pos_raw = get_neuron_positions([n.positions for n in nodes], [src_node_ids, tgt_node_ids]) # Raw positions w/o mapping
@@ -450,7 +460,7 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     dist_bins = np.arange(0, num_dist_bins + 1) * bin_size_um
     bip_bins = [np.min(bip_mat), 0, np.max(bip_mat)]
 
-    p_conn_dist_bip, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat, bip_mat], [dist_bins, bip_bins])
+    p_conn_dist_bip, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat, bip_mat], [dist_bins, bip_bins], min_count_per_bin)
 
     return {'p_conn_dist_bip': p_conn_dist_bip, 'dist_bins': dist_bins, 'bip_bins': bip_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
@@ -534,7 +544,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, min_count_per_bin=10, **_):
     """Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -565,7 +575,7 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     dy_bins = np.arange(0, num_bins_dy + 1) * bin_size_dy + dy_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_offset, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dx_mat, dy_mat, dz_mat], [dx_bins, dy_bins, dz_bins])
+    p_conn_offset, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dx_mat, dy_mat, dz_mat], [dx_bins, dy_bins, dz_bins], min_count_per_bin)
 
     return {'p_conn_offset': p_conn_offset, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
@@ -777,7 +787,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, **_):
+def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100, max_range_um=None, pos_map_file=None, min_count_per_bin=10, **_):
     """Extract offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -806,9 +816,9 @@ def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size
     dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_offset, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dr_mat, dz_mat], [dr_bins, dz_bins])
+    p_conn_offset, count_conn_offset, count_all_offset = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dr_mat, dz_mat], [dr_bins, dz_bins], min_count_per_bin)
 
-    return {'p_conn_offset': p_conn_offset, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_offset': p_conn_offset, 'count_conn_offset': count_conn_offset, 'count_all_offset': count_all_offset, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
 def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
@@ -918,7 +928,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, **_):
+def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, min_count_per_bin=10, **_):
     """Extract position-dependent connection probability (5th order) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -971,7 +981,7 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     dy_bins = np.arange(0, num_bins_dy + 1) * bin_size_dy + dy_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat], [x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins])
+    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat], [x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins], min_count_per_bin)
 
     return {'p_conn_position': p_conn_position, 'x_bins': x_bins, 'y_bins': y_bins, 'z_bins': z_bins, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
@@ -1215,7 +1225,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
-def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, **_):
+def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position_bin_size_um=1000, position_max_range_um=None, offset_bin_size_um=100, offset_max_range_um=None, pos_map_file=None, plot_model_ovsampl=3, plot_model_extsn=0, min_count_per_bin=10, **_):
     """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
     # Get neuron positions (incl. position mapping, if provided)
     _, pos_acc = load_pos_mapping_model(pos_map_file)
@@ -1255,7 +1265,7 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
     dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [z_mat, dr_mat, dz_mat], [z_bins, dr_bins, dz_bins])
+    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [z_mat, dr_mat, dz_mat], [z_bins, dr_bins, dz_bins], min_count_per_bin)
 
     return {'p_conn_position': p_conn_position, 'z_bins': z_bins, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
