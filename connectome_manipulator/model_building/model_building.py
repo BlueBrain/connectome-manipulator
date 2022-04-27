@@ -20,6 +20,7 @@ import numpy as np
 from bluepysnap.circuit import Circuit
 
 from connectome_manipulator.model_building import model_types
+from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
 
 # NOT USED ANY MORE
@@ -55,8 +56,7 @@ def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_s
     print(f'INFO: Circuit loaded: {circuit_config}')
 
     # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported for modelling!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
@@ -73,8 +73,11 @@ def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_s
     assert grouped_by in src_nodes.property_names, f'ERROR: "{grouped_by}" property not found in source nodes!'
     assert grouped_by in tgt_nodes.property_names, f'ERROR: "{grouped_by}" property not found in target nodes!'
 
-    src_types = list(np.unique(src_nodes.get(sel_src, properties=grouped_by)))
-    tgt_types = list(np.unique(tgt_nodes.get(sel_dest, properties=grouped_by)))
+    node_ids_src = get_node_ids(src_nodes, sel_src)
+    node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
+
+    src_types = list(np.unique(src_nodes.get(node_ids_src, properties=grouped_by)))
+    tgt_types = list(np.unique(tgt_nodes.get(node_ids_dest, properties=grouped_by)))
 
     # Create list of model configs per pathway
     model_build_name = model_config['model']['name']

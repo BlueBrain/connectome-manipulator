@@ -48,10 +48,11 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
 
     if sample_size is None or sample_size <= 0:
         sample_size = np.inf # Select all nodes
-    else:
+    if sample_size < len(node_ids_src) or sample_size < len(node_ids_dest):
         print('WARNING: Sub-sampling neurons! Consider running model building with a different random sub-samples!')
     sample_size_src = min(sample_size, len(node_ids_src))
     sample_size_dest = min(sample_size, len(node_ids_dest))
+    assert sample_size_src > 0 and sample_size_dest > 0, 'ERROR: Empty nodes selection!'
     node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
     node_ids_dest_sel = node_ids_dest[np.random.permutation([True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest))]
 
