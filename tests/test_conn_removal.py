@@ -48,7 +48,7 @@ def test_apply():
     assert np.all(np.logical_or(res['@source_node'] == src_id,
                                 res['@target_node'] == tgt_id))
 
-    # check that connection size filtering works for minimum connection size
+    # Check that connection size filtering works for minimum connection size
     res = test_module.apply(edges_table, nodes, None,
                             min_syn_per_conn=2,
                             amount_pct=100)
@@ -56,7 +56,7 @@ def test_apply():
                               axis=0, return_counts=True)
     assert np.all(n_syn_conn < 2)
 
-    # check that connection size filtering works for maximum connection size
+    # Check that connection size filtering works for maximum connection size
     res = test_module.apply(edges_table, nodes, None,
                             max_syn_per_conn=2,
                             amount_pct=100)
@@ -64,7 +64,7 @@ def test_apply():
                               axis=0, return_counts=True)
     assert np.all(n_syn_conn > 2)
 
-    # check that connection size filtering works when both are enabled
+    # Check that connection size filtering works when both are enabled
     res = test_module.apply(edges_table, nodes, None,
                             min_syn_per_conn=2,
                             max_syn_per_conn=2,
@@ -72,3 +72,11 @@ def test_apply():
     _, n_syn_conn = np.unique(res[['@source_node', '@target_node']],
                               axis=0, return_counts=True)
     assert np.all(n_syn_conn != 2)
+
+    # Check with empty selection, i.e. nothing to be removed
+    res = test_module.apply(edges_table, nodes, None,
+                            min_syn_per_conn=np.inf,
+                            amount_pct=100)
+    _, n_syn_conn = np.unique(res[['@source_node', '@target_node']],
+                              axis=0, return_counts=True)
+    assert res.equals(edges_table)
