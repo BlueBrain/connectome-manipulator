@@ -26,8 +26,8 @@ def test_log_assert():
 def test_logging_init():
     logname = 'chronicle'
     with setup_tempdir(__name__) as tempdir:
-        test_module.logging_init(tempdir, logname)
         logdir = os.path.join(tempdir, 'logs')
+        test_module.logging_init(logdir, logname)
 
         assert os.path.isdir(logdir)
 
