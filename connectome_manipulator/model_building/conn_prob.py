@@ -20,6 +20,7 @@ from scipy.sparse import csr_matrix
 from scipy.spatial import distance_matrix
 from sklearn.ensemble import RandomForestRegressor
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
@@ -30,7 +31,7 @@ HOT = plt.cm.get_cmap('hot')
 
 def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwargs):
     """Extract connection probability between samples of neurons."""
-    print(f'INFO: Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)...')
+    log.info(f'Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)...')
 
     # Select edge population [assuming exactly one edge population in given edges file]
     edges = get_edges_population(circuit)
@@ -44,15 +45,15 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
 
     if not kwargs.get('pos_map_file') is None:
-        assert (src_nodes.name == tgt_nodes.name) or (src_nodes.ids().min() > tgt_nodes.ids().max()) or (src_nodes.ids().max() < tgt_nodes.ids().min()), 'ERROR: Position mapping only supported for same source/taget node population or non-overlapping id ranges!'
+        log.log_assert((src_nodes.name == tgt_nodes.name) or (src_nodes.ids().min() > tgt_nodes.ids().max()) or (src_nodes.ids().max() < tgt_nodes.ids().min()), 'ERROR: Position mapping only supported for same source/taget node population or non-overlapping id ranges!')
 
     if sample_size is None or sample_size <= 0:
         sample_size = np.inf # Select all nodes
     if sample_size < len(node_ids_src) or sample_size < len(node_ids_dest):
-        print('WARNING: Sub-sampling neurons! Consider running model building with a different random sub-samples!')
+        log.warning('Sub-sampling neurons! Consider running model building with a different random sub-samples!')
     sample_size_src = min(sample_size, len(node_ids_src))
     sample_size_dest = min(sample_size, len(node_ids_dest))
-    assert sample_size_src > 0 and sample_size_dest > 0, 'ERROR: Empty nodes selection!'
+    log.log_assert(sample_size_src > 0 and sample_size_dest > 0, 'ERROR: Empty nodes selection!')
     node_ids_src_sel = node_ids_src[np.random.permutation([True] * sample_size_src + [False] * (len(node_ids_src) - sample_size_src))]
     node_ids_dest_sel = node_ids_dest[np.random.permutation([True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest))]
 
@@ -74,12 +75,12 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     elif order == '5R':
         return extract_5th_order_reduced(nodes, edges, node_ids_src_sel, node_ids_dest_sel, **kwargs)
     else:
-        assert False, f'ERROR: Order-{order} data extraction not supported!'
+        log.log_assert(False, f'ERROR: Order-{order} data extraction not supported!')
 
 
 def build(order, **kwargs):
     """Build connection probability model from data."""
-    print(f'INFO: Running order-{order} model building...')
+    log.info(f'Running order-{order} model building...')
 
     if not isinstance(order, str):
         order = str(order)
@@ -99,12 +100,12 @@ def build(order, **kwargs):
     elif order == '5R':
         return build_5th_order_reduced(**kwargs)
     else:
-        assert False, f'ERROR: Order-{order} model building not supported!'
+        log.log_assert(False, f'ERROR: Order-{order} model building not supported!')
 
 
 def plot(order, **kwargs):
     """Visualize data vs. model."""
-    print(f'INFO: Running order-{order} data/model visualization...')
+    log.info(f'Running order-{order} data/model visualization...')
 
     if not isinstance(order, str):
         order = str(order)
@@ -124,7 +125,7 @@ def plot(order, **kwargs):
     elif order == '5R':
         return plot_5th_order_reduced(**kwargs)
     else:
-        assert False, f'ERROR: Order-{order} data/model visualization not supported!'
+        log.log_assert(False, f'ERROR: Order-{order} data/model visualization not supported!')
 
 
 ###################################################################################################
@@ -137,10 +138,10 @@ def load_pos_mapping_model(pos_map_file):
         pos_map = None
         pos_acc = None
     else:
-        assert os.path.exists(pos_map_file), 'Position mapping model file not found!'
-        print(f'Loading position mapping model from {pos_map_file}')
+        log.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
+        log.info(f'Loading position mapping model from {pos_map_file}')
         pos_map = model_types.AbstractModel.model_from_file(pos_map_file)
-        assert pos_map.input_names == ['gids'], 'ERROR: Position mapping model error (must take "gids" as input)!'
+        log.log_assert(pos_map.input_names == ['gids'], 'ERROR: Position mapping model error (must take "gids" as input)!')
         pos_acc = lambda gids: pos_map.apply(gids=gids) # Access function
 
     return pos_map, pos_acc
@@ -151,7 +152,7 @@ def get_neuron_positions(pos_fct, node_ids_list):
     if not isinstance(pos_fct, list):
         pos_fct = [pos_fct for i in node_ids_list]
     else:
-        assert len(pos_fct) == len(node_ids_list), 'ERROR: "pos_fct" must be scalar or a list with same length as "node_ids_list"!'
+        log.log_assert(len(pos_fct) == len(node_ids_list), 'ERROR: "pos_fct" must be scalar or a list with same length as "node_ids_list"!')
 
     nrn_pos = [np.array(pos_fct[i](node_ids_list[i])) for i in range(len(node_ids_list))]
 
@@ -196,8 +197,8 @@ def get_neuron_positions(pos_fct, node_ids_list):
 def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins, min_count_per_bin=None):
     """Extract D-dimensional conn. prob. dependent on D property matrices between source-target pairs of neurons within given range of bins."""
     num_dep = len(dep_matrices)
-    assert len(dep_bins) == num_dep, 'ERROR: Dependencies/bins mismatch!'
-    assert np.all([dep_matrices[dim].shape == (len(src_node_ids), len(tgt_node_ids)) for dim in range(num_dep)]), 'ERROR: Matrix dimension mismatch!'
+    log.log_assert(len(dep_bins) == num_dep, 'ERROR: Dependencies/bins mismatch!')
+    log.log_assert(np.all([dep_matrices[dim].shape == (len(src_node_ids), len(tgt_node_ids)) for dim in range(num_dep)]), 'ERROR: Matrix dimension mismatch!')
 
     # Extract adjacency
     conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids)))
@@ -206,7 +207,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     else:
         adj_mat = csr_matrix((max(src_node_ids) + 1, max(tgt_node_ids) + 1)) # Empty matrix
     if np.any(adj_mat.diagonal()):
-        print('WARNING: Autaptic connection(s) found!')
+        log.warning('Autaptic connection(s) found!')
 
     # Extract connection probability
     num_bins = [len(b) - 1 for b in dep_bins]
@@ -214,7 +215,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     count_all = np.full(num_bins, -1) # Count of all pairs of neurons for each combination of dependencies
     count_conn = np.full(num_bins, -1) # Count of connected pairs of neurons for each combination of dependencies
 
-    print(f'Extracting {num_dep}-dimensional ({"x".join([str(n) for n in num_bins])}) connection probabilities...', flush=True)
+    log.info(f'Extracting {num_dep}-dimensional ({"x".join([str(n) for n in num_bins])}) connection probabilities...')
     pbar = progressbar.ProgressBar(maxval=np.prod(num_bins) - 1)
     for idx in pbar(itertools.product(*bin_indices)):
         dep_sel = np.full((len(src_node_ids), len(tgt_node_ids)), True)
@@ -233,7 +234,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
         min_count_per_bin = 0 # No threshold
     bad_bins = np.logical_and(count_all > 0, count_all < min_count_per_bin)
     if np.sum(bad_bins) > 0:
-        print(f'WARNING: Found {np.sum(bad_bins)} of {count_all.size} ({100.0 * np.sum(bad_bins) / count_all.size:.1f}%) bins with less than th={min_count_per_bin} pairs of neurons ... IGNORING! (Consider increasing sample size and/or bin size and/or smoothing!)')
+        log.warning(f'Found {np.sum(bad_bins)} of {count_all.size} ({100.0 * np.sum(bad_bins) / count_all.size:.1f}%) bins with less than th={min_count_per_bin} pairs of neurons ... IGNORING! (Consider increasing sample size and/or bin size and/or smoothing!)')
         p_conn[bad_bins] = 0.0
 
     return p_conn, count_conn, count_all
@@ -246,27 +247,27 @@ def get_value_ranges(max_range, num_coords, pos_range=False):
     else:
         if num_coords == 1: # Special case
             pos_range = [pos_range]
-        assert len(pos_range) == num_coords, f'ERROR: pos_range must have {num_coords} elements!'
+        log.log_assert(len(pos_range) == num_coords, f'ERROR: pos_range must have {num_coords} elements!')
 
     if np.isscalar(max_range):
         max_range = [max_range for i in range(num_coords)]
     else:
         if num_coords == 1: # Special case
             max_range = [max_range]
-        assert len(max_range) == num_coords, f'ERROR: max_range must have {num_coords} elements!'
+        log.log_assert(len(max_range) == num_coords, f'ERROR: max_range must have {num_coords} elements!')
 
     val_ranges = []
     for ridx, (r, p) in enumerate(zip(max_range, pos_range)):
         if np.isscalar(r):
-            assert r > 0.0, f'ERROR: Maximum range of coord {ridx} must be larger than 0!'
+            log.log_assert(r > 0.0, f'ERROR: Maximum range of coord {ridx} must be larger than 0!')
             if p: # Positive range
                 val_ranges.append([0, r])
             else: # Symmetric range
                 val_ranges.append([-r, r])
         else: # Arbitrary range
-            assert len(r) == 2 and r[0] < r[1], f'ERROR: Range of coord {ridx} invalid!'
+            log.log_assert(len(r) == 2 and r[0] < r[1], f'ERROR: Range of coord {ridx} invalid!')
             if p:
-                assert r[0] == 0, f'ERROR: Range of coord {ridx} must include 0!'
+                log.log_assert(r[0] == 0, f'ERROR: Range of coord {ridx} must include 0!')
             val_ranges.append(r)
 
     if num_coords == 1: # Special case
@@ -286,7 +287,7 @@ def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, min_count_per_b
 
     src_cell_count = len(src_node_ids)
     tgt_cell_count = len(tgt_node_ids)
-    print(f'INFO: Found {conn_count} connections between {src_cell_count}x{tgt_cell_count} neurons (p = {p_conn:.3f})')
+    log.info(f'Found {conn_count} connections between {src_cell_count}x{tgt_cell_count} neurons (p = {p_conn:.3f})')
 
     return {'p_conn': p_conn, 'src_cell_count': src_cell_count, 'tgt_cell_count': tgt_cell_count}
 
@@ -296,8 +297,7 @@ def build_1st_order(p_conn, **_):
 
     # Create model
     model = model_types.ConnProb1stOrderModel(p_conn=p_conn)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -319,7 +319,7 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
 
@@ -340,7 +340,7 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     # Extract distance-dependent connection probabilities
     if max_range_um is None:
         max_range_um = np.nanmax(dist_mat)
-    assert max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!'
+    log.log_assert(max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!')
     num_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_bins + 1) * bin_size_um
 
@@ -360,8 +360,7 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
 
     # Create model
     model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -409,7 +408,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
     plt.suptitle(f'Distance-dependent connection probability model (2nd order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Data counts
@@ -424,7 +423,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
     plt.legend()
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_counts.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
 
@@ -456,7 +455,7 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
         max_range_um = np.nanmax(dist_mat)
-    assert max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!'
+    log.log_assert(max_range_um > 0 and bin_size_um > 0, 'ERROR: Max. range and bin size must be larger than 0um!')
     num_dist_bins = np.ceil(max_range_um / bin_size_um).astype(int)
     dist_bins = np.arange(0, num_dist_bins + 1) * bin_size_um
     bip_bins = [np.min(bip_mat), 0, np.max(bip_mat)]
@@ -479,8 +478,7 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, **_):
 
     # Create model
     model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -533,7 +531,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
     plt.suptitle(f'Bipolar distance-dependent connection probability model (3rd order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
 
@@ -561,11 +559,11 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
         dx_range, dy_range, dz_range = get_value_ranges(max_range_um, 3, pos_range=False)
 
     if np.isscalar(bin_size_um): # Single scalar range value to be used for all dimensions
-        assert bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dx = bin_size_dy = bin_size_dz = bin_size_um
     else: # Three values for x/y/z dimensions
-        assert len(bin_size_um) == 3, 'ERROR: Offset bin sizes in x/y/z dimension expected!'
-        assert np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(len(bin_size_um) == 3, 'ERROR: Offset bin sizes in x/y/z dimension expected!')
+        log.log_assert(np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dx, bin_size_dy, bin_size_dz = bin_size_um
 
     num_bins_dx = np.ceil((dx_range[1] - dx_range[0]) / bin_size_dx).astype(int)
@@ -601,16 +599,16 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
         if not isinstance(smoothing_sigma_um, list):
             smoothing_sigma_um = [smoothing_sigma_um] * 3 # Same value for all coordinates
         else:
-            assert len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!'
-        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+            log.log_assert(len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!')
+        log.log_assert(np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!')
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        log.info(f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
         p_conn_offset = gaussian_filter(p_conn_offset, sigmas, mode='constant')
 
     model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([dx_pos, dy_pos, dz_pos], names=model_inputs)
@@ -619,7 +617,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
 
     elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
 
-        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+        log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
 #         dxv, dyv, dzv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
 #         data_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
@@ -632,10 +630,9 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
 #         model = model_types...
 
     else:
-        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -648,8 +645,8 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
 
     # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
-    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
-    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    log.log_assert(isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!')
+    log.log_assert(isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!')
     dx_bin_size_model = np.diff(dx_bins[:2])[0] / plot_model_ovsampl
     dy_bin_size_model = np.diff(dy_bins[:2])[0] / plot_model_ovsampl
     dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
@@ -709,7 +706,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_3d.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Max. intensity projection (data vs. model)
@@ -775,7 +772,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_2d.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
 
@@ -804,11 +801,11 @@ def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size
         dr_range, dz_range = get_value_ranges(max_range_um, 2, pos_range=[True, False])
 
     if np.isscalar(bin_size_um): # Single scalar range value to be used for all dimensions
-        assert bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dr = bin_size_dz = bin_size_um
     else: # Two values for r/z directions
-        assert len(bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!'
-        assert np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(len(bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!')
+        log.log_assert(np.all([b > 0.0 for b in bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dr, bin_size_dz = bin_size_um
 
     num_bins_dr = np.ceil((dr_range[1] - dr_range[0]) / bin_size_dr).astype(int)
@@ -840,10 +837,10 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
         if not isinstance(smoothing_sigma_um, list):
             smoothing_sigma_um = [smoothing_sigma_um] * 2 # Same value for all coordinates
         else:
-            assert len(smoothing_sigma_um) == 2, 'ERROR: Smoothing sigma for 2 dimensions required!'
-        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+            log.log_assert(len(smoothing_sigma_um) == 2, 'ERROR: Smoothing sigma for 2 dimensions required!')
+        log.log_assert(np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!')
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        log.info(f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
         p_reflect = np.vstack([p_conn_offset[::-1, :], p_conn_offset]) # Mirror along radial axis at dr==0, to avoid edge effect
         p_reflect = gaussian_filter(p_reflect, sigmas, mode='constant')
         p_conn_offset = p_reflect[p_conn_offset.shape[0]:, :] # Cut original part of the data
@@ -851,7 +848,7 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
     model_inputs = ['dr', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([dr_pos, dz_pos], names=model_inputs)
@@ -859,13 +856,12 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
         model = model_types.ConnProb4thOrderLinInterpnReducedModel(p_conn_table=df)
 
     elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
-        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+        log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
     else:
-        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -874,8 +870,8 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
     """Visualize data vs. model (4th order reduced)."""
 
     # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
-    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
-    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    log.log_assert(isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!')
+    log.log_assert(isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!')
     dr_bin_size_model = np.diff(dr_bins[:2])[0] / plot_model_ovsampl
     dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
     dr_bins_model = np.arange(dr_bins[0], dr_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dr_bin_size_model, dr_bin_size_model)
@@ -894,7 +890,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
     # Connection probability (data vs. model)
     fig = plt.figure(figsize=(12, 4), dpi=300)
     # (Data)
-    assert dr_bins[0] == 0, 'ERROR: Radial bin range error!'
+    log.log_assert(dr_bins[0] == 0, 'ERROR: Radial bin range error!')
     plt.subplot(1, 2, 1)
     plt.imshow(np.hstack([p_conn_offset.T[:, ::-1], p_conn_offset.T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0)
     plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
@@ -917,7 +913,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
     plt.suptitle(f'Reduced offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
 
@@ -946,11 +942,11 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
         x_range, y_range, z_range = get_value_ranges(position_max_range_um, 3, pos_range=False)
     
     if np.isscalar(position_bin_size_um): # Single scalar range value to be used for all dimensions
-        assert position_bin_size_um > 0.0, 'ERROR: Position bin size must be larger than 0um!'
+        log.log_assert(position_bin_size_um > 0.0, 'ERROR: Position bin size must be larger than 0um!')
         bin_size_x = bin_size_y = bin_size_z = position_bin_size_um
     else: # Three values for x/y/z dimensions
-        assert len(position_bin_size_um) == 3, 'ERROR: Position bin sizes in x/y/z dimension expected!'
-        assert np.all([b > 0.0 for b in position_bin_size_um]), 'ERROR: Position bin size must be larger than 0um!'
+        log.log_assert(len(position_bin_size_um) == 3, 'ERROR: Position bin sizes in x/y/z dimension expected!')
+        log.log_assert(np.all([b > 0.0 for b in position_bin_size_um]), 'ERROR: Position bin size must be larger than 0um!')
         bin_size_x, bin_size_y, bin_size_z = position_bin_size_um
 
     num_bins_x = np.ceil((x_range[1] - x_range[0]) / bin_size_x).astype(int)
@@ -967,11 +963,11 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
         dx_range, dy_range, dz_range = get_value_ranges(offset_max_range_um, 3, pos_range=False)
 
     if np.isscalar(offset_bin_size_um): # Single scalar range value to be used for all dimensions
-        assert offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dx = bin_size_dy = bin_size_dz = offset_bin_size_um
     else: # Three values for x/y/z dimensions
-        assert len(offset_bin_size_um) == 3, 'ERROR: Offset bin sizes in x/y/z dimension expected!'
-        assert np.all([b > 0.0 for b in offset_bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(len(offset_bin_size_um) == 3, 'ERROR: Offset bin sizes in x/y/z dimension expected!')
+        log.log_assert(np.all([b > 0.0 for b in offset_bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dx, bin_size_dy, bin_size_dz = offset_bin_size_um
 
     num_bins_dx = np.ceil((dx_range[1] - dx_range[0]) / bin_size_dx).astype(int)
@@ -1016,16 +1012,16 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
         if not isinstance(smoothing_sigma_um, list):
             smoothing_sigma_um = [smoothing_sigma_um] * 6 # Same value for all coordinates
         else:
-            assert len(smoothing_sigma_um) == 6, 'ERROR: Smoothing sigma for 6 dimensions required!'
-        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+            log.log_assert(len(smoothing_sigma_um) == 6, 'ERROR: Smoothing sigma for 6 dimensions required!')
+        log.log_assert(np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!')
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        log.info(f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
         p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
 
     model_inputs = ['x', 'y', 'z', 'dx', 'dy', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos], names=model_inputs)
@@ -1034,7 +1030,7 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
 
     elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
 
-        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+        log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
 #         xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos, indexing='ij')
 #         data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
@@ -1047,10 +1043,9 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
 #         model = model_types...
 
     else:
-        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -1071,8 +1066,8 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
     dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
 
     # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
-    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
-    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    log.log_assert(isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!')
+    log.log_assert(isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!')
     dx_bin_size_model = np.diff(dx_bins[:2])[0] / plot_model_ovsampl
     dy_bin_size_model = np.diff(dy_bins[:2])[0] / plot_model_ovsampl
     dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
@@ -1139,7 +1134,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.suptitle(f'Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={x_pos_model[ix]:.0f}$\\mu$m, Y={y_pos_model[iy]:.0f}$\\mu$m, Z={z_pos_model[iz]:.0f}$\\mu$m')
                 plt.tight_layout()
                 out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_3d_x{ix}y{iy}z{iz}.png'))
-                print(f'INFO: Saving {out_fn}...')
+                log.info(f'Saving {out_fn}...')
                 plt.savefig(out_fn)
 
     # Max. intensity projection (data vs. model)
@@ -1212,7 +1207,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 plt.suptitle(f'Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={x_pos_model[ix]:.0f}$\\mu$m, Y={y_pos_model[iy]:.0f}$\\mu$m, Z={z_pos_model[iz]:.0f}$\\mu$m')
                 plt.tight_layout()
                 out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_2d_x{ix}y{iy}z{iz}.png'))
-                print(f'INFO: Saving {out_fn}...')
+                log.info(f'Saving {out_fn}...')
                 plt.savefig(out_fn)
 
 
@@ -1242,7 +1237,7 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
     else:
         z_range = get_value_ranges(position_max_range_um, 1, pos_range=False)
 
-    assert np.isscalar(position_bin_size_um) and position_bin_size_um > 0.0, 'ERROR: Position bin size must be a scalar larger than 0um!'
+    log.log_assert(np.isscalar(position_bin_size_um) and position_bin_size_um > 0.0, 'ERROR: Position bin size must be a scalar larger than 0um!')
     bin_size_z = position_bin_size_um
     num_bins_z = np.ceil((z_range[1] - z_range[0]) / bin_size_z).astype(int)
     z_bins = np.arange(0, num_bins_z + 1) * bin_size_z + z_range[0]
@@ -1253,11 +1248,11 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
         dr_range, dz_range = get_value_ranges(offset_max_range_um, 2, pos_range=[True, False])
 
     if np.isscalar(offset_bin_size_um): # Single scalar range value to be used for all dimensions
-        assert offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(offset_bin_size_um > 0.0, 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dr = bin_size_dz = offset_bin_size_um
     else: # Two values for r/z dimensions
-        assert len(offset_bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!'
-        assert np.all([b > 0.0 for b in offset_bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!'
+        log.log_assert(len(offset_bin_size_um) == 2, 'ERROR: Offset bin sizes in r/z directions expected!')
+        log.log_assert(np.all([b > 0.0 for b in offset_bin_size_um]), 'ERROR: Offset bin size must be larger than 0um!')
         bin_size_dr, bin_size_dz = offset_bin_size_um
 
     num_bins_dr = np.ceil((dr_range[1] - dr_range[0]) / bin_size_dr).astype(int)
@@ -1292,16 +1287,16 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_spe
         if not isinstance(smoothing_sigma_um, list):
             smoothing_sigma_um = [smoothing_sigma_um] * 3 # Same value for all coordinates
         else:
-            assert len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!'
-        assert np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!'
+            log.log_assert(len(smoothing_sigma_um) == 3, 'ERROR: Smoothing sigma for 3 dimensions required!')
+        log.log_assert(np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!')
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        print(f'INFO: Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
+        log.info(f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
         p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
 
     model_inputs = ['z', 'dr', 'dz'] # Must be the same for all interpolation types!
     if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        assert len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!'
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([z_pos, dr_pos, dz_pos], names=model_inputs)
@@ -1309,13 +1304,12 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_spe
         model = model_types.ConnProb5thOrderLinInterpnReducedModel(p_conn_table=df)
 
     elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
-        assert False, 'ERROR: No model class implemented for RandomForestRegressor!'
+        log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
     else:
-        assert False, f'ERROR: Model type "{model_specs.get("name")}" unknown!'
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -1327,8 +1321,8 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
     z_pos_model = z_bins[:-1] + z_bin_offset # Positions at bin centers
 
     # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
-    assert isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!'
-    assert isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!'
+    log.log_assert(isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1, 'ERROR: Model plot oversampling must be an integer factor >= 1!')
+    log.log_assert(isinstance(plot_model_extsn, int) and plot_model_extsn >= 0, 'ERROR: Model plot extension must be an integer number of bins >= 0!')
     dr_bin_size_model = np.diff(dr_bins[:2])[0] / plot_model_ovsampl
     dz_bin_size_model = np.diff(dz_bins[:2])[0] / plot_model_ovsampl
     dr_bins_model = np.arange(dr_bins[0], dr_bins[-1] + (1 + plot_model_extsn * plot_model_ovsampl) * dr_bin_size_model, dr_bin_size_model)
@@ -1350,7 +1344,7 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
     fig = plt.figure(figsize=(12, 4 * len(z_pos_model)), dpi=300)
     for zidx, zval in enumerate(z_pos_model):
         # (Data)
-        assert dr_bins[0] == 0, 'ERROR: Radial bin range error!'
+        log.log_assert(dr_bins[0] == 0, 'ERROR: Radial bin range error!')
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 1)
         plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=p_max)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
@@ -1377,5 +1371,5 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
     plt.suptitle(f'Reduced position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)

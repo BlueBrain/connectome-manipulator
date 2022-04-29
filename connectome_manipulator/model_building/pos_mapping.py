@@ -15,6 +15,7 @@ from scipy.interpolate import griddata
 from scipy.spatial import distance_matrix
 from voxcell.nexus.voxelbrain import Atlas
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 
 
@@ -22,9 +23,9 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
     """Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) of a given nodes population."""
     # Get neuron positions
     if nodes_pop_name is None:
-        assert len(circuit.nodes.population_names) == 1, f'ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!'
+        log.log_assert(len(circuit.nodes.population_names) == 1, f'ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!')
         nodes_pop_name = circuit.nodes.population_names[0]
-        print(f'INFO: Loading nodes population "{nodes_pop_name}"')
+        log.info(f'Loading nodes population "{nodes_pop_name}"')
     nodes = circuit.nodes[nodes_pop_name]
     nrn_pos = nodes.positions()
     nrn_ids = nrn_pos.index.to_numpy()
@@ -35,21 +36,21 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
     flatmap_atlas = Atlas.open(flatmap_path)
     flatmap = flatmap_atlas.load_data(xy_file)
     depths = flatmap_atlas.load_data(z_file)
-    assert flatmap.raw.shape[:3] == depths.raw.shape, 'ERROR: Flatmap and depths map sizes inconsistent!'
-    assert np.all(flatmap.voxel_dimensions == depths.voxel_dimensions), 'ERROR: Flatmap and depths map voxels inconsistent!'
-    assert np.all(flatmap.bbox == depths.bbox), 'ERROR: Flatmap and depths map bounding boxes inconsistent!'
+    log.log_assert(flatmap.raw.shape[:3] == depths.raw.shape, 'ERROR: Flatmap and depths map sizes inconsistent!')
+    log.log_assert(np.all(flatmap.voxel_dimensions == depths.voxel_dimensions), 'ERROR: Flatmap and depths map voxels inconsistent!')
+    log.log_assert(np.all(flatmap.bbox == depths.bbox), 'ERROR: Flatmap and depths map bounding boxes inconsistent!')
 
     if xy_scale is None: # x/y scaling from a.u. to um
         xy_scale = [flatmap.voxel_dimensions[0], flatmap.voxel_dimensions[1]] # Default: Assume same pixel size in flat space as voxel size in atlas
     else:
-        assert np.array(xy_scale).size == 2 and np.all(np.isfinite(xy_scale)) and np.all(np.array(xy_scale) != 0), 'ERROR: XY scale error!'
+        log.log_assert(np.array(xy_scale).size == 2 and np.all(np.isfinite(xy_scale)) and np.all(np.array(xy_scale) != 0), 'ERROR: XY scale error!')
 
     if z_scale is None: # z scaling from a.u. to um
         z_scale = 1.0 # Default: Assume depth values are already scaled to um
     else:
-        assert np.array(z_scale).size == 1 and np.isfinite(z_scale) and z_scale != 0, 'ERROR: Z scale error!'
+        log.log_assert(np.array(z_scale).size == 1 and np.isfinite(z_scale) and z_scale != 0, 'ERROR: Z scale error!')
 
-    print(f'INFO: Loaded x/y flatmap ("{xy_file}"; scale={np.round(xy_scale, decimals=2)}) and z (depth) map ("{z_file}"; scale={np.round(z_scale, decimals=2)}) from "{flatmap_path}"')
+    log.info(f'Loaded x/y flatmap ("{xy_file}"; scale={np.round(xy_scale, decimals=2)}) and z (depth) map ("{z_file}"; scale={np.round(z_scale, decimals=2)}) from "{flatmap_path}"')
 
     # Convert cell positions to flat space [Assume: missing values set to -1]
     flat_x = flatmap.lookup(nrn_pos)[:, 0].astype(float)
@@ -65,7 +66,7 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
 
     # Nearest-neighbor interpolation only (FASTER)
     if NN_only:
-        print('WARNING: Using nearest-neighbor interpolation only!')
+        log.warning('Using nearest-neighbor interpolation only!')
         flat_x_intpl = griddata(map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices, method='nearest')
         flat_y_intpl = griddata(map_pos[flat_y != -1], flat_y[flat_y != -1], map_indices, method='nearest')
         flat_z_intpl = griddata(map_pos[flat_z != -1], flat_z[flat_z != -1], map_indices, method='nearest')
@@ -88,12 +89,11 @@ def extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None,
 def build(nrn_ids, flat_pos, **_):
     """Build flat space position mapping model."""
     flat_pos_table = pd.DataFrame(flat_pos, index=nrn_ids, columns=['x', 'y', 'z'])
-    assert np.all(np.isfinite(flat_pos_table)), 'ERROR: Position error!'
+    log.log_assert(np.all(np.isfinite(flat_pos_table)), 'ERROR: Position error!')
 
     # Create model
     model = model_types.PosMapModel(pos_table=flat_pos_table)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -126,13 +126,13 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_positions.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Cell distances in atlas vs. flat space
     max_plot = 10000
     if len(nrn_ids) > max_plot:
-        print('WARNING: Using subsampling for distance plots!')
+        log.warning('Using subsampling for distance plots!')
         nrn_sel = np.random.choice(len(nrn_ids), max_plot)
         nrn_ids = nrn_ids[nrn_sel]
         nrn_pos = nrn_pos[nrn_sel, :]
@@ -158,7 +158,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_distances.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Nearest neighbors in atlas vs. flat space
@@ -168,7 +168,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     num_NN_list = list(range(1, 30, 1))
     NN_match = np.full(len(num_NN_list), np.nan)
 
-    print('Computing nearest neighbors in atlas vs. flat space...', flush=True)
+    log.info('Computing nearest neighbors in atlas vs. flat space...')
     pbar = progressbar.ProgressBar()
     for nidx in pbar(range(len(num_NN_list))):
         num_NN = num_NN_list[nidx]
@@ -183,5 +183,5 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     plt.title(f'Nearest neighbors in atlas vs. flat space [N={len(nrn_ids)}cells]')
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_neighbors.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)

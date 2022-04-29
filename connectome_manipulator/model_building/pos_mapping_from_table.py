@@ -14,6 +14,7 @@ import pandas as pd
 import progressbar
 from scipy.spatial import distance_matrix
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids
 
@@ -22,9 +23,9 @@ def extract(circuit, pos_file, coord_names, nodes_pop_name=None, nodes_spec=None
     """Loads pre-computed position mapping of a given nodes population."""
     # Get neuron GIDs
     if nodes_pop_name is None:
-        assert len(circuit.nodes.population_names) == 1, f'ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!'
+        log.log_assert(len(circuit.nodes.population_names) == 1, f'ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!')
         nodes_pop_name = circuit.nodes.population_names[0]
-        print(f'INFO: Loading nodes population "{nodes_pop_name}"')
+        log.info(f'Loading nodes population "{nodes_pop_name}"')
     nodes = circuit.nodes[nodes_pop_name]
 
     nrn_ids = get_node_ids(nodes, nodes_spec)
@@ -36,27 +37,27 @@ def extract(circuit, pos_file, coord_names, nodes_pop_name=None, nodes_spec=None
         idx_offset = 1 # One-based indexing in pos_file (BluePy GIDs)
 
     # Load position table
-    assert os.path.exists(pos_file), f'ERROR: Position file "{pos_file}" not found!'
+    log.log_assert(os.path.exists(pos_file), f'ERROR: Position file "{pos_file}" not found!')
     file_format = os.path.splitext(pos_file)[1]
     if file_format == '.feather':
         nrn_table = pd.read_feather(pos_file)
     else:
-        assert False, f'ERROR: "{file_format}" format not supported!'
+        log.log_assert(False, f'ERROR: "{file_format}" format not supported!')
 
-    print(f'INFO: Loaded position table for {nrn_table.shape[0]} neurons from "{pos_file}"')
+    log.info(f'Loaded position table for {nrn_table.shape[0]} neurons from "{pos_file}"')
 
     # Assign mapped positions
     if gid_column is None: # Use index column
         tab_gids = nrn_table.index.to_numpy()
     else: # Use specified gid_column
-        assert gid_column in nrn_table.columns, f'ERROR: GID column "{gid_column}" not found!'
+        log.log_assert(gid_column in nrn_table.columns, f'ERROR: GID column "{gid_column}" not found!')
         tab_gids = nrn_table[gid_column].to_numpy()
 
-    assert np.all(np.isin(nrn_ids + idx_offset, tab_gids)), 'ERROR: Neuron IDs mismatch!'
-    assert np.all(np.isin(coord_names, nrn_table.columns)), 'ERROR: Coordinate name(s) not found in position table!'
+    log.log_assert(np.all(np.isin(nrn_ids + idx_offset, tab_gids)), 'ERROR: Neuron IDs mismatch!')
+    log.log_assert(np.all(np.isin(coord_names, nrn_table.columns)), 'ERROR: Coordinate name(s) not found in position table!')
     map_pos = nrn_table.loc[np.isin(tab_gids, nrn_ids + idx_offset), coord_names].to_numpy()
 
-    print(f'INFO: Loaded {", ".join(coord_names)} coordinates for {map_pos.shape[0]} neurons from position table')
+    log.info(f'Loaded {", ".join(coord_names)} coordinates for {map_pos.shape[0]} neurons from position table')
 
     return {'nrn_ids': nrn_ids, 'map_pos': map_pos, 'nrn_pos': nrn_pos, 'nrn_lay': nrn_lay}
 
@@ -64,12 +65,11 @@ def extract(circuit, pos_file, coord_names, nodes_pop_name=None, nodes_spec=None
 def build(nrn_ids, coord_names, map_pos, **_):
     """Build position mapping model."""
     map_pos_table = pd.DataFrame(map_pos, index=nrn_ids, columns=coord_names)
-    assert np.all(np.isfinite(map_pos_table)), 'ERROR: Invalid mapped positions found!'
+    log.log_assert(np.all(np.isfinite(map_pos_table)), 'ERROR: Invalid mapped positions found!')
 
     # Create model
     model = model_types.PosMapModel(pos_table=map_pos_table)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -108,7 +108,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
                 ax.set_ylabel(coo[1])
                 ax.set_zlabel(coo[2])
             else:
-                print(f'WARNING: Only 2D/3D plotting supported! Skipping "{lbl}"...')
+                log.warning(f'Only 2D/3D plotting supported! Skipping "{lbl}"...')
                 continue
             plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), ncol=1)
             if vidx == 0:
@@ -116,13 +116,13 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_positions.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Cell distances in atlas vs. flat space
     max_plot = 10000
     if len(nrn_ids) > max_plot:
-        print('WARNING: Using subsampling for distance plots!')
+        log.warning('Using subsampling for distance plots!')
         nrn_sel = np.random.choice(len(nrn_ids), max_plot)
         nrn_ids = nrn_ids[nrn_sel]
         nrn_pos = nrn_pos[nrn_sel, :]
@@ -148,7 +148,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_distances.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Nearest neighbors in atlas vs. flat space
@@ -158,7 +158,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     num_NN_list = list(range(1, 30, 1))
     NN_match = np.full(len(num_NN_list), np.nan)
 
-    print('Computing nearest neighbors in atlas vs. flat space...', flush=True)
+    log.info('Computing nearest neighbors in atlas vs. flat space...')
     pbar = progressbar.ProgressBar()
     for nidx in pbar(range(len(num_NN_list))):
         num_NN = num_NN_list[nidx]
@@ -173,5 +173,5 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     plt.title(f'Nearest neighbors in atlas vs. flat space [N={len(nrn_ids)}cells]')
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model_neighbors.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)

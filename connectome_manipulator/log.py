@@ -36,10 +36,9 @@ def log_assert(cond, msg):
     assert cond, msg
 
 
-def logging_init(output_path, name):
+def logging_init(log_path, name):
     """Initialize logger (with custom log level for profiling and assert with logging)."""
     # Configure logging
-    log_path = os.path.join(output_path, 'logs')
     if not os.path.exists(log_path):
         os.makedirs(log_path)
 

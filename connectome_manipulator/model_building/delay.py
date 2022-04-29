@@ -12,6 +12,7 @@ import numpy as np
 import progressbar
 from sklearn.linear_model import LinearRegression
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
@@ -38,7 +39,7 @@ def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None
     # Extract distance/delay values
     edges_table = edges.pathway_edges(source=node_ids_src_sel, target=node_ids_dest_sel, properties=['@source_node', 'delay', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z'])
 
-    print(f'INFO: Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)')
+    log.info(f'Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)')
 
     src_pos = src_nodes.positions(edges_table['@source_node'].to_numpy()).to_numpy() # Soma position of pre-synaptic neuron
     tgt_pos = edges_table[['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
@@ -54,7 +55,7 @@ def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None
     dist_delays_std = np.full(num_bins, np.nan)
     dist_count = np.zeros(num_bins).astype(int)
 
-    print('Extracting distance-dependent synaptic delays...', flush=True)
+    log.info('Extracting distance-dependent synaptic delays...')
     pbar = progressbar.ProgressBar()
     for idx in pbar(range(num_bins)):
         d_sel = np.logical_and(src_tgt_dist >= dist_bins[idx], (src_tgt_dist < dist_bins[idx + 1]) if idx < num_bins - 1 else (src_tgt_dist <= dist_bins[idx + 1])) # Including last edge
@@ -68,7 +69,7 @@ def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None
 
 def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size_um, **_):
     """Build distance-dependent synaptic delay model (linear model for delay mean, const model for delay std)."""
-    assert np.all((np.diff(dist_bins) - bin_size_um) < 1e-12), 'ERROR: Bin size mismatch!'
+    log.log_assert(np.all((np.diff(dist_bins) - bin_size_um) < 1e-12), 'ERROR: Bin size mismatch!')
     bin_offset = 0.5 * bin_size_um
 
     # Mean delay model (linear)
@@ -85,8 +86,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
 
     # Create model
     model = model_types.LinDelayModel(delay_mean_coefs=delay_mean_coefs, delay_std=delay_std, delay_min=delay_min)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -125,7 +125,7 @@ def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, mode
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'data_vs_model.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
     # Visualize model output (generative model)
@@ -143,5 +143,5 @@ def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, mode
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, 'model_output.png'))
-    print(f'INFO: Saving {out_fn}...')
+    log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)

@@ -10,6 +10,7 @@ Main module for model building:
 """
 
 import importlib
+import json
 import os.path
 import pickle
 import time
@@ -19,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from bluepysnap.circuit import Circuit
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
@@ -105,6 +107,7 @@ def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_s
 
 def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no cover
     """Main entry point for connectome model building."""
+    # Check model building config(s)
     if not isinstance(model_config_input, list):
         assert isinstance(model_config_input, dict), 'ERROR: model_config_input must be of type list or dict!'
         model_config_input = [model_config_input]
@@ -112,6 +115,7 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
     if len(model_config_input) > 1:
         print(f'INFO: Building {len(model_config_input)} models: {model_config_input[0]["model"]["name"]}..{model_config_input[-1]["model"]["name"]}')
 
+    # Run model building
     for midx, model_config in enumerate(model_config_input):
         if len(model_config_input) > 1:
             print(f'\n>>> BUILDING MODEL {midx + 1}/{len(model_config_input)}: {model_config["model"]["name"]} <<<')
@@ -126,14 +130,9 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
             force_reextract = force_recomp[0]
             force_rebuild = force_recomp[1]
 
-        # Load circuit
-        circuit_config = model_config['circuit_config']
-        circuit = Circuit(circuit_config)
-        print(f'INFO: Circuit loaded: {circuit_config}')
-
         # Prepare saving
         model_build_name = model_config['model']['name']
-        out_dir = os.path.join(model_config['out_dir'], model_build_name) # Where to put figures
+        out_dir = os.path.join(model_config['out_dir'], model_build_name) # Where to put output/figures
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 
@@ -145,28 +144,36 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
         if not os.path.exists(os.path.split(model_dir)[0]):
             os.makedirs(os.path.split(model_dir)[0])
 
+        # Initialize logger
+        log_file = log.logging_init(out_dir, name=__name__.rsplit('.', maxsplit=1)[-1])
+
         # Prepare computation module
         comp_source = model_config['model']['fct']['source']
         comp_kwargs = model_config['model']['fct']['kwargs']
 
         comp_module = importlib.import_module('connectome_manipulator.model_building.' + comp_source)
-        assert hasattr(comp_module, 'extract'), f'ERROR: Model building module "{comp_source}" requires extract() function!'
-        assert hasattr(comp_module, 'build'), f'ERROR: Model building module "{comp_source}" requires build() function!'
-        assert hasattr(comp_module, 'plot'), f'ERROR: Model building module "{comp_source}" requires plot() function!'
+        log.log_assert(hasattr(comp_module, 'extract'), f'ERROR: Model building module "{comp_source}" requires extract() function!')
+        log.log_assert(hasattr(comp_module, 'build'), f'ERROR: Model building module "{comp_source}" requires build() function!')
+        log.log_assert(hasattr(comp_module, 'plot'), f'ERROR: Model building module "{comp_source}" requires plot() function!')
+
+        # Load circuit
+        circuit_config = model_config['circuit_config']
+        circuit = Circuit(circuit_config)
+        log.info(f'Circuit loaded: {circuit_config}')
 
         # Extract data (or load from file)
         data_file = os.path.join(data_dir, model_build_name + '.pickle')
         if os.path.exists(data_file) and not force_reextract:
             # Load from file
-            print(f'INFO: Loading data from {data_file}')
+            log.info(f'Loading data from {data_file}')
             with open(data_file, 'rb') as f:
                 data_dict = pickle.load(f)
         else:
             # Compute & save to file
             t_start = time.time()
             data_dict = comp_module.extract(circuit, **comp_kwargs)
-            print(f'<TIME ELAPSED (data extraction): {time.time() - t_start:.1f}s>')
-            print(f'INFO: Writing data to {data_file}')
+            log.info(f'<TIME ELAPSED (data extraction): {time.time() - t_start:.1f}s>')
+            log.info(f'Writing data to {data_file}')
             if not os.path.exists(os.path.split(data_file)[0]):
                 os.makedirs(os.path.split(data_file)[0])
             with open(data_file, 'wb') as f:
@@ -176,17 +183,21 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
         model_file = os.path.join(model_dir, model_build_name + '.json')
         if os.path.exists(model_file) and not force_rebuild:
             # Load from file
-            print(f'INFO: Loading model from {model_file}')
+            log.info(f'Loading model from {model_file}')
             model = model_types.AbstractModel.model_from_file(model_file)
         else:
             # Compute & save to file
             t_start = time.time()
             model = comp_module.build(**data_dict, **comp_kwargs)
-            print(f'<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>')
-            print(f'INFO: Writing model to {model_file}')
+            log.info(f'<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>')
+            log.info(f'Writing model to {model_file}')
             if not os.path.exists(model_dir):
                 os.makedirs(model_dir)
             model.save_model(model_dir, model_build_name)
+
+            # Save model config dict for reproducibility
+            with open(os.path.join(out_dir, 'model_config.json'), 'w') as f:
+                json.dump(model_config, f, indent=2)
 
         # Visualize data vs. model
         comp_module.plot(**data_dict, **comp_kwargs, model=model, out_dir=out_dir)

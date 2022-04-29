@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
 
+from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_edges_population
 
@@ -41,7 +42,7 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     m_type_layer = [[nodes[i].get({'mtype': m}, properties='layer').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
     syn_props = list(filter(lambda x: not np.any([excl in x for excl in ['@', 'delay', 'afferent', 'efferent', 'spine_length']]), edges.property_names))
 
-    print(f'INFO: Estimating statistics for {len(syn_props)} properties between {len(m_types[0])}x{len(m_types[1])} m-types', flush=True)
+    log.info(f'Estimating statistics for {len(syn_props)} properties between {len(m_types[0])}x{len(m_types[1])} m-types')
 
     # Statistics for #syn/conn
     syns_per_conn_data = {'mean': np.full((len(m_types[0]), len(m_types[1])), np.nan),
@@ -103,7 +104,7 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             for pidx in range(len(syn_props)):
                 conn_prop_data['hist'][sidx][tidx][pidx] = np.histogram(means_within[:, pidx], bins=hist_bins)
 
-    print(f'INFO: Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.')
+    log.info(f'Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.')
 
     return {'syns_per_conn_data': syns_per_conn_data, 'conn_prop_data': conn_prop_data, 'm_types': m_types, 'm_type_class': m_type_class, 'm_type_layer': m_type_layer, 'syn_props': syn_props, 'hist_bins': hist_bins}
 
@@ -148,16 +149,16 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
         conn_prop_model['min'][sidx, tidx, :] = [np.nanmin(conn_prop_data['min'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
         conn_prop_model['max'][sidx, tidx, :] = [np.nanmax(conn_prop_data['max'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
 
-    print(f'INFO: Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }')
+    log.info(f'Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }')
 
     # Create model properties dictionary
     prop_model_dict = {}
     for pidx, prop in enumerate(syn_props + ['n_syn_per_conn']):
         prop_model_dict[prop] = {}
         if not prop in distr_types:
-            print(f'WARNING: No distribution type for "{prop}" specified - Using "normal"!')
+            log.warning(f'No distribution type for "{prop}" specified - Using "normal"!')
         distr_type = distr_types.get(prop, 'normal')
-        assert distr_type in DISTRIBUTION_ATTRIBUTES, f'ERROR: Distribution type "{distr_type}" not supported!'
+        log.log_assert(distr_type in DISTRIBUTION_ATTRIBUTES, f'ERROR: Distribution type "{distr_type}" not supported!')
         dtype = data_types.get(prop)
         bounds = data_bounds.get(prop)
         for sidx, src in enumerate(m_types[0]):
@@ -182,8 +183,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
 
     # Create model
     model = model_types.ConnPropsModel(src_types=m_types[0], tgt_types=m_types[1], prop_stats=prop_model_dict)
-    print('MODEL:', end=' ')
-    print(model.get_model_str())
+    log.info('Model description:\n' + model.get_model_str())
 
     return model
 
@@ -209,7 +209,7 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
             plt.tight_layout()
 
             out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_map_{stat_sel}__{p}.png'))
-            print(f'INFO: Saving {out_fn}...')
+            log.info(f'Saving {out_fn}...')
             plt.savefig(out_fn)
 
     # Plot data vs. model: Distribution histogram examples (generative model)
@@ -237,5 +237,5 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
         plt.tight_layout()
 
         out_fn = os.path.abspath(os.path.join(out_dir, f'data_vs_model_hist__{p}.png'))
-        print(f'INFO: Saving {out_fn}...')
+        log.info(f'Saving {out_fn}...')
         plt.savefig(out_fn)

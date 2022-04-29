@@ -12,6 +12,8 @@ from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 import sys
 
+from connectome_manipulator import log
+
 P_TH_ABS = 0.01 # Absolute probability threshold
 P_TH_REL = 0.1 # Relative probability threshold
 
@@ -54,11 +56,11 @@ class AbstractModel(metaclass=ABCMeta):
     @staticmethod
     def model_from_file(model_file):
         """Wrapper function to load model object from file."""
-        assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
-        assert os.path.splitext(model_file)[1] == '.json', f'ERROR: Model file must be of type ".json"!'
+        log.log_assert(os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!')
+        log.log_assert(os.path.splitext(model_file)[1] == '.json', f'ERROR: Model file must be of type ".json"!')
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
-        assert 'model' in model_dict, 'ERROR: Model type not found!'
+        log.log_assert('model' in model_dict, 'ERROR: Model type not found!')
 
         model_type = model_dict['model']
         model_class = getattr(sys.modules[__class__.__module__], model_type) # Get model subclass
@@ -75,29 +77,29 @@ class AbstractModel(metaclass=ABCMeta):
             self.init_params(kwargs)
             self.init_data(kwargs)
         if len(kwargs) > 0:
-            print(f'WARNING: Unused parameter(s): {set(kwargs.keys())}!')
+            log.warning(f'Unused parameter(s): {set(kwargs.keys())}!')
 
     def init_params(self, model_dict):
         """Initialize model parameters from dict (removing used keys from dict)."""
-        assert np.all([p in model_dict for p in self.param_names]), f'ERROR: Missing parameters for model initialization! Must contain initialization for {set(self.param_names)}.'
+        log.log_assert(np.all([p in model_dict for p in self.param_names]), f'ERROR: Missing parameters for model initialization! Must contain initialization for {set(self.param_names)}.')
         for p in self.param_names:
             val = np.array(model_dict.pop(p)).tolist() # Convert to numpy and back to list, so that reduced to basic (non-numpy) data types
             setattr(self, p, val)
 
     def init_data(self, data_dict):
         """Initialize data frames with supplementary model data from dict (removing used keys from dict)."""
-        assert np.all([d in data_dict for d in self.data_names]), f'ERROR: Missing data for model initialization! Must contain initialization for {set(self.data_names)}.'
-        assert np.all([isinstance(data_dict[d], pd.DataFrame) for d in self.data_names]), 'ERROR: Model data must be Pandas dataframes!'
+        log.log_assert(np.all([d in data_dict for d in self.data_names]), f'ERROR: Missing data for model initialization! Must contain initialization for {set(self.data_names)}.')
+        log.log_assert(np.all([isinstance(data_dict[d], pd.DataFrame) for d in self.data_names]), 'ERROR: Model data must be Pandas dataframes!')
         for d in self.data_names:
             setattr(self, d, data_dict.pop(d))
 
     def apply(self, **kwargs):
         """Main method for applying model, i.e., returning model output given its model inputs.
            [Calls get_model_output() which must be implemented in specific model subclass!]"""
-        assert np.all([inp in kwargs for inp in self.input_names]), f'ERROR: Missing model inputs! Must contain input values for {set(self.input_names)}.'
+        log.log_assert(np.all([inp in kwargs for inp in self.input_names]), f'ERROR: Missing model inputs! Must contain input values for {set(self.input_names)}.')
         inp_dict = {inp: kwargs.pop(inp) for inp in self.input_names}
         if len(kwargs) > 0:
-            print(f'WARNING: Unused input(s): {set(kwargs.keys())}!')
+            log.warning(f'Unused input(s): {set(kwargs.keys())}!')
         return self.get_model_output(**inp_dict)
 
     def get_param_dict(self):
@@ -115,7 +117,7 @@ class AbstractModel(metaclass=ABCMeta):
 
         # Save supplementary model data (if any) to .h5 data file
         data_dict = self.get_data_dict()
-        assert np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!'
+        log.log_assert(np.all([isinstance(v, pd.DataFrame) for k, v in data_dict.items()]), 'ERROR: Model data must be Pandas dataframes!')
         data_file = os.path.splitext(model_file)[0] + '.h5'
         for idx, (key, df) in enumerate(data_dict.items()):
             df.to_hdf(data_file, key, append=idx > 0)
@@ -129,25 +131,25 @@ class AbstractModel(metaclass=ABCMeta):
 
     def load_model(self, model_file):
         """Load model from file: Model dict from .json, model data (if any) from supplementary .h5 data file."""
-        assert os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!'
+        log.log_assert(os.path.exists(model_file), f'ERROR: Model file "{model_file}" not found!')
         with open(model_file, 'r') as f:
             model_dict = jsonpickle.decode(f.read())
 
-        assert 'model' in model_dict and model_dict.pop('model') == self.__class__.__name__, 'ERROR: Model type mismatch!'
+        log.log_assert('model' in model_dict and model_dict.pop('model') == self.__class__.__name__, 'ERROR: Model type mismatch!')
         self.init_params(model_dict)
         data_keys = model_dict.pop('data_keys')
         unused_params = [k for k in model_dict.keys() if k.find('__') != 0] # Unused paramters, excluding meta data ('__<name>') that may be included in file
         if len(unused_params) > 0:
-            print(f'WARNING: Unused parameter(s) in model file: {set(unused_params)}!')
+            log.warning(f'Unused parameter(s) in model file: {set(unused_params)}!')
 
         # Load supplementary model data (if any) from .h5 data file [same name and folder as .json file]
         if len(data_keys) > 0:
             data_file = os.path.splitext(model_file)[0] + '.h5'
-            assert os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!'
+            log.log_assert(os.path.exists(data_file), f'ERROR: Data file "{data_file}" missing!')
             data_dict = {key: pd.read_hdf(data_file, key) for key in data_keys}
             self.init_data(data_dict)
             if len(data_dict) > 0:
-                print(f'WARNING: Unused data frame(s) in model data file: {set(data_dict.keys())}!')
+                log.warning(f'Unused data frame(s) in model data file: {set(data_dict.keys())}!')
 
 
 ### MODEL TEMPLATE ###
@@ -166,7 +168,7 @@ class AbstractModel(metaclass=ABCMeta):
 #         super().__init__(**kwargs)
 # 
 #         # Check parameters
-#         assert ...
+#         log.log_assert(...)
 # 
 #     # <Additional access methods, if needed>
 #     ...
@@ -200,9 +202,9 @@ class LinDelayModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check paramters
-        assert hasattr(self.delay_mean_coefs, '__iter__') and len(self.delay_mean_coefs) == 2, 'ERROR: Two mean coefficients required for linear delay model!'
-        assert self.delay_std > 0.0, 'ERROR: Delay std must be larger than zero!'
-        assert self.delay_min >= 0.0, 'ERROR: Delay min cannot be negative!'
+        log.log_assert(hasattr(self.delay_mean_coefs, '__iter__') and len(self.delay_mean_coefs) == 2, 'ERROR: Two mean coefficients required for linear delay model!')
+        log.log_assert(self.delay_std > 0.0, 'ERROR: Delay std must be larger than zero!')
+        log.log_assert(self.delay_min >= 0.0, 'ERROR: Delay min cannot be negative!')
 
     def get_mean(self, distance):
         """Get delay mean for given distance (linear)."""
@@ -294,16 +296,16 @@ class ConnPropsModel(AbstractModel):
                 return data
 
         # Check & convert parameters
-        assert isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!'
+        log.log_assert(isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!')
         self.prop_stats = dict_conv(self.prop_stats) # Convert dict to basic data types
         self.prop_names = self.prop_stats.keys()
-        assert 'n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing'
-        assert np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!'
-        assert np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!'
-        assert np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!'
-        assert np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!'
+        log.log_assert('n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing')
+        log.log_assert(np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!')
+        log.log_assert(np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!')
+        log.log_assert(np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!')
+        log.log_assert(np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!')
         required_keys = ['type', 'mean', 'std'] # Required keys to be specified for each distribution
-        assert np.all([[[np.all(np.isin(required_keys, list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {required_keys})!'
+        log.log_assert(np.all([[[np.all(np.isin(required_keys, list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {required_keys})!')
 
     def get_prop_names(self):
         """Return list of connection/synapse property names."""
@@ -327,22 +329,22 @@ class ConnPropsModel(AbstractModel):
         if distr_type == 'constant':
             drawn_values = np.full(size, distr_mean)
         elif distr_type == 'normal':
-            assert distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!'
+            log.log_assert(distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!')
             drawn_values = np.random.normal(loc=distr_mean, scale=distr_std, size=size)
         elif distr_type == 'truncnorm':
-            assert distr_mean is not None and distr_std is not None and distr_min is not None and distr_max is not None, 'ERROR: Distribution missing (required: mean/std/min/max)!'
+            log.log_assert(distr_mean is not None and distr_std is not None and distr_min is not None and distr_max is not None, 'ERROR: Distribution missing (required: mean/std/min/max)!')
             drawn_values = truncnorm(a=(distr_min - distr_mean) / distr_std,
                                      b=(distr_max - distr_mean) / distr_std,
                                      loc=distr_mean, scale=distr_std).rvs(size=size)
         elif distr_type == 'gamma':
-            assert distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!'
+            log.log_assert(distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!')
             drawn_values = np.random.gamma(shape=distr_mean**2 / distr_std**2,
                                            scale=distr_std**2 / distr_mean, size=size)
         elif distr_type == 'poisson':
-            assert distr_mean is not None, 'ERROR: Distribution parameter missing (required: mean)!'
+            log.log_assert(distr_mean is not None, 'ERROR: Distribution parameter missing (required: mean)!')
             drawn_values = np.random.poisson(lam=distr_mean, size=size)
         else:
-            assert False, f'ERROR: Distribution type "{distr_type}" not supported!'
+            log.log_assert(False, f'ERROR: Distribution type "{distr_type}" not supported!')
         return drawn_values
 
     def draw(self, prop_name, src_type, tgt_type, size=1):
@@ -414,7 +416,7 @@ class ConnProb1stOrderModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert 0.0 <= self.p_conn <= 1.0, 'ERROR: Connection probability must be between 0 and 1!'
+        log.log_assert(0.0 <= self.p_conn <= 1.0, 'ERROR: Connection probability must be between 0 and 1!')
 
     def get_conn_prob(self):
         """Return (constant) connection probability."""
@@ -424,7 +426,7 @@ class ConnProb1stOrderModel(AbstractModel):
         """Return (constant) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
         return np.full((src_pos.shape[0], tgt_pos.shape[0]), self.get_conn_prob())
 
     def get_model_str(self):
@@ -449,8 +451,8 @@ class ConnProb2ndOrderExpModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert 0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!'
-        assert self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!'
+        log.log_assert(0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
+        log.log_assert(self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!')
 
     def get_conn_prob(self, distance):
         """Return (distance-dependent) connection probability."""
@@ -467,7 +469,7 @@ class ConnProb2ndOrderExpModel(AbstractModel):
         """Return (distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
         dist_mat = self.compute_dist_matrix(src_pos, tgt_pos)
         return self.get_conn_prob(dist_mat)
 
@@ -494,9 +496,9 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert 0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!'
-        assert self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must not be negative!'
-        assert isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!'
+        log.log_assert(0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
+        log.log_assert(self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must not be negative!')
+        log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
 
     def get_conn_prob(self, distance, bip):
         """Return (bipolar distance-dependent) connection probability."""
@@ -525,7 +527,7 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         """Return (bipolar distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
         dist_mat = self.compute_dist_matrix(src_pos, tgt_pos)
         bip_mat = self.compute_bip_matrix(src_pos, tgt_pos, self.bip_coord)
         return self.get_conn_prob(dist_mat, bip_mat)
@@ -557,8 +559,8 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (dx, dy, dz) required!'
-        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+        log.log_assert(len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (dx, dy, dz) required!')
+        log.log_assert(self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!')
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
@@ -590,7 +592,7 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         for dim in np.where(self.data_dim_sel)[0]:
             p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
         if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
-            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+            log.warning(f'Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
@@ -606,8 +608,8 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
-        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        log.log_assert(src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!')
         dx_mat, dy_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
         return self.get_conn_prob(dx_mat, dy_mat, dz_mat)
 
@@ -637,8 +639,8 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert len(self.p_conn_table.index.levels) == 2, 'ERROR: Data frame with 2 index levels (dr, dz) required!'
-        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+        log.log_assert(len(self.p_conn_table.index.levels) == 2, 'ERROR: Data frame with 2 index levels (dr, dz) required!')
+        log.log_assert(self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!')
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
@@ -675,7 +677,7 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         for dim in np.where(self.data_dim_sel)[0]:
             p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
         if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
-            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+            log.warning(f'Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
@@ -692,8 +694,8 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
-        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        log.log_assert(src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!')
         dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
         return self.get_conn_prob(dr_mat, dz_mat)
 
@@ -723,8 +725,8 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert len(self.p_conn_table.index.levels) == 6, 'ERROR: Data frame with 6 index levels (x, y, z, dx, dy, dz) required!'
-        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+        log.log_assert(len(self.p_conn_table.index.levels) == 6, 'ERROR: Data frame with 6 index levels (x, y, z, dx, dy, dz) required!')
+        log.log_assert(self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!')
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data positions & offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
@@ -756,7 +758,7 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         for dim in np.where(self.data_dim_sel)[0]:
             p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
         if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
-            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+            log.warning(f'Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
@@ -778,8 +780,8 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
-        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        log.log_assert(src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!')
         x_mat, y_mat, z_mat = self.compute_position_matrices(src_pos, tgt_pos)
         dx_mat, dy_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
         return self.get_conn_prob(x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat)
@@ -810,8 +812,8 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        assert len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (z, dr, dz) required!'
-        assert self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!'
+        log.log_assert(len(self.p_conn_table.index.levels) == 3, 'ERROR: Data frame with 3 index levels (z, dr, dz) required!')
+        log.log_assert(self.p_conn_table.shape[1] == 1, 'ERROR: Data frame with 1 column (conn. prob.) required!')
 
         self.data_points = [list(lev_pos) for lev_pos in self.p_conn_table.index.levels] # Extract data positions & offsets from multi-index
         self.p_data = self.p_conn_table.to_numpy().reshape(self.p_conn_table.index.levshape)
@@ -848,7 +850,7 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         for dim in np.where(self.data_dim_sel)[0]:
             p_border = np.maximum(p_border, np.max(np.max(self.p_data, dim)[[0, -1]])) # Take first/last element per dimension
         if p_border > P_TH_ABS or p_border / np.max(self.p_data) > P_TH_REL:
-            print(f'WARNING: Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
+            log.warning(f'Probability at border should be close to zero (p_abs={p_border:.2f} (th_abs={P_TH_ABS:.2f}); p_rel={p_border / np.max(self.p_data):.2f} (th_rel={P_TH_REL:.2f})). Consider smoothing and/or increasing max. sampling range!')
 
         return p_conn
 
@@ -871,8 +873,8 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         src_pos = kwargs['src_pos']
         tgt_pos = kwargs['tgt_pos']
-        assert src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!'
-        assert src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!'
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        log.log_assert(src_pos.shape[1] == 3, 'ERROR: Wrong number of input dimensions (3 required)!')
         z_mat = self.compute_position_matrix(src_pos, tgt_pos)
         dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
         return self.get_conn_prob(z_mat, dr_mat, dz_mat)
