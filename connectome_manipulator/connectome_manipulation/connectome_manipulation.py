@@ -277,7 +277,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
             os.makedirs(output_path)
 
     # Initialize logger
-    log_file = log.logging_init(os.path.join(output_path, 'logs'), name=__name__.rsplit('.', maxsplit=1)[-1])
+    log_file = log.logging_init(os.path.join(output_path, 'logs'), name='connectome_manipulation')
 
     # Initialize profiler
     csv_file = os.path.splitext(log_file)[0] + '.csv'
