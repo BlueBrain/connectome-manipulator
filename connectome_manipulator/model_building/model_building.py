@@ -13,6 +13,7 @@ import importlib
 import json
 import os.path
 import pickle
+import sys
 import time
 from copy import deepcopy
 
@@ -145,7 +146,7 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
             os.makedirs(os.path.split(model_dir)[0])
 
         # Initialize logger
-        log_file = log.logging_init(out_dir, name=__name__.rsplit('.', maxsplit=1)[-1])
+        log_file = log.logging_init(out_dir, name='model_building')
 
         # Prepare computation module
         comp_source = model_config['model']['fct']['source']
@@ -206,3 +207,42 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
             plt.show()
         else:
             plt.close("all")
+
+
+def main_wrapper():
+    """Main function wrapper when called from command line.
+       Command line arguments:
+         model_config: Config file (.json), specifying the model building settings
+         force_reextract (optional): Disable (0; default) or enable (1) forced re-extraction of data, in case already existing
+         force_rebuild (optional): Disable (0) or enable (1) forced model re-building, in case model already exists (default: force_reextract)
+    """
+
+    # Parse inputs
+    args = sys.argv[1:]
+    print(len(args))
+    if len(args) < 1:
+        print(f'Usage: {__file__} <model_config.json> [force_reextract] [force_rebuild]')
+        sys.exit(2)
+
+    # Load config dict
+    with open(args[0], 'r') as f:
+        config_dict = json.load(f)
+
+    # Read force_reextract flag
+    if len(args) > 1:
+        force_reextract = bool(int(args[1]))
+    else:
+        force_reextract = False
+
+    # Read force_rebuild flag
+    if len(args) > 2:
+        force_rebuild = bool(int(args[2]))
+    else:
+        force_rebuild = force_reextract
+
+    # Call main function
+    main(config_dict, show_fig=False, force_recomp=[force_reextract, force_rebuild])
+
+
+if __name__ == "__main__":
+    main_wrapper()

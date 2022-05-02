@@ -1,0 +1,17 @@
+{
+  "circuit_path": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/circuit-build-S1_v1",
+  "circuit_config": "sonata/circuit_config.json",
+  "blue_config_to_update": "CircuitConfig",
+  "workflow_template": "../templates/bbp-workflow_RegisterCircuit.cfg",
+  "seed": 3210,
+  "N_split_nodes": 1,
+  "manip": {
+    "name": "NoManip",
+    "fcts": [
+      {
+        "source": "no_manipulation",
+        "kwargs": {}
+      }
+    ]
+  }
+}

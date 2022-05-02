@@ -11,6 +11,7 @@ import os
 import pandas as pd
 import resource
 import subprocess
+import sys
 import time
 from datetime import datetime
 
@@ -400,3 +401,49 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
             create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
 
     resource_profiling(do_profiling, 'final', csv_file=csv_file)
+
+
+def main_wrapper():
+    """Main function wrapper when called from command line.
+       Command line arguments:
+         manip_config: Config file (.json), specifying the manipulation settings
+         do_profiling (optional): Disable (0; default) or enable (1) resource profiling
+         do_resume (optional): Disable (0; default) or enable (1) resume option in case .parquet file(s) already exist
+         keep_parquet (optional): Disable (0; default) or enable (1) keeping temporary .parquet file(s) after completion
+    """
+
+    # Parse inputs
+    args = sys.argv[1:]
+    print(len(args))
+    if len(args) < 1:
+        print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet]')
+        sys.exit(2)
+
+    # Load config dict
+    with open(args[0], 'r') as f:
+        config_dict = json.load(f)
+
+    # Read do_profiling flag
+    if len(args) > 1:
+        do_profiling = bool(int(args[1]))
+    else:
+        do_profiling = False
+
+    # Read do_resume flag
+    if len(args) > 2:
+        do_resume = bool(int(args[2]))
+    else:
+        do_resume = False
+
+    # Read keep_parquet flag
+    if len(args) > 3:
+        keep_parquet = bool(int(args[3]))
+    else:
+        keep_parquet = False
+
+    # Call main function
+    main(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
+
+
+if __name__ == "__main__":
+    main_wrapper()
