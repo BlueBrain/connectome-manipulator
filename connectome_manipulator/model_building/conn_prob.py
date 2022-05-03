@@ -227,7 +227,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
         count_all[idx] = np.sum(dep_sel)
         count_conn[idx] = np.sum(adj_mat[src_node_ids[sidx], tgt_node_ids[tidx]])
     p_conn = np.array(count_conn / count_all)
-    p_conn[np.isnan(p_conn)] = 0.0
+#     p_conn[np.isnan(p_conn)] = 0.0
 
     # Check bin counts below threshold and ignore
     if min_count_per_bin is None:
@@ -235,7 +235,7 @@ def extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, dep_matrices, de
     bad_bins = np.logical_and(count_all > 0, count_all < min_count_per_bin)
     if np.sum(bad_bins) > 0:
         log.warning(f'Found {np.sum(bad_bins)} of {count_all.size} ({100.0 * np.sum(bad_bins) / count_all.size:.1f}%) bins with less than th={min_count_per_bin} pairs of neurons ... IGNORING! (Consider increasing sample size and/or bin size and/or smoothing!)')
-        p_conn[bad_bins] = 0.0
+        p_conn[bad_bins] = np.nan # 0.0
 
     return p_conn, count_conn, count_all
 
@@ -594,6 +594,10 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
     dy_pos = dy_bins[:-1] + dy_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
 
+    # Set NaNs to zero (for smoothing/interpolation)
+    p_conn_offset = p_conn_offset.copy()
+    p_conn_offset[np.isnan(p_conn_offset)] = 0.0
+
     # Apply Gaussian smoothing filter to data points (optional)
     if smoothing_sigma_um is not None:
         if not isinstance(smoothing_sigma_um, list):
@@ -832,6 +836,10 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
     dr_pos = dr_bins[:-1] + dr_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
 
+    # Set NaNs to zero (for smoothing/interpolation)
+    p_conn_offset = p_conn_offset.copy()
+    p_conn_offset[np.isnan(p_conn_offset)] = 0.0
+
     # Apply Gaussian smoothing filter to data points (optional)
     if smoothing_sigma_um is not None:
         if not isinstance(smoothing_sigma_um, list):
@@ -1006,6 +1014,10 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
     dx_pos = dx_bins[:-1] + dx_bin_offset # Positions at bin centers
     dy_pos = dy_bins[:-1] + dy_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Set NaNs to zero (for smoothing/interpolation)
+    p_conn_position = p_conn_position.copy()
+    p_conn_position[np.isnan(p_conn_position)] = 0.0
 
     # Apply Gaussian smoothing filter to data points (optional)
     if smoothing_sigma_um is not None:
@@ -1281,6 +1293,10 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_spe
 
     dr_pos = dr_bins[:-1] + dr_bin_offset # Positions at bin centers
     dz_pos = dz_bins[:-1] + dz_bin_offset # Positions at bin centers
+
+    # Set NaNs to zero (for smoothing/interpolation)
+    p_conn_position = p_conn_position.copy()
+    p_conn_position[np.isnan(p_conn_position)] = 0.0
 
     # Apply Gaussian smoothing filter to data points (optional)
     if smoothing_sigma_um is not None:
