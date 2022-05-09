@@ -12,6 +12,7 @@ Main module for model building:
 import importlib
 import json
 import os.path
+import pandas as pd
 import pickle
 import sys
 import time
@@ -43,7 +44,7 @@ from connectome_manipulator.access_functions import get_node_ids, get_edges_popu
 #     return model_fct
 
 
-def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_src', dest_sel_key='sel_dest'):
+def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_src', dest_sel_key='sel_dest', group_fct=None):
     """Create model config dict for pathways between all pairs of groups (e.g. layer, mtype, ...)."""
     # Check model config
     assert 'model' in model_config.keys(), 'ERROR: "model" key missing in model_config!'
@@ -73,35 +74,60 @@ def create_model_config_per_pathway(model_config, grouped_by, src_sel_key='sel_s
     if sel_dest is not None:
         assert isinstance(sel_dest, dict), 'ERROR: Target node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
 
-    assert grouped_by in src_nodes.property_names, f'ERROR: "{grouped_by}" property not found in source nodes!'
-    assert grouped_by in tgt_nodes.property_names, f'ERROR: "{grouped_by}" property not found in target nodes!'
+    if not isinstance(grouped_by, list):
+        grouped_by = [grouped_by]
+    grouped_by_name = '-'.join(grouped_by)
+    assert np.all([g in src_nodes.property_names for g in grouped_by]), f'ERROR: "{grouped_by_name}" property not found in source nodes!'
+    assert np.all([g in tgt_nodes.property_names for g in grouped_by]), f'ERROR: "{grouped_by_name}" property not found in target nodes!'
 
     node_ids_src = get_node_ids(src_nodes, sel_src)
     node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
 
-    src_types = list(np.unique(src_nodes.get(node_ids_src, properties=grouped_by)))
-    tgt_types = list(np.unique(tgt_nodes.get(node_ids_dest, properties=grouped_by)))
+    src_types_nodes = src_nodes.get(node_ids_src, properties=grouped_by)
+    tgt_types_nodes = tgt_nodes.get(node_ids_dest, properties=grouped_by)
+    src_types = sorted(src_types_nodes.groupby(grouped_by).indices.keys())
+    tgt_types = sorted(tgt_types_nodes.groupby(grouped_by).indices.keys())
+    if len(grouped_by) == 1:
+        src_types = [[s] for s in src_types]
+        tgt_types = [[t] for t in tgt_types]
+
+    if group_fct is not None:
+        if not isinstance(group_fct, list):
+            group_fct = [group_fct]
+        assert len(group_fct) == len(grouped_by), f'ERROR: Group functions to be provided for {len(grouped_by)} groups!'
+        src_types_nodes_base = pd.concat([src_types_nodes[grouped_by[i]].apply(group_fct[i]) for i in range(len(group_fct))], axis=1)
+        tgt_types_nodes_base = pd.concat([tgt_types_nodes[grouped_by[i]].apply(group_fct[i]) for i in range(len(group_fct))], axis=1)
+        src_types_base = sorted(src_types_nodes_base.groupby(grouped_by).indices.keys())
+        tgt_types_base = sorted(tgt_types_nodes_base.groupby(grouped_by).indices.keys())
+        if len(grouped_by) == 1:
+            src_types_base = [[s] for s in src_types_base]
+            tgt_types_base = [[t] for t in tgt_types_base]
+        src_types = [[list(np.unique(src_types_nodes[grouped_by[i]][src_types_nodes_base[grouped_by[i]] == s[i]])) for i in range(len(group_fct))] for s in src_types_base]
+        tgt_types = [[list(np.unique(tgt_types_nodes[grouped_by[i]][tgt_types_nodes_base[grouped_by[i]] == t[i]])) for i in range(len(group_fct))] for t in tgt_types_base]
+    else:
+        src_types_base = src_types
+        tgt_types_base = tgt_types
 
     # Create list of model configs per pathway
     model_build_name = model_config['model']['name']
     model_config_pathways = []
-    for s in src_types:
-        for t in tgt_types:
+    for s, sname in zip(src_types, src_types_base):
+        for t, tname in zip(tgt_types, tgt_types_base):
             m_dict = deepcopy(model_config)
             if sel_src is None:
-                m_dict['model']['fct']['kwargs'].update({src_sel_key: {grouped_by: s}})
+                m_dict['model']['fct']['kwargs'].update({src_sel_key: {k: (v.tolist() if hasattr(v, 'tolist') else v) for k, v in zip(grouped_by, s)}}) # tolist ... to get rid of hidden numpy data types (e.g., numpy.int64)
             else:
-                m_dict['model']['fct']['kwargs'][src_sel_key].update({grouped_by: s})
+                m_dict['model']['fct']['kwargs'][src_sel_key].update({k: (v.tolist() if hasattr(v, 'tolist') else v) for k, v in zip(grouped_by, s)}) # tolist ... to get rid of hidden numpy data types (e.g., numpy.int64)
             if sel_dest is None:
-                m_dict['model']['fct']['kwargs'].update({dest_sel_key: {grouped_by: t}})
+                m_dict['model']['fct']['kwargs'].update({dest_sel_key: {k: (v.tolist() if hasattr(v, 'tolist') else v) for k, v in zip(grouped_by, t)}}) # tolist ... to get rid of hidden numpy data types (e.g., numpy.int64)
             else:
-                m_dict['model']['fct']['kwargs'][dest_sel_key].update({grouped_by: t})
-            m_dict['model']['name'] += f'__{grouped_by}__{str(s).replace(":", "_")}-{str(t).replace(":", "_")}'
-            m_dict['working_dir'] = os.path.join(m_dict['working_dir'], model_build_name + f'__{grouped_by}_pathways')
-            m_dict['out_dir'] = os.path.join(m_dict['out_dir'], model_build_name + f'__{grouped_by}_pathways')
+                m_dict['model']['fct']['kwargs'][dest_sel_key].update({k: (v.tolist() if hasattr(v, 'tolist') else v) for k, v in zip(grouped_by, t)}) # tolist ... to get rid of hidden numpy data types (e.g., numpy.int64)
+            m_dict['model']['name'] += f'__{grouped_by_name}__{"-".join([str(sn) for sn in sname]).replace(":", "_")}-{"-".join([str(tn) for tn in tname]).replace(":", "_")}'
+            m_dict['working_dir'] = os.path.join(m_dict['working_dir'], model_build_name + f'__{grouped_by_name}_pathways')
+            m_dict['out_dir'] = os.path.join(m_dict['out_dir'], model_build_name + f'__{grouped_by_name}_pathways')
             model_config_pathways.append(m_dict)
 
-    print(f'INFO: Created model configurations for {len(model_config_pathways)} pathways between {len(src_types)}x{len(tgt_types)} {grouped_by}{"e" if grouped_by[-1] == "s" else ""}s')
+    print(f'INFO: Created model configurations for {len(model_config_pathways)} pathways between {len(src_types)}x{len(tgt_types)} {grouped_by_name}{"e" if grouped_by_name[-1] == "s" else ""}s')
 
     return model_config_pathways
 
