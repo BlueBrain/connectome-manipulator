@@ -356,7 +356,11 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
     X = dist_bins[:-1][np.isfinite(p_conn_dist)] + bin_offset
     y = p_conn_dist[np.isfinite(p_conn_dist)]
-    (a_opt, b_opt), _ = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
+    try:
+        (a_opt, b_opt), _ = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
+    except Exception as e:
+        log.error(e)
+        (a_opt, b_opt) = (np.nan, np.nan)
 
     # Create model
     model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
@@ -473,8 +477,13 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, **_):
     y = p_conn_dist_bip[np.all(np.isfinite(p_conn_dist_bip), 1), :]
 
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
-    (aN_opt, bN_opt), _ = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
-    (aP_opt, bP_opt), _ = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
+    try:
+        (aN_opt, bN_opt), _ = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
+        (aP_opt, bP_opt), _ = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
+    except Exception as e:
+        log.error(e)
+        (aN_opt, bN_opt) = (np.nan, np.nan)
+        (aP_opt, bP_opt) = (np.nan, np.nan)
 
     # Create model
     model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]

@@ -159,7 +159,8 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
 
         # Prepare saving
         model_build_name = model_config['model']['name']
-        out_dir = os.path.join(model_config['out_dir'], model_build_name) # Where to put output/figures
+        # out_dir = os.path.join(model_config['out_dir'], model_build_name) # Where to put output/figures
+        out_dir = os.path.join(model_config['out_dir'], 'output') # Where to put output/figures
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 

@@ -416,7 +416,10 @@ class ConnProb1stOrderModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        log.log_assert(0.0 <= self.p_conn <= 1.0, 'ERROR: Connection probability must be between 0 and 1!')
+        if np.all(np.isnan([getattr(self, p) for p in self.param_names])):
+            log.warning('Empty/invalid model!')
+        else:
+            log.log_assert(0.0 <= self.p_conn <= 1.0, 'ERROR: Connection probability must be between 0 and 1!')
 
     def get_conn_prob(self):
         """Return (constant) connection probability."""
@@ -451,8 +454,11 @@ class ConnProb2ndOrderExpModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        log.log_assert(0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
-        log.log_assert(self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!')
+        if np.all(np.isnan([getattr(self, p) for p in self.param_names])):
+            log.warning('Empty/invalid model!')
+        else:
+            log.log_assert(0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
+            log.log_assert(self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!')
 
     def get_conn_prob(self, distance):
         """Return (distance-dependent) connection probability."""
@@ -496,9 +502,12 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        log.log_assert(0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
-        log.log_assert(self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must not be negative!')
-        log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
+        if np.all(np.isnan([getattr(self, p) for p in self.param_names])):
+            log.warning('Empty/invalid model!')
+        else:
+            log.log_assert(0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
+            log.log_assert(self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must not be negative!')
+            log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
 
     def get_conn_prob(self, distance, bip):
         """Return (bipolar distance-dependent) connection probability."""
