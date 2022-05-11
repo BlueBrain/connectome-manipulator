@@ -365,8 +365,10 @@ def build_2nd_order(p_conn_dist, dist_bins, **_):
     y = p_conn_dist[np.isfinite(p_conn_dist)]
     try:
         (a_opt, b_opt), _ = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
+        assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
+        assert b_opt >= 0.0, '"Exponent" must be non-negative!'
     except Exception as e:
-        log.error(e)
+        log.warning(e)
         (a_opt, b_opt) = (np.nan, np.nan)
 
     # Create model
@@ -487,8 +489,10 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, **_):
     try:
         (aN_opt, bN_opt), _ = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
         (aP_opt, bP_opt), _ = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
+        assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, '"Scale" must be between 0 and 1!'
+        assert bN_opt >= 0.0 and bP_opt >= 0.0, '"Exponent" must not be negative!'
     except Exception as e:
-        log.error(e)
+        log.warning(e)
         (aN_opt, bN_opt) = (np.nan, np.nan)
         (aP_opt, bP_opt) = (np.nan, np.nan)
 
