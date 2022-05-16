@@ -19,7 +19,7 @@ from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids
 
 
-def extract(circuit, pos_file, coord_names, nodes_pop_name=None, nodes_spec=None, zero_based_indexing=False, gid_column=None, **_):
+def extract(circuit, pos_file, coord_names, coord_scale=None, nodes_pop_name=None, nodes_spec=None, zero_based_indexing=False, gid_column=None, **_):
     """Loads pre-computed position mapping of a given nodes population."""
     # Get neuron GIDs
     if nodes_pop_name is None:
@@ -57,14 +57,24 @@ def extract(circuit, pos_file, coord_names, nodes_pop_name=None, nodes_spec=None
     log.log_assert(np.all(np.isin(coord_names, nrn_table.columns)), 'ERROR: Coordinate name(s) not found in position table!')
     map_pos = nrn_table.loc[np.isin(tab_gids, nrn_ids + idx_offset), coord_names].to_numpy()
 
-    log.info(f'Loaded {", ".join(coord_names)} coordinates for {map_pos.shape[0]} neurons from position table')
+    # Apply scale
+    if coord_scale is not None:
+        log.log_assert(len(coord_names) == len(coord_scale), 'ERROR: Coordinate scale mismatch!')
+        map_pos = map_pos * coord_scale
+
+    log.info(f'Loaded {", ".join(coord_names)} coordinates for {map_pos.shape[0]} neurons from position table (coord_scale={coord_scale})')
 
     return {'nrn_ids': nrn_ids, 'map_pos': map_pos, 'nrn_pos': nrn_pos, 'nrn_lay': nrn_lay}
 
 
-def build(nrn_ids, coord_names, map_pos, **_):
+def build(nrn_ids, coord_names, map_pos, model_coord_names=None, **_):
     """Build position mapping model."""
-    map_pos_table = pd.DataFrame(map_pos, index=nrn_ids, columns=coord_names)
+    if model_coord_names is None:
+        model_coord_names = coord_names # Same model coord names as input coord names
+    else:
+        log.log_assert(len(model_coord_names) == len(coord_names), 'ERROR: Model coordinate names mismatch!')
+
+    map_pos_table = pd.DataFrame(map_pos, index=nrn_ids, columns=model_coord_names)
     log.log_assert(np.all(np.isfinite(map_pos_table)), 'ERROR: Invalid mapped positions found!')
 
     # Create model
@@ -79,13 +89,13 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     nrn_pos_model = model.apply(gids=nrn_ids)
 
     # Cell positions in 3D original vs. mapped space
-    coord_names = model.get_coord_names()
+    model_coord_names = model.get_coord_names()
     num_layers = len(np.unique(nrn_lay))
     lay_colors = plt.cm.get_cmap('jet')(np.linspace(0, 1, num_layers))
     views_3d = [[90, 0], [0, 0]]
     pos_list = [nrn_pos, nrn_pos_model]
     lbl_list = ['Original space (data)', 'Mapped space (model)']
-    coord_list = [['x [$\\mu$m]', 'y [$\\mu$m]', 'z [$\\mu$m]'], coord_names]
+    coord_list = [['x [$\\mu$m]', 'y [$\\mu$m]', 'z [$\\mu$m]'], model_coord_names]
     fig = plt.figure(figsize=(10, 3 * len(views_3d)), dpi=300)
     plt.gcf().patch.set_facecolor('w')
     for vidx, v in enumerate(views_3d):
