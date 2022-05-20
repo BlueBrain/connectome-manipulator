@@ -64,7 +64,7 @@ def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None
             dist_delays_mean[idx] = np.mean(src_tgt_delay[d_sel])
             dist_delays_std[idx] = np.std(src_tgt_delay[d_sel])
 
-    return {'dist_bins': dist_bins, 'dist_delays_mean': dist_delays_mean, 'dist_delays_std': dist_delays_std, 'dist_count': dist_count, 'dist_delay_min': np.min(src_tgt_delay)}
+    return {'dist_bins': dist_bins, 'dist_delays_mean': dist_delays_mean, 'dist_delays_std': dist_delays_std, 'dist_count': dist_count, 'dist_delay_min': np.nanmin(src_tgt_delay)}
 
 
 def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size_um, **_):
@@ -79,7 +79,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     delay_mean_coefs = [dist_delays_mean_fit.intercept_, dist_delays_mean_fit.coef_[0]]
 
     # Std delay model (const)
-    delay_std = np.mean(dist_delays_std)
+    delay_std = np.nanmean(dist_delays_std)
 
     # Min delay model (const)
     delay_min = dist_delay_min
