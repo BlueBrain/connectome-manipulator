@@ -27,8 +27,10 @@ DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
 #   *Capture cross-correlations between synaptic properties
 
 
-def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, **_):
-    """Extract statistics for synaptic properties between samples of neurons for each pair of m-types."""
+def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, sel_props=None, **_):
+    """Extract statistics for synaptic properties between samples of neurons for each pair of m-types.
+       (sel_props: None to select default properties; if no properties are selected (empty list),
+                   only #synapses/connection will be estimated)"""
     # Select edge population [assuming exactly one edge population in given edges file]
     edges = get_edges_population(circuit)
 
@@ -40,9 +42,15 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     m_types = [sorted(n.property_values('mtype', is_present=True)) for n in nodes]
     m_type_class = [[nodes[i].get({'mtype': m}, properties='synapse_class').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
     m_type_layer = [[nodes[i].get({'mtype': m}, properties='layer').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
-    syn_props = list(filter(lambda x: not np.any([excl in x for excl in ['@', 'delay', 'afferent', 'efferent', 'spine_length']]), edges.property_names))
+    if sel_props is None: # Select all available properties
+        syn_props = list(filter(lambda x: not np.any([excl in x for excl in ['@', 'delay', 'afferent', 'efferent', 'spine_length']]), edges.property_names))
+    else:
+        syn_props = list(sel_props)
+        syn_props_check = np.array([prop in edges.property_names for prop in syn_props])
+        if len(syn_props_check) > 0:
+            log.log_assert(np.all(syn_props_check), f'Selected synapse properties not found: {np.array(syn_props)[~syn_props_check]}')
 
-    log.info(f'Estimating statistics for {len(syn_props)} properties between {len(m_types[0])}x{len(m_types[1])} m-types')
+    log.info(f'Estimating statistics for {len(syn_props)} properties (plus #synapses/connection) between {len(m_types[0])}x{len(m_types[1])} m-types (min_sample_size_per_group={min_sample_size_per_group}, max_sample_size_per_group={max_sample_size_per_group})')
 
     # Statistics for #syn/conn
     syns_per_conn_data = {'mean': np.full((len(m_types[0]), len(m_types[1])), np.nan),
@@ -153,7 +161,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
 
     # Create model properties dictionary
     prop_model_dict = {}
-    for pidx, prop in enumerate(syn_props + ['n_syn_per_conn']):
+    for pidx, prop in enumerate(syn_props + [model_types.N_SYN_PER_CONN_NAME]):
         prop_model_dict[prop] = {}
         if not prop in distr_types:
             log.warning(f'No distribution type for "{prop}" specified - Using "normal"!')
@@ -166,7 +174,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
             for tidx, tgt in enumerate(m_types[1]):
                 attr_dict = {'type': distr_type}
                 distr_attr = DISTRIBUTION_ATTRIBUTES[distr_type]
-                if prop == 'n_syn_per_conn':
+                if prop == model_types.N_SYN_PER_CONN_NAME:
                     attr_dict.update({attr: syns_per_conn_model[attr][sidx, tidx] for attr in distr_attr})
                 else:
                     if np.any(conn_prop_model['std-within'][sidx, tidx, pidx] > 0.0):
@@ -191,7 +199,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
 def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, hist_bins, **_):
     """Visualize data vs. model."""
     model_params = model.get_param_dict()
-    prop_names = syn_props + ['n_syn_per_conn']
+    prop_names = syn_props + [model_types.N_SYN_PER_CONN_NAME]
 
     # Plot data vs. model: property maps
     title_str = ['Data', 'Model']

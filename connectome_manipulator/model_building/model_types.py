@@ -17,6 +17,8 @@ from connectome_manipulator import log
 P_TH_ABS = 0.01 # Absolute probability threshold
 P_TH_REL = 0.1 # Relative probability threshold
 
+N_SYN_PER_CONN_NAME = 'n_syn_per_conn'
+
 
 class AbstractModel(metaclass=ABCMeta):
     """Abstract base class for different types of models."""
@@ -299,7 +301,7 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!')
         self.prop_stats = dict_conv(self.prop_stats) # Convert dict to basic data types
         self.prop_names = self.prop_stats.keys()
-        log.log_assert('n_syn_per_conn' in self.prop_names, 'ERROR: "n_syn_per_conn" missing')
+        log.log_assert(N_SYN_PER_CONN_NAME in self.prop_names, f'ERROR: "{N_SYN_PER_CONN_NAME}" missing')
         log.log_assert(np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!')
         log.log_assert(np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!')
         log.log_assert(np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!')
@@ -348,7 +350,8 @@ class ConnPropsModel(AbstractModel):
         return drawn_values
 
     def draw(self, prop_name, src_type, tgt_type, size=1):
-        """Draw value(s) for given property name of a single connection"""
+        """Draw value(s) for given property name of a single connection
+           (or multiple connections, if prop_name==N_SYN_PER_CONN_NAME)"""
         stats_dict = self.prop_stats.get(prop_name)
 
         distr_type = stats_dict[src_type][tgt_type].get('type')
@@ -358,11 +361,14 @@ class ConnPropsModel(AbstractModel):
         min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
         max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
 
-        conn_mean = self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, 1) # Draw connection mean
-        if std_within > 0.0 and size > 0:
-            drawn_values = self.draw_from_distribution(distr_type, conn_mean, std_within, min_val, max_val, size) # Draw property values for synapses within connection
+        if prop_name == N_SYN_PER_CONN_NAME: # Draw <size> N_SYN_PER_CONN_NAME value(s)
+            drawn_values = np.maximum(np.round(self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, size)).astype(int), 1) # At least one synapse/connection, otherwise no connection!!
         else:
-            drawn_values = np.full(size, conn_mean) # No within-connection variability
+            conn_mean = self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, 1) # Draw connection mean
+            if std_within > 0.0 and size > 0:
+                drawn_values = self.draw_from_distribution(distr_type, conn_mean, std_within, min_val, max_val, size) # Draw property values for synapses within connection
+            else:
+                drawn_values = np.full(size, conn_mean) # No within-connection variability
 
         # Apply upper/lower bounds (optional)
         lower_bound = stats_dict[src_type][tgt_type].get('lower_bound')
@@ -384,8 +390,8 @@ class ConnPropsModel(AbstractModel):
 
     def get_model_output(self, **kwargs):
         """Draw property values for one connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
-        syn_props = [p for p in self.prop_names if p != 'n_syn_per_conn']
-        n_syn = self.draw('n_syn_per_conn', kwargs['src_type'], kwargs['tgt_type'], 1)[0]
+        syn_props = [p for p in self.prop_names if p != N_SYN_PER_CONN_NAME]
+        n_syn = self.draw(N_SYN_PER_CONN_NAME, kwargs['src_type'], kwargs['tgt_type'], 1)[0]
 
         df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
         for p in syn_props:
