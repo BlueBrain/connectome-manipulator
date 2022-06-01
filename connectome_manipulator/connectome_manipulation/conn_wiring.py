@@ -60,7 +60,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     src_class = nodes[0].get(src_node_ids, properties='synapse_class')
     src_mtypes = nodes[0].get(src_node_ids, properties='mtype').to_numpy()
     log.log_assert(len(src_node_ids) > 0, f'No source nodes selected!')
-    src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)    
+    src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
     
     tgt_node_ids = get_node_ids(nodes[1], sel_dest)
     num_tgt_total = len(tgt_node_ids)
@@ -131,9 +131,8 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
 
         # Assign distance-dependent delays, based on (generative) delay model (optional)
         if d_model is not None:
-            # Determine distance from source neurons (soma) to synapse positions on target neuron
             src_new_pos = nodes[0].positions(src_new).to_numpy()
-            syn_dist = np.sqrt(np.sum((pos_sel - src_new_pos[syn_conn_idx, :])**2, 1))
+            syn_dist = np.sqrt(np.sum((pos_sel - src_new_pos[syn_conn_idx, :])**2, 1)) # Distance from source neurons (soma) to synapse positions on target neuron
             new_edges['delay'] = d_model.apply(distance=syn_dist)
 
         # Add new_edges to edges table

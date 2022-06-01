@@ -1,20 +1,19 @@
-'''TODO: improve description'''
-# Connectome manipulation function
-#
-# Definition of apply(edges_table, nodes, ...):
-# - The first three parameters are always: edges_table, nodes, aux_dict
-# - aux_dict contains information about data splits; may also be used to pass global information from one split iteration to another
-# - Other parameters may be added (optional)
-# - Returns a manipulated edged_table
+"""
+Manipulation name: conn_rewiring
+Description: Rewiring of existing connectome, based on a given model of connection probability.
+             Optionally, number of ingoing connections (and #synapses/connection) can be kept the same
+             by re-using existing synapses. Otherwise, existing synapses may be deleted or new ones
+             created, based on the selected generation method (Only "duplicate_sample" supported so far!).
+"""
 
-import os.path
+import os
 import pickle
 
 import numpy as np
 from scipy.stats import truncnorm
 
 from connectome_manipulator import log
-from connectome_manipulator.model_building import conn_prob, model_building
+from connectome_manipulator.model_building import model_types, conn_prob
 from connectome_manipulator.access_functions import get_node_ids
 
 
@@ -35,47 +34,23 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     # Load connection probability model
     log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
     log.info(f'Loading conn. prob. model from {prob_model_file}')
-    with open(prob_model_file, 'rb') as f:
-        prob_model_dict = pickle.load(f)
-    p_model = model_building.get_model(prob_model_dict['model'], prob_model_dict['model_inputs'], prob_model_dict['model_params'])
-
-    if len(prob_model_dict['model_inputs']) == 0:
-        model_order = 1 # Constant conn. prob. (no inputs)
-    elif len(prob_model_dict['model_inputs']) == 1:
-        model_order = 2 # Distance-dependent conn. prob. (1 input: distance)
-    elif len(prob_model_dict['model_inputs']) == 2:
-        model_order = 3 # Bipolar distance-dependent conn. prob. (2 inputs: distance, z offset)
-    elif len(prob_model_dict['model_inputs']) == 3:
-        model_order = 4 # Offset-dependent conn. prob. (3 inputs: x/y/z offsets)
-    elif len(prob_model_dict['model_inputs']) == 6:
-        model_order = 5 # Position-dependent conn. prob. (6 inputs: x/y/z positions, x/y/z offsets)
-    else:
-        log.log_assert(False, 'Model order could not be determined!')
-    log.info(f'Model order {model_order} detected')
+    p_model = model_types.AbstractModel.model_from_file(prob_model_file)
+    log.log_assert(p_model.input_names == ['src_pos', 'tgt_pos'], 'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!')
+    log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
     # Load delay model (optional)
     if delay_model_file is not None:
         log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
         log.info(f'Loading delay model from {delay_model_file}')
-        with open(delay_model_file, 'rb') as f:
-            delay_model_dict = pickle.load(f)
-        d_model = model_building.get_model(delay_model_dict['model'], delay_model_dict['model_inputs'], delay_model_dict['model_params'])
-        log.log_assert(len(delay_model_dict['model_inputs']) == 2, 'Distance-dependent delay model with two inputs (d, type) expected!')
+        d_model = model_types.AbstractModel.model_from_file(delay_model_file)
+        log.info(f'Loaded delay model of type "{d_model.__class__.__name__}"')
     else:
         d_model = None
         log.info('No delay model provided')
 
     # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
-    if pos_map_file is not None:
-        log.log_assert(model_order >= 2, 'Position mapping only applicable for 2nd-order models and higher!')
-        log.log_assert((nodes[0].name == nodes[1].name) or (nodes[0].ids().min() > nodes[1].ids().max()) or (nodes[0].ids().max() < nodes[1].ids().min()), 'Position mapping only supported for same source/taget node population or non-overlapping id ranges!')
-        log.log_assert(os.path.exists(pos_map_file), 'Position mapping model file not found!')
-        log.info(f'Loading position map from {pos_map_file}')
-        with open(pos_map_file, 'rb') as f:
-            pos_map_dict = pickle.load(f)
-        pos_map = model_building.get_model(pos_map_dict['model'], pos_map_dict['model_inputs'], pos_map_dict['model_params'])
-    else:
-        pos_map = None
+    _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)    
+    if pos_acc is None:
         log.info('No position mapping model provided')
 
     # Determine source/target nodes for rewiring
@@ -87,8 +62,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     syn_sel_idx_src = np.isin(edges_table['@source_node'], src_node_ids)
     log.log_assert(np.all(edges_table.loc[syn_sel_idx_src, 'syn_type_id'] >= 100) if syn_class == 'EXC'
                    else np.all(edges_table.loc[syn_sel_idx_src, 'syn_type_id'] < 100), 'Synapse class error!')
-    if model_order >= 2:
-        src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_map is None else pos_map, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
+    src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
 
     tgt_node_ids = get_node_ids(nodes[1], sel_dest)
     num_tgt_total = len(tgt_node_ids)
@@ -133,29 +107,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
             continue # Nothing to rewire (no synapses on target node)
 
         # Determine conn. prob. of all source nodes to be connected with target node
-        if model_order == 1: # Constant conn. prob. (no inputs)
-            p_src = np.full(len(src_node_ids), p_model())
-        elif model_order == 2: # Distance-dependent conn. prob. (1 input: distance)
-            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-            d = conn_prob.compute_dist_matrix(src_pos, tgt_pos)
-            p_src = p_model(d).flatten()
-        elif model_order == 3: # Bipolar distance-dependent conn. prob. (2 inputs: distance, z offset)
-            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-            d = conn_prob.compute_dist_matrix(src_pos, tgt_pos)
-            bip = conn_prob.compute_bip_matrix(src_pos, tgt_pos)
-            p_src = p_model(d, bip).flatten()
-        elif model_order == 4: # Offset-dependent conn. prob. (3 inputs: x/y/z offsets)
-            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-            dx, dy, dz = conn_prob.compute_offset_matrices(src_pos, tgt_pos)
-            p_src = p_model(dx, dy, dz).flatten()
-        elif model_order == 5: # Position-dependent conn. prob. (6 inputs: x/y/z positions, x/y/z offsets)
-            tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_map is None else pos_map, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-            x, y, z = conn_prob.compute_position_matrices(src_pos, tgt_pos)
-            dx, dy, dz = conn_prob.compute_offset_matrices(src_pos, tgt_pos)
-            p_src = p_model(x, y, z, dx, dy, dz).flatten()
-        else:
-            log.log_assert(False, f'Model order {model_order} not supported!')
-
+        tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_acc is None else pos_acc, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
+        p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten()
         p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
         p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
 
@@ -217,7 +170,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
                     stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
                     stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
 
-                    # Assign new distance-dependent delays (in-place), drawn from truncated normal distribution (optional)
+                    # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
                     if d_model is not None:
                         assign_delays_from_model(d_model, nodes, new_edges, src_gen, syn_conn_idx)
 
@@ -234,7 +187,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
         stats_dict['num_syn_rewired'] = stats_dict.get('num_syn_rewired', []) + [len(src_syn_idx)] # (Synapses)
         stats_dict['num_conn_rewired'] = stats_dict.get('num_conn_rewired', []) + [len(src_new)] # (Connections)
 
-        # Assign new distance-dependent delays (in-place), drawn from truncated normal distribution (optional)
+        # Assign new distance-dependent delays (in-place), based on (generative) delay model (optional)
         if d_model is not None:
             assign_delays_from_model(d_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx)
 
@@ -272,13 +225,8 @@ def assign_delays_from_model(delay_model, nodes, edges_table, src_new, src_syn_i
     syn_pos = edges_table.loc[syn_sel_idx, ['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy() # Synapse position on post-synaptic dendrite
     syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_syn_idx, :])**2, 1))
 
-    # Get model parameters
-    d_mean = delay_model(syn_dist, 'mean')
-    d_std = delay_model(syn_dist, 'std')
-    d_min = delay_model(syn_dist, 'min')
-
-    # Generate model-based delays
-    delay_new = truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
+    # Obtain delay values from (generative) model
+    delay_new = delay_model.apply(distance=syn_dist)
 
     # Assign to edges_table (in-place)
     edges_table.loc[syn_sel_idx, 'delay'] = delay_new
