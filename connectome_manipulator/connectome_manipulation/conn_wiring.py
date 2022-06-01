@@ -1,7 +1,7 @@
 """
 Manipulation name: conn_wiring
-Description: Special case of connectome rewiring, which wires an empty connectome from scratch, or adds
-             connections to an existing connectome (edges table)!
+Description: Special case of connectome rewiring, which wires an empty connectome from scratch, or simply
+             adds connections to an existing connectome (edges table)!
              Only specific properties like source/target node, afferent synapse positions, synapse type
              (INH: 0, EXC: 100), and delay (optional) will be generated.
 """
@@ -23,9 +23,10 @@ from connectome_manipulator.access_functions import get_node_ids
 
 def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, amount_pct=100.0):
     """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
-       => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, axonal delays"""
-    log.log_assert(edges_table.shape[0] == 0, 'Initial connectome must be empty!')
+       => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays"""
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
+    if edges_table.shape[0] > 0:
+        log.warning('Initial connectome not empty! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses.')
 
     # Load connection probability model
     log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
@@ -83,7 +84,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True, extension='h5') # Access function (incl. transformation!), using .h5 format
 
     # Run connection wiring
-    init_edge_count = edges_table.shape[0]
+    all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
@@ -136,16 +137,23 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
             new_edges['delay'] = d_model.apply(distance=syn_dist)
 
         # Add new_edges to edges table
-        edges_table = edges_table.append(new_edges)
+        all_new_edges = all_new_edges.append(new_edges)
 
-    # Re-sort edges table and assign new index
+    # Drop empty columns [OTHERWISE: Problem converting to SONATA]
+    init_prop_count = all_new_edges.shape[1]
+    all_new_edges.dropna(axis=1, inplace=True, how='all') # Drop empty/unused columns
+    unused_props = np.setdiff1d(edges_table.keys(), all_new_edges.keys())
+    edges_table.drop(unused_props, axis=1, inplace=True) # Drop in original table as well, to avoid inconsistencies!
+    final_prop_count = all_new_edges.shape[1]
+
+    # Add new synapses to table, re-sort, and assign new index
+    init_edge_count = edges_table.shape[0]
+    edges_table = edges_table.append(all_new_edges)
     final_edge_count = edges_table.shape[0]
     if final_edge_count > init_edge_count:
         edges_table.sort_values(['@target_node', '@source_node'], inplace=True)
         edges_table.reset_index(inplace=True, drop=True) # [No index offset required when merging files in block-based processing]
-    log.info(f'Generated {final_edge_count - init_edge_count} new synapses')
 
-    # Drop empty columns [OTHERWISE: Problem converting to SONATA]
-    edges_table.dropna(axis=1, inplace=True, how='all')
+    log.info(f'Generated {final_edge_count - init_edge_count} of {edges_table.shape[0]} new synapses with {final_prop_count} properties ({init_prop_count - final_prop_count} removed)')
 
     return edges_table
