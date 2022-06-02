@@ -75,9 +75,9 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     conn_counts = {'min': np.inf, 'max': -np.inf, 'sel': 0} # Count connections for reporting
     pbar = progressbar.ProgressBar()
     for sidx in pbar(range(len(m_types[0]))):
-        sids = src_nodes.ids({'mtype': m_types[0][sidx]})
+        sids = np.intersect1d(src_nodes.ids({'mtype': m_types[0][sidx]}), node_ids_src)
         for tidx in range(len(m_types[1])):
-            tids = tgt_nodes.ids({'mtype': m_types[1][tidx]})
+            tids = np.intersect1d(tgt_nodes.ids({'mtype': m_types[1][tidx]}), node_ids_dest)
             edges_sel = edges.pathway_edges(sids, tids, ['@source_node', '@target_node'] + syn_props)
             if edges_sel.shape[0] == 0: # No synapses between pair of m-types
                 continue
