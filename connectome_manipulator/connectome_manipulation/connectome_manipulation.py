@@ -35,6 +35,8 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
     tgt_nodes = edges.target
+    if src_nodes is not tgt_nodes:
+        log.log_assert(len(np.intersect1d(src_nodes.ids(), tgt_nodes.ids())) == 0, 'Node IDs must be unique across different node populations!')
     nodes = [src_nodes, tgt_nodes]
 
     src_file_idx = np.where(np.array(c.nodes.population_names) == src_nodes.name)[0]

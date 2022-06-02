@@ -21,12 +21,12 @@ from connectome_manipulator.access_functions import get_node_ids
 #   Accept model file name OR model dict for prob_model_file, nsynconn_model_file, delay_model_file
 #   Add model for synapse placement
 
-def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, amount_pct=100.0):
+def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, amount_pct=100.0, morph_ext='swc'):
     """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
        => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays"""
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
     if edges_table.shape[0] > 0:
-        log.warning('Initial connectome not empty! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses.')
+        log.warning(f'Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses.')
 
     # Load connection probability model
     log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
@@ -61,7 +61,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     src_mtypes = nodes[0].get(src_node_ids, properties='mtype').to_numpy()
     log.log_assert(len(src_node_ids) > 0, f'No source nodes selected!')
     src_pos = conn_prob.get_neuron_positions(nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids])[0] # Get neuron positions (incl. position mapping, if provided)
-    
+
     tgt_node_ids = get_node_ids(nodes[1], sel_dest)
     num_tgt_total = len(tgt_node_ids)
     tgt_node_ids = np.intersect1d(tgt_node_ids, aux_dict['split_ids']) # Only select target nodes that are actually in current split of edges_table
@@ -81,7 +81,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     # get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True) # Access function
     morph_dir = nodes[1].config['morphologies_dir']
     tgt_morph = MorphHelper(morph_dir, nodes[1], {'h5v1': os.path.join(morph_dir, 'h5v1'), 'neurolucida-asc': os.path.join(morph_dir, 'ascii')})
-    get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True, extension='h5') # Access function (incl. transformation!), using .h5 format
+    get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True, extension=morph_ext) # Access function (incl. transformation!), using specified format (swc/h5/...)
 
     # Run connection wiring
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
@@ -94,12 +94,14 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
         tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_acc is None else pos_acc, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
         p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten()
         p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
-        p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
+        p_src[src_node_ids == tgt] = 0.0 # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
 
         # Sample new presynaptic neurons from list of source nodes according to conn. prob.
         src_new_sel = np.random.rand(len(src_node_ids)) < p_src
         src_new = src_node_ids[src_new_sel] # New source node IDs per connection
         num_new = len(src_new)
+        if num_new == 0:
+            continue # Nothing to wire
 
         # Sample number of synapses per connection
         num_syn_per_conn = [nsynconn_model.draw(model_types.N_SYN_PER_CONN_NAME, src_type=s, tgt_type=tgt_mtypes[tidx])[0] for s in src_mtypes[src_new_sel]]
@@ -142,7 +144,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     init_prop_count = all_new_edges.shape[1]
     all_new_edges.dropna(axis=1, inplace=True, how='all') # Drop empty/unused columns
     unused_props = np.setdiff1d(edges_table.keys(), all_new_edges.keys())
-    edges_table.drop(unused_props, axis=1, inplace=True) # Drop in original table as well, to avoid inconsistencies!
+    edges_table = edges_table.drop(unused_props, axis=1) # Drop in original table as well, to avoid inconsistencies!
     final_prop_count = all_new_edges.shape[1]
 
     # Add new synapses to table, re-sort, and assign new index
@@ -153,6 +155,6 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
         edges_table.sort_values(['@target_node', '@source_node'], inplace=True)
         edges_table.reset_index(inplace=True, drop=True) # [No index offset required when merging files in block-based processing]
 
-    log.info(f'Generated {final_edge_count - init_edge_count} of {edges_table.shape[0]} new synapses with {final_prop_count} properties ({init_prop_count - final_prop_count} removed)')
+    log.info(f'Generated {final_edge_count - init_edge_count} (of {edges_table.shape[0]}) new synapses with {final_prop_count} properties ({init_prop_count - final_prop_count} removed)')
 
     return edges_table

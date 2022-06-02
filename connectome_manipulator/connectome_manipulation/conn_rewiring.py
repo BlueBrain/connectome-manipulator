@@ -110,7 +110,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
         tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_acc is None else pos_acc, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
         p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten()
         p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
-        p_src[src_node_ids == tgt] = 0.0 # Exclude autapses
+        p_src[src_node_ids == tgt] = 0.0 # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
 
         # Currently existing sources for given target node
         src, src_syn_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)

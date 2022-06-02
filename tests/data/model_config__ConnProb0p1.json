@@ -1,0 +1,10 @@
+{
+  "p_conn": 0.1,
+  "data_keys": [],
+  "model": "ConnProb1stOrderModel",
+  "__version_info__": {
+    "python": "3.7.4 (default, Feb  1 2020, 05:57:20) \n[GCC 8.3.0]",
+    "jsonpickle": "2.1.0",
+    "pandas": "1.2.5"
+  }
+}
