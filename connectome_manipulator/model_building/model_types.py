@@ -300,7 +300,7 @@ class ConnPropsModel(AbstractModel):
         # Check & convert parameters
         log.log_assert(isinstance(self.prop_stats, dict), 'ERROR: "prop_stats" dictionary required!')
         self.prop_stats = dict_conv(self.prop_stats) # Convert dict to basic data types
-        self.prop_names = self.prop_stats.keys()
+        self.prop_names = list(self.prop_stats.keys())
         log.log_assert(N_SYN_PER_CONN_NAME in self.prop_names, f'ERROR: "{N_SYN_PER_CONN_NAME}" missing')
         log.log_assert(np.all([isinstance(self.prop_stats[p], dict) for p in self.prop_names]), 'ERROR: Property statistics dictionary required!')
         log.log_assert(np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!')

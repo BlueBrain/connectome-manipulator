@@ -13,7 +13,7 @@ import progressbar
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
-from connectome_manipulator.access_functions import get_edges_population
+from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
                            'normal': ['mean', 'std'],
@@ -22,12 +22,12 @@ DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
                            'poisson': ['mean']}
 
 # Ideas for improvement:
-#   *Restrict to given node set!!
+#   *Discrete distributions
 #   *Detect actual distributions of synaptic properties (incl. data type!)
 #   *Capture cross-correlations between synaptic properties
 
 
-def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, sel_props=None, **_):
+def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=None, hist_bins=50, sel_props=None, sel_src=None, sel_dest=None, **_):
     """Extract statistics for synaptic properties between samples of neurons for each pair of m-types.
        (sel_props: None to select default properties; if no properties are selected (empty list),
                    only #synapses/connection will be estimated)"""
@@ -39,10 +39,14 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     tgt_nodes = edges.target
     nodes = [src_nodes, tgt_nodes]
 
-    m_types = [sorted(n.property_values('mtype', is_present=True)) for n in nodes]
-    m_type_class = [[nodes[i].get({'mtype': m}, properties='synapse_class').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
-    m_type_layer = [[nodes[i].get({'mtype': m}, properties='layer').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
-    if sel_props is None: # Select all available properties
+    node_ids_src = get_node_ids(src_nodes, sel_src)
+    node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
+    node_ids = [node_ids_src, node_ids_dest]
+
+    m_types = [np.unique(n.get(ids, properties='mtype')).tolist() for n, ids in zip(nodes, node_ids)]
+    m_type_class = [[nodes[i].get(np.intersect1d(nodes[i].ids({'mtype': m}), node_ids[i]), properties='synapse_class').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
+    m_type_layer = [[nodes[i].get(np.intersect1d(nodes[i].ids({'mtype': m}), node_ids[i]), properties='layer').iloc[0] for m in m_types[i]] for i in range(len(nodes))]
+    if sel_props is None: # Select all usable properties
         syn_props = list(filter(lambda x: not np.any([excl in x for excl in ['@', 'delay', 'afferent', 'efferent', 'spine_length']]), edges.property_names))
     else:
         syn_props = list(sel_props)
@@ -199,7 +203,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
 def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, hist_bins, **_):
     """Visualize data vs. model."""
     model_params = model.get_param_dict()
-    prop_names = syn_props + [model_types.N_SYN_PER_CONN_NAME]
+    prop_names = model.get_prop_names()
 
     # Plot data vs. model: property maps
     title_str = ['Data', 'Model']
@@ -209,8 +213,8 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
             for didx, data in enumerate([conn_prop_data[stat_sel][:, :, pidx] if pidx < conn_prop_data[stat_sel].shape[2] else syns_per_conn_data[stat_sel], np.array([[model_params['prop_stats'][p][s][t][stat_sel] for t in m_types[1]] for s in m_types[0]])]):
                 plt.subplot(1, 2, didx + 1)
                 plt.imshow(data, interpolation='nearest', cmap='jet')
-                plt.xticks(range(len(m_types[1])), m_types[0], rotation=90, fontsize=3)
-                plt.yticks(range(len(m_types[1])), m_types[0], rotation=0, fontsize=3)
+                plt.xticks(range(len(m_types[1])), m_types[1], rotation=90, fontsize=3)
+                plt.yticks(range(len(m_types[0])), m_types[0], rotation=0, fontsize=3)
                 plt.colorbar()
                 plt.title(title_str[didx])
             plt.suptitle(f'{p} ({stat_sel})', fontweight='bold')
