@@ -306,7 +306,7 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!')
         log.log_assert(np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!')
         log.log_assert(np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!')
-        required_keys = ['type', 'mean', 'std'] # Required keys to be specified for each distribution
+        required_keys = ['type', 'mean'] # Required keys to be specified for each distribution
         log.log_assert(np.all([[[np.all(np.isin(required_keys, list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {required_keys})!')
 
     def get_prop_names(self):
@@ -356,7 +356,7 @@ class ConnPropsModel(AbstractModel):
 
         distr_type = stats_dict[src_type][tgt_type].get('type')
         mean_val = stats_dict[src_type][tgt_type]['mean']
-        std_val = stats_dict[src_type][tgt_type]['std']
+        std_val = stats_dict[src_type][tgt_type].get('std', 0.0)
         std_within = stats_dict[src_type][tgt_type].get('std-within', 0.0)
         min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
         max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
