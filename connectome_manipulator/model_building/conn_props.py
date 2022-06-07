@@ -209,10 +209,8 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
     title_str = ['Data', 'Model']
     for stat_sel in ['mean', 'std']:
         for pidx, p in enumerate(prop_names):
-            if not stat_sel in model_params['prop_stats'][p][m_types[0][0]][m_types[1][0]]:
-                continue
             plt.figure(figsize=(8, 3), dpi=300)
-            for didx, data in enumerate([conn_prop_data[stat_sel][:, :, pidx] if pidx < conn_prop_data[stat_sel].shape[2] else syns_per_conn_data[stat_sel], np.array([[model_params['prop_stats'][p][s][t][stat_sel] for t in m_types[1]] for s in m_types[0]])]):
+            for didx, data in enumerate([conn_prop_data[stat_sel][:, :, pidx] if pidx < conn_prop_data[stat_sel].shape[2] else syns_per_conn_data[stat_sel], np.array([[model_params['prop_stats'][p][s][t][stat_sel] if stat_sel in model_params['prop_stats'][p][s][t] else np.nan for t in m_types[1]] for s in m_types[0]])]):
                 plt.subplot(1, 2, didx + 1)
                 plt.imshow(data, interpolation='nearest', cmap='jet')
                 plt.xticks(range(len(m_types[1])), m_types[1], rotation=90, fontsize=3)
