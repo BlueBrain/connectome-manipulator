@@ -15,12 +15,6 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
-DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
-                           'normal': ['mean', 'std'],
-                           'truncnorm': ['mean', 'std', 'min', 'max'],
-                           'gamma': ['mean', 'std'],
-                           'poisson': ['mean']}
-
 # Ideas for improvement:
 #   *Discrete distributions
 #   *Detect actual distributions of synaptic properties (incl. data type!)
@@ -170,14 +164,14 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
         if not prop in distr_types:
             log.warning(f'No distribution type for "{prop}" specified - Using "normal"!')
         distr_type = distr_types.get(prop, 'normal')
-        log.log_assert(distr_type in DISTRIBUTION_ATTRIBUTES, f'ERROR: Distribution type "{distr_type}" not supported!')
+        log.log_assert(distr_type in model_types.ConnPropsModel.DISTRIBUTION_ATTRIBUTES, f'ERROR: Distribution type "{distr_type}" not supported!')
         dtype = data_types.get(prop)
         bounds = data_bounds.get(prop)
         for sidx, src in enumerate(m_types[0]):
             prop_model_dict[prop][src] = {}
             for tidx, tgt in enumerate(m_types[1]):
                 attr_dict = {'type': distr_type}
-                distr_attr = DISTRIBUTION_ATTRIBUTES[distr_type]
+                distr_attr = model_types.ConnPropsModel.DISTRIBUTION_ATTRIBUTES[distr_type]
                 if prop == model_types.N_SYN_PER_CONN_NAME:
                     attr_dict.update({attr: syns_per_conn_model[attr][sidx, tidx] for attr in distr_attr})
                 else:

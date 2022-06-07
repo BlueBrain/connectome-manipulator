@@ -271,7 +271,7 @@ class PosMapModel(AbstractModel):
         model_str = model_str +  '  Range: ' + ', '.join([f'{k}: {self.pos_table[k].min():.1f}..{self.pos_table[k].max():.1f}' for k in self.get_coord_names()])
         return model_str
 
-    
+
 class ConnPropsModel(AbstractModel):
     """ Connection/synapse properties model for pairs of m-types [generative model]:
         -Connection/synapse property values drawn from given distributions
@@ -281,6 +281,13 @@ class ConnPropsModel(AbstractModel):
     param_names = ['src_types', 'tgt_types', 'prop_stats']
     data_names = []
     input_names = ['src_type', 'tgt_type']
+
+    # Required attributes for given distributions
+    DISTRIBUTION_ATTRIBUTES = {'constant': ['mean'],
+                               'normal': ['mean', 'std'],
+                               'truncnorm': ['mean', 'std', 'min', 'max'],
+                               'gamma': ['mean', 'std'],
+                               'poisson': ['mean']}
 
     def __init__(self, **kwargs):
         """Model initialization."""
@@ -306,8 +313,8 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(np.all([np.all(np.isin(self.src_types, list(self.prop_stats[p].keys()))) for p in self.prop_names]), 'ERROR: Source type statistics missing!')
         log.log_assert(np.all([[isinstance(self.prop_stats[p][src], dict) for p in self.prop_names] for src in self.src_types]), 'ERROR: Property statistics dictionary required!')
         log.log_assert(np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!')
-        required_keys = ['type', 'mean'] # Required keys to be specified for each distribution
-        log.log_assert(np.all([[[np.all(np.isin(required_keys, list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {required_keys})!')
+        log.log_assert(np.all([[['type' in self.prop_stats[p][src][tgt].keys() for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution type missing!')
+        log.log_assert(np.all([[[np.all(np.isin(self.DISTRIBUTION_ATTRIBUTES[self.prop_stats[p][src][tgt]['type']], list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {self.DISTRIBUTION_ATTRIBUTES})!')
 
     def get_prop_names(self):
         """Return list of connection/synapse property names."""
