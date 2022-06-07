@@ -194,7 +194,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
     return model
 
 
-def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, hist_bins, **_):
+def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, **_):
     """Visualize data vs. model."""
     model_params = model.get_param_dict()
     prop_names = model.get_prop_names()
@@ -232,6 +232,12 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
             data_hist = syns_per_conn_data['hist'][sidx][tidx]
         plt.bar(data_hist[1][:-1], data_hist[0] / np.sum(data_hist[0]), align='edge', width=np.min(np.diff(data_hist[1])), label=f'Data (N={np.max(conn_counts)})')
         model_data = np.hstack([model.draw(prop_name=p, src_type=src, tgt_type=tgt) for n in range(N)])
+        hist_bins = data_hist[1] # Use same model distribution binning as for data
+        bin_size = np.min(np.diff(hist_bins))
+        if min(model_data) < hist_bins[0]: # Extend binning to lower values to cover whole range
+            hist_bins = np.hstack([np.flip(np.arange(hist_bins[0], min(model_data) - bin_size, -bin_size)), hist_bins[1:]])
+        if max(model_data) > hist_bins[-1]: # Extend binning to higher values to cover whole range
+            hist_bins = np.hstack([hist_bins[:-1], np.arange(hist_bins[-1], max(model_data) + bin_size, bin_size)])
         model_hist = np.histogram(model_data, bins=hist_bins)
         plt.step(model_hist[1], np.hstack([model_hist[0][0], model_hist[0]]) / np.sum(model_hist[0]), where='pre', color='tab:orange', label=f'Model (N={N})')
         plt.grid()
