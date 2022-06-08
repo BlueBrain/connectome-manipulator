@@ -7,7 +7,6 @@ Description: Special case of connectome rewiring, which wires an empty connectom
 """
 
 import os
-import pickle
 
 import neurom as nm
 import numpy as np
