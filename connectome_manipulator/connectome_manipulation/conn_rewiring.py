@@ -76,21 +76,11 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     tgt_mtypes = nodes[1].get(tgt_node_ids, properties='mtype').to_numpy()
     tgt_layers = nodes[1].get(tgt_node_ids, properties='layer').to_numpy()
 
-    if gen_method == 'duplicate_sample':
-        if syn_class == 'EXC':
-            syn_sel_idx_type = edges_table['syn_type_id'] >= 100
-        elif syn_class == 'INH':
-            syn_sel_idx_type = edges_table['syn_type_id'] < 100
-        else:
-            log.log_assert(False, f'Synapse class {syn_class} not supported!')
-
     log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
 
     # Run connection rewiring
-    props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-    per_mtype_dict = {} # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
     stats_dict['target_count'] = num_tgt # (Neurons)
     stats_dict['unable_to_rewire_count'] = 0 # (Neurons)
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
@@ -138,46 +128,13 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
                 src_new = src_new[:num_src] # ... and existing connections
 
                 if gen_method == 'duplicate_sample': # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
-                    # Sample #synapses/connection from other existing synapses targetting neurons of the same mtype (or layer) as tgt (incl. tgt)
-                    if tgt_mtypes[tidx] in per_mtype_dict.keys(): # Load from dict, if already exists [optimized for speed]
-                        syn_sel_idx_mtype = per_mtype_dict[tgt_mtypes[tidx]]['syn_sel_idx_mtype']
-                        num_syn_per_conn = per_mtype_dict[tgt_mtypes[tidx]]['num_syn_per_conn']
-                    else: # Otherwise compute
-                        syn_sel_idx_mtype = np.logical_and(syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_mtypes == tgt_mtypes[tidx]]))
-                        if np.sum(syn_sel_idx_mtype) == 0: # Ignore m-type, consider matching layer
-                            syn_sel_idx_mtype = np.logical_and(syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_layers == tgt_layers[tidx]]))
-                        log.log_assert(np.sum(syn_sel_idx_mtype) > 0, f'No synapses to sample connection property values for target neuron {tgt} from!')
-                        _, num_syn_per_conn = np.unique(edges_table[syn_sel_idx_mtype][['@source_node', '@target_node']], axis=0, return_counts=True)
-                        per_mtype_dict[tgt_mtypes[tidx]] = {'syn_sel_idx_mtype': syn_sel_idx_mtype, 'num_syn_per_conn': num_syn_per_conn}
-                    num_syn_per_conn = num_syn_per_conn[np.random.choice(len(num_syn_per_conn), num_gen_conn)] # Sample #synapses/connection
-                    syn_conn_idx = np.concatenate([[i] * n for i, n in enumerate(num_syn_per_conn)]) # Create mapping from synapses to connections
-                    num_gen_syn = len(syn_conn_idx) # Number of synapses to generate
-
-                    # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-                    if num_sel > 0: # Duplicate only synapses of syn_class type
-                        sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-                    else: # Include all synapses, if no synapses of syn_class type are available
-                        sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-                    new_edges = edges_table.iloc[sel_dupl].copy()
-
-                    # Sample (non-morphology-related) property values independently from other existing synapses targetting neurons of the same mtype as tgt (incl. tgt)
-                    # => Assume identical (non-morphology-related) property values for synapses belonging to same connection (incl. delay)!!
-                    for p in props_sel:
-                        new_edges[p] = edges_table.loc[syn_sel_idx_mtype, p].sample(num_gen_conn, replace=True).to_numpy()[syn_conn_idx]
-
-                    # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
-                    new_edges['@source_node'] = src_gen[syn_conn_idx]
-                    stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
-                    stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
-
-                    # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
-                    if d_model is not None:
-                        assign_delays_from_model(d_model, nodes, new_edges, src_gen, syn_conn_idx)
-
-                    # Add new_edges to global new edges table [ignoring duplicate indices]
-                    all_new_edges = all_new_edges.append(new_edges)
+                    new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, tgt_mtypes, syn_class, stats_dict, d_model)
                 else:
                     log.log_assert(False, f'Generation method {gen_method} unknown!')
+
+                # Add new_edges to global new edges table [ignoring duplicate indices]
+                all_new_edges = all_new_edges.append(new_edges)
+
             else: # num_src == num_new
                 # Exact match: nothing to add, nothing to delete
                 pass
@@ -208,6 +165,66 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, sel_src=None
     log.info('STATISTICS:\n%s', '\n'.join(stat_str))
 
     return edges_table
+
+def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, tgt_mtypes, syn_class, stats_dict, d_model=None):
+    """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_node_ids[tidx]>, by duplicating existing
+       synapse position & sampling (non-morphology-related) property values independently from existing synapses."""
+    # Init static variables (function attributes) related to this method which should only be initialized once [for better performance]
+    if not hasattr(duplicate_sample_synapses, 'per_mtype_dict'):
+        duplicate_sample_synapses.per_mtype_dict = {} # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
+
+    if not hasattr(duplicate_sample_synapses, 'props_sel'):
+        duplicate_sample_synapses.props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
+
+    if not hasattr(duplicate_sample_synapses, 'syn_sel_idx_type'):
+        if syn_class == 'EXC':
+            duplicate_sample_synapses.syn_sel_idx_type = edges_table['syn_type_id'] >= 100
+        elif syn_class == 'INH':
+            duplicate_sample_synapses.syn_sel_idx_type = edges_table['syn_type_id'] < 100
+        else:
+            log.log_assert(False, f'Synapse class {syn_class} not supported!')
+
+    # Sample #synapses/connection from other existing synapses targetting neurons of the same mtype (or layer) as tgt (incl. tgt)
+    tgt = tgt_node_ids[tidx]
+    tgt_mtype = tgt_mtypes[tidx]
+    num_gen_conn = len(src_gen)
+    if tgt_mtype in duplicate_sample_synapses.per_mtype_dict.keys(): # Load from dict, if already exists [optimized for speed]
+        syn_sel_idx_mtype = duplicate_sample_synapses.per_mtype_dict[tgt_mtype]['syn_sel_idx_mtype']
+        num_syn_per_conn = duplicate_sample_synapses.per_mtype_dict[tgt_mtype]['num_syn_per_conn']
+    else: # Otherwise compute
+        syn_sel_idx_mtype = np.logical_and(duplicate_sample_synapses.syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_mtypes == tgt_mtype]))
+        if np.sum(syn_sel_idx_mtype) == 0: # Ignore m-type, consider matching layer
+            syn_sel_idx_mtype = np.logical_and(duplicate_sample_synapses.syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_layers == tgt_layers[tidx]]))
+        log.log_assert(np.sum(syn_sel_idx_mtype) > 0, f'No synapses to sample connection property values for target neuron {tgt} from!')
+        _, num_syn_per_conn = np.unique(edges_table[syn_sel_idx_mtype][['@source_node', '@target_node']], axis=0, return_counts=True)
+        duplicate_sample_synapses.per_mtype_dict[tgt_mtype] = {'syn_sel_idx_mtype': syn_sel_idx_mtype, 'num_syn_per_conn': num_syn_per_conn}
+    num_syn_per_conn = num_syn_per_conn[np.random.choice(len(num_syn_per_conn), num_gen_conn)] # Sample #synapses/connection
+    syn_conn_idx = np.concatenate([[i] * n for i, n in enumerate(num_syn_per_conn)]) # Create mapping from synapses to connections
+    num_gen_syn = len(syn_conn_idx) # Number of synapses to generate
+
+    # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
+    num_sel = np.sum(syn_sel_idx)
+    if num_sel > 0: # Duplicate only synapses of syn_class type
+        sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+    else: # Include all synapses, if no synapses of syn_class type are available
+        sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+    new_edges = edges_table.iloc[sel_dupl].copy()
+
+    # Sample (non-morphology-related) property values independently from other existing synapses targetting neurons of the same mtype as tgt (incl. tgt)
+    # => Assume identical (non-morphology-related) property values for synapses belonging to same connection (incl. delay, but this will (optionally) be re-assigned)!!
+    for p in duplicate_sample_synapses.props_sel:
+        new_edges[p] = edges_table.loc[syn_sel_idx_mtype, p].sample(num_gen_conn, replace=True).to_numpy()[syn_conn_idx]
+
+    # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
+    new_edges['@source_node'] = src_gen[syn_conn_idx]
+    stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
+    stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
+
+    # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
+    if d_model is not None:
+        assign_delays_from_model(d_model, nodes, new_edges, src_gen, syn_conn_idx)
+
+    return new_edges
 
 
 def assign_delays_from_model(delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx=None):
