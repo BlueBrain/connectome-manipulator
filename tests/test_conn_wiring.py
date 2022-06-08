@@ -10,14 +10,14 @@ import connectome_manipulator.connectome_manipulation.conn_wiring as test_module
 
 
 def test_apply():
-    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    c = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]
     node_ids = [n.ids() for n in nodes]
     edges_table = edges.afferent_edges(node_ids[1], properties=edges.property_names)
 
     aux_dict = {'split_ids': node_ids[1]}
-    prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p1.json')
+    prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p0.json')
     nsynconn_model_file = os.path.join(TEST_DATA_DIR, 'model_config__NSynPerConn2.json')
     pct = 100.0
     # np.random.seed(0)
@@ -26,5 +26,10 @@ def test_apply():
     assert False, 'NYI'
     # TODO: Check if existing synapses unchanged
     #       Check if number of new synapses valid
-    #       Check if new synapse properties valid
-    #       Test with different sets of input parameters
+    #       Check if new synapse property values valid
+    #       Check if required properties are returned
+    #       Test with different sets of input parameters:
+    #         *Full/empty edges table: edges_table = edges_table.loc[[]]
+    #         *p = 0.0/0.1/1.0
+    #         *pct = 0/50/100
+    #         *...

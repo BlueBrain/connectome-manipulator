@@ -44,10 +44,10 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     if delay_model_file is not None:
         log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
         log.info(f'Loading delay model from {delay_model_file}')
-        d_model = model_types.AbstractModel.model_from_file(delay_model_file)
-        log.info(f'Loaded delay model of type "{d_model.__class__.__name__}"')
+        delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
+        log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
     else:
-        d_model = None
+        delay_model = None
         log.info('No delay model provided')
 
     # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
@@ -132,17 +132,18 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
         new_edges['syn_type_id'] = syn_type
 
         # Assign distance-dependent delays, based on (generative) delay model (optional)
-        if d_model is not None:
+        if delay_model is not None:
             src_new_pos = nodes[0].positions(src_new).to_numpy()
             syn_dist = np.sqrt(np.sum((pos_sel - src_new_pos[syn_conn_idx, :])**2, 1)) # Distance from source neurons (soma) to synapse positions on target neuron
-            new_edges['delay'] = d_model.apply(distance=syn_dist)
+            new_edges['delay'] = delay_model.apply(distance=syn_dist)
 
         # Add new_edges to edges table
         all_new_edges = all_new_edges.append(new_edges)
 
-    # Drop empty columns [OTHERWISE: Problem converting to SONATA]
+    # Drop empty (NaN) columns [OTHERWISE: Problem converting to SONATA]
     init_prop_count = all_new_edges.shape[1]
-    all_new_edges.dropna(axis=1, inplace=True, how='all') # Drop empty/unused columns
+    if all_new_edges.shape[0] > 0:
+        all_new_edges.dropna(axis=1, inplace=True, how='all') # Drop empty/unused columns
     unused_props = np.setdiff1d(edges_table.keys(), all_new_edges.keys())
     edges_table = edges_table.drop(unused_props, axis=1) # Drop in original table as well, to avoid inconsistencies!
     final_prop_count = all_new_edges.shape[1]
