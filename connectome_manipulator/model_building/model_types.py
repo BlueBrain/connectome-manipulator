@@ -205,7 +205,7 @@ class LinDelayModel(AbstractModel):
 
         # Check paramters
         log.log_assert(hasattr(self.delay_mean_coefs, '__iter__') and len(self.delay_mean_coefs) == 2, 'ERROR: Two mean coefficients required for linear delay model!')
-        log.log_assert(self.delay_std > 0.0, 'ERROR: Delay std must be larger than zero!')
+        log.log_assert(self.delay_std >= 0.0, 'ERROR: Delay std must be larger than zero!')
         log.log_assert(self.delay_min >= 0.0, 'ERROR: Delay min cannot be negative!')
 
     def get_mean(self, distance):

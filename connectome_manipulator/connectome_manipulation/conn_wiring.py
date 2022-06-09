@@ -67,7 +67,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
     if np.sum(tgt_sel) == 0: # Nothing to wire
-        logging.info('No target nodes selected, nothing to wire')
+        log.info('No target nodes selected, nothing to wire')
         return edges_table
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
     tgt_mtypes = nodes[1].get(tgt_node_ids, properties='mtype').to_numpy()
@@ -84,7 +84,7 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
 
     # Run connection wiring
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-    progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
+    progress_pct = np.maximum(0, np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int))
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
             print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
