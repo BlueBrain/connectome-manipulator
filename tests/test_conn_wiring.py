@@ -88,7 +88,16 @@ def test_apply():
         res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct.tolist(), prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
         assert res.shape[0] == (len(src_ids) * len(tgt_ids) * pct / 100 - len(np.intersect1d(src_ids, tgt_ids)) * pct / 100) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
 
-    # Case 4: Check delays (from PRE neuron (soma) to POST synapse position)
+    # Case 4: Check src/tgt_sel
+    for src_class in ['EXC', 'INH']:
+        for tgt_class in ['EXC', 'INH']:
+            sel_src = {'synapse_class': src_class}
+            sel_dest = {'synapse_class': tgt_class}
+            res = test_module.apply(edges_table_empty, nodes, aux_dict, sel_src=sel_src, sel_dest=sel_dest, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
+            assert np.all(np.isin(res['@source_node'], nodes[0].ids(sel_src))), 'ERROR: Source selection error!'
+            assert np.all(np.isin(res['@target_node'], nodes[0].ids(sel_dest))), 'ERROR: Target selection error!'
+
+    # Case 5: Check delays (from PRE neuron (soma) to POST synapse position)
     pct = 100.0
     res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file, delay_model_file=delay_model_file)
     for i in range(res.shape[0]):
@@ -99,7 +108,7 @@ def test_apply():
         delay = delay_scale * dist + delay_offset
         assert np.isclose(res.iloc[i]['delay'], delay), 'ERROR: Delay mismatch!'
 
-    # Case 5: Check connectivity with conn. prob. p=0.1
+    # Case 6: Check connectivity with conn. prob. p=0.1
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p1.json')
     np.random.seed(0)
     syn_counts = []
