@@ -225,7 +225,10 @@ class LinDelayModel(AbstractModel):
         d_mean = self.get_mean(np.array(kwargs['distance']))
         d_std = self.get_std(np.array(kwargs['distance']))
         d_min = self.get_min(np.array(kwargs['distance']))
-        return truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
+        if np.all(d_std > 0.0):
+            return truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
+        else:
+            return np.maximum(d_mean, d_min) # Deterministic
 
     def get_model_str(self):
         """Return model string describing the model."""

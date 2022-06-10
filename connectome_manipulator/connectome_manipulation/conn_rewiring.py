@@ -118,6 +118,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         # Sample new presynaptic neurons from list of source nodes according to conn. prob.
         if keep_indegree: # Keep the same number of ingoing connections (and #synapses/connection)
             log.log_assert(len(src_node_ids) >= num_src, f'Not enough source neurons for target neuron {tgt} available for rewiring!')
+            log.log_assert(np.sum(p_src) > 0.0, f'Keeping indegree not possible since connection probability zero!')
             src_new = np.random.choice(src_node_ids, size=num_src, replace=False, p=p_src / np.sum(p_src)) # New source node IDs per connection
         else: # Number of ingoing connections (and #synapses/connection) NOT kept the same
             src_new_sel = np.random.rand(len(src_node_ids)) < p_src
