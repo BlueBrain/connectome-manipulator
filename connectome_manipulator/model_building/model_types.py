@@ -518,7 +518,7 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
-        if np.all(np.isnan([getattr(self, p) for p in self.param_names])):
+        if np.all(np.isnan([getattr(self, p) for p in np.setdiff1d(self.param_names, 'bip_coord')])):
             log.warning('Empty/invalid model!')
         else:
             log.log_assert(0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
