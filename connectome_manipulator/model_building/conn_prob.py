@@ -356,24 +356,29 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_dist': p_conn_dist, 'count_conn': count_conn, 'count_all': count_all, 'dist_bins': dist_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_2nd_order(p_conn_dist, dist_bins, rel_err_th=None, **_):
+def build_2nd_order(p_conn_dist, dist_bins, rel_fit_err_th=None, strict_fit=False, **_):
     """Build 2nd order model (exponential distance-dependent conn. prob.)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
 
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
     X = dist_bins[:-1][np.isfinite(p_conn_dist)] + bin_offset
     y = p_conn_dist[np.isfinite(p_conn_dist)]
-    try:
-        (a_opt, b_opt), pcov = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
-        assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
-        assert b_opt >= 0.0, '"Exponent" must be non-negative!'
-        rel_err = np.sqrt(np.diag(pcov)) / np.array([a_opt, b_opt]) # Rel. standard error of the coefficients
-        log.info(f'Rel. error of 2nd-order model fit: {rel_err}')
-        if rel_err_th is not None:
-            assert max(rel_err) <= rel_err_th, f'Rel. error of model fit exceeds error threshold of {rel_err_th}!'
-    except Exception as e:
-        log.warning(e)
-        (a_opt, b_opt) = (np.nan, np.nan)
+    if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+        a_opt = b_opt = 0.0
+    else:
+        try:
+            (a_opt, b_opt), pcov = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
+            assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
+            assert b_opt >= 0.0, '"Exponent" must be non-negative!'
+            rel_err = np.sqrt(np.diag(pcov)) / np.array([a_opt, b_opt]) # Rel. standard error of the coefficients
+            log.info(f'Rel. error of 2nd-order model fit: {rel_err}')
+            if rel_fit_err_th is not None:
+                assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+            if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                assert np.isfinite(p_conn_dist[0]), 'Strict fit violation: Lowest-distance bin empty!'
+        except Exception as e:
+            log.warning(e)
+            (a_opt, b_opt) = (np.nan, np.nan)
 
     # Create model
     model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
@@ -482,7 +487,7 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_dist_bip': p_conn_dist_bip, 'dist_bins': dist_bins, 'bip_bins': bip_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_3rd_order(p_conn_dist_bip, dist_bins, rel_err_th=None, **_):
+def build_3rd_order(p_conn_dist_bip, dist_bins, rel_fit_err_th=None, strict_fit=False, **_):
     """Build 3rd order model (bipolar exp. distance-dependent conn. prob.)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
 
@@ -490,19 +495,25 @@ def build_3rd_order(p_conn_dist_bip, dist_bins, rel_err_th=None, **_):
     y = p_conn_dist_bip[np.all(np.isfinite(p_conn_dist_bip), 1), :]
 
     exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
-    try:
-        (aN_opt, bN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
-        (aP_opt, bP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
-        assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, '"Scale" must be between 0 and 1!'
-        assert bN_opt >= 0.0 and bP_opt >= 0.0, '"Exponent" must not be negative!'
-        rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array([aN_opt, bN_opt, aP_opt, bP_opt]) # Rel. standard error of the coefficients
-        log.info(f'Rel. error of 3rd-order model fit: {rel_err}')
-        if rel_err_th is not None:
-            assert max(rel_err) <= rel_err_th, f'Rel. error of model fit exceeds error threshold of {rel_err_th}!'
-    except Exception as e:
-        log.warning(e)
-        (aN_opt, bN_opt) = (np.nan, np.nan)
-        (aP_opt, bP_opt) = (np.nan, np.nan)
+    if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+        aN_opt = bN_opt = 0.0
+        aP_opt = bP_opt = 0.0
+    else:
+        try:
+            (aN_opt, bN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
+            (aP_opt, bP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
+            assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, '"Scale" must be between 0 and 1!'
+            assert bN_opt >= 0.0 and bP_opt >= 0.0, '"Exponent" must not be negative!'
+            rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array([aN_opt, bN_opt, aP_opt, bP_opt]) # Rel. standard error of the coefficients
+            log.info(f'Rel. error of 3rd-order model fit: {rel_err}')
+            if rel_fit_err_th is not None:
+                assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+            if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                assert np.all(np.isfinite(p_conn_dist_bip[0, :])), 'Strict fit violation: Lowest-distance bin empty!'
+        except Exception as e:
+            log.warning(e)
+            (aN_opt, bN_opt) = (np.nan, np.nan)
+            (aP_opt, bP_opt) = (np.nan, np.nan)
 
     # Create model
     model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
