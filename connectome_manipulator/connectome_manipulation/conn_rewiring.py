@@ -81,7 +81,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
     if np.sum(tgt_sel) == 0: # Nothing to rewire
-        logging.info('No target nodes selected, nothing to rewire')
+        log.info('No target nodes selected, nothing to rewire')
         return edges_table
     tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
 
