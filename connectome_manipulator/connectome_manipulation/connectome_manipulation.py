@@ -416,7 +416,6 @@ def main_wrapper():
 
     # Parse inputs
     args = sys.argv[1:]
-    print(len(args))
     if len(args) < 1:
         print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet]')
         sys.exit(2)

@@ -285,7 +285,6 @@ def main_wrapper():
 
     # Parse inputs
     args = sys.argv[1:]
-    print(len(args))
     if len(args) < 1:
         print(f'Usage: {__file__} <model_config.json> [force_reextract] [force_rebuild]')
         sys.exit(2)
