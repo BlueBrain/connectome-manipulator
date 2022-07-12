@@ -345,15 +345,24 @@ class ConnPropsModel(AbstractModel):
             drawn_values = np.random.normal(loc=distr_mean, scale=distr_std, size=size)
         elif distr_type == 'truncnorm':
             log.log_assert(distr_mean is not None and distr_std is not None and distr_min is not None and distr_max is not None, 'ERROR: Distribution missing (required: mean/std/min/max)!')
-            drawn_values = truncnorm(a=(distr_min - distr_mean) / distr_std,
-                                     b=(distr_max - distr_mean) / distr_std,
-                                     loc=distr_mean, scale=distr_std).rvs(size=size)
+            log.log_assert(distr_min <= distr_max, 'ERROR: Range error (truncnorm)!')
+            if distr_std > 0.0:
+                drawn_values = truncnorm(a=(distr_min - distr_mean) / distr_std,
+                                         b=(distr_max - distr_mean) / distr_std,
+                                         loc=distr_mean, scale=distr_std).rvs(size=size)
+            else:
+                drawn_values = np.minimum(np.maximum(np.full(size, distr_mean), distr_min), distr_max)
         elif distr_type == 'gamma':
             log.log_assert(distr_mean is not None and distr_std is not None, 'ERROR: Distribution parameter missing (required: mean/std)!')
-            drawn_values = np.random.gamma(shape=distr_mean**2 / distr_std**2,
-                                           scale=distr_std**2 / distr_mean, size=size)
+            log.log_assert(distr_mean > 0.0 and distr_std >= 0.0, 'ERROR: Range error (gamma)!')
+            if distr_std > 0.0:
+                drawn_values = np.random.gamma(shape=distr_mean**2 / distr_std**2,
+                                               scale=distr_std**2 / distr_mean, size=size)
+            else:
+                drawn_values = np.full(size, distr_mean)
         elif distr_type == 'poisson':
             log.log_assert(distr_mean is not None, 'ERROR: Distribution parameter missing (required: mean)!')
+            log.log_assert(distr_mean >= 0.0, 'ERROR: Range error (poisson)!')
             drawn_values = np.random.poisson(lam=distr_mean, size=size)
         else:
             log.log_assert(False, f'ERROR: Distribution type "{distr_type}" not supported!')
