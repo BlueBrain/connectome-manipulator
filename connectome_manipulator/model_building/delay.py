@@ -19,7 +19,7 @@ from connectome_manipulator.access_functions import get_node_ids, get_edges_popu
 
 def extract(circuit, bin_size_um, max_range_um=None, sel_src=None, sel_dest=None, sample_size=None, **_):
     """Extract distance-dependent synaptic delays between samples of neurons."""
-    # Select edge population [assuming exactly one edge population in given edges file]
+    # Select edge population
     edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations

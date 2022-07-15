@@ -33,7 +33,7 @@ def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwa
     """Extract connection probability between samples of neurons."""
     log.info(f'Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)...')
 
-    # Select edge population [assuming exactly one edge population in given edges file]
+    # Select edge population
     edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
@@ -1401,7 +1401,7 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
         # (Data)
         log.log_assert(dr_bins[0] == 0, 'ERROR: Radial bin range error!')
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 1)
-        plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=p_max)
+        plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max == 0.0 else p_max)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
         plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
         plt.gca().invert_yaxis()
@@ -1413,7 +1413,7 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
 
         # (Model)
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 2)
-        plt.imshow(np.hstack([np.squeeze(model_val[zidx, ::-1, :]).T, np.squeeze(model_val[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins_model[-1], dr_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0, vmax=p_max_model)
+        plt.imshow(np.hstack([np.squeeze(model_val[zidx, ::-1, :]).T, np.squeeze(model_val[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins_model[-1], dr_bins_model[-1], dz_bins_model[-1], dz_bins_model[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max_model == 0.0 else p_max_model)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
         plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
         plt.gca().invert_yaxis()

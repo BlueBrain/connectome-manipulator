@@ -25,7 +25,7 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
     """Extract statistics for synaptic properties between samples of neurons for each pair of m-types.
        (sel_props: None to select default properties; if no properties are selected (empty list),
                    only #synapses/connection will be estimated)"""
-    # Select edge population [assuming exactly one edge population in given edges file]
+    # Select edge population
     edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
