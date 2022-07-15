@@ -1394,14 +1394,15 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
     model_val = model_val.reshape([len(z_pos_model), len(dr_pos_model), len(dz_pos_model)])
 
     # Connection probability (data vs. model)
-    p_max = np.max(p_conn_position)
-    p_max_model = np.max(model_val)
+    p_max = np.nanmax(p_conn_position)
+    p_max_model = np.nanmax(model_val)
     fig = plt.figure(figsize=(12, 4 * len(z_pos_model)), dpi=300)
     for zidx, zval in enumerate(z_pos_model):
         # (Data)
         log.log_assert(dr_bins[0] == 0, 'ERROR: Radial bin range error!')
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 1)
         plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max == 0.0 else p_max)
+        plt.imshow(), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max == 0.0 else p_max)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
         plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
         plt.gca().invert_yaxis()
