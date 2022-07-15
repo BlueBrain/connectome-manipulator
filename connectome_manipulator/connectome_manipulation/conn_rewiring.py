@@ -26,9 +26,14 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
-    if keep_indegree:
-        log.log_assert(gen_method is None, f'Generation method {gen_method} not compatible with "keep_indegree" option!')
-        log.log_assert(reuse_conns == True, f'"keep_indegree" cannot be used without "reuse_conns" option!')
+#     if keep_indegree:
+#         log.log_assert(gen_method is None, f'Generation method {gen_method} not compatible with "keep_indegree" option!')
+#         log.log_assert(reuse_conns == True, f'"keep_indegree" cannot be used without "reuse_conns" option!')
+#     else:
+#         log.log_assert(gen_method in ['duplicate_sample', 'duplicate_randomize'], 'Valid generation method required (must be "duplicate_sample" or "duplicate_randomize")!')
+
+    if keep_indegree and reuse_conns:
+        log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
     else:
         log.log_assert(gen_method in ['duplicate_sample', 'duplicate_randomize'], 'Valid generation method required (must be "duplicate_sample" or "duplicate_randomize")!')
 
@@ -61,7 +66,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         props_model = model_types.AbstractModel.model_from_file(props_model_file)
         log.info(f'Loaded properties model of type "{props_model.__class__.__name__}"')
     else:
-        log.log_assert(props_model_file is None, f'Properties model not incompatible with generation method "{gen_method}"!')
+        log.log_assert(props_model_file is None, f'Properties model incompatible with generation method "{gen_method}"!')
         props_model = None
 
     # Determine source/target nodes for rewiring
@@ -123,37 +128,37 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         else: # Number of ingoing connections (and #synapses/connection) NOT kept the same
             src_new_sel = np.random.rand(len(src_node_ids)) < p_src
             src_new = src_node_ids[src_new_sel] # New source node IDs per connection
-            num_new = len(src_new)
+        num_new = len(src_new)
 
-            # Re-use (up to) num_src existing connections for rewiring of (up to) num_new new connections (optional)
-            if reuse_conns:
-                num_src_to_reuse = num_src
-                num_new_reused = num_new
+        # Re-use (up to) num_src existing connections for rewiring of (up to) num_new new connections (optional)
+        if reuse_conns:
+            num_src_to_reuse = num_src
+            num_new_reused = num_new
+        else:
+            num_src_to_reuse = 0
+            num_new_reused = 0
+
+        if num_src > num_new_reused: # Delete unused connections/synapses
+            syn_del_idx[syn_sel_idx] = src_syn_idx >= num_new_reused # Set global indices of connections to be deleted
+            syn_sel_idx[syn_del_idx] = False # Remove to-be-deleted indices from selection
+            stats_dict['num_syn_removed'] = stats_dict.get('num_syn_removed', []) + [np.sum(src_syn_idx >= num_new_reused)] # (Synapses)
+            stats_dict['num_conn_removed'] = stats_dict.get('num_conn_removed', []) + [num_src - num_new_reused] # (Connections)
+            src_syn_idx = src_syn_idx[src_syn_idx < num_new_reused]
+
+        if num_src_to_reuse < num_new: # Generate new synapses/connections, if needed
+            num_gen_conn = num_new - num_src_to_reuse # Number of new connections to generate
+            src_gen = src_new[-num_gen_conn:] # Split new sources into ones used for newly generated ...
+            src_new = src_new[:num_src_to_reuse] # ... and existing connections
+
+            if gen_method == 'duplicate_sample': # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
+                new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict)
+            elif gen_method == 'duplicate_randomize': # Duplicate existing synapse position & randomize (non-morphology-related) property values based on pathway-specific model distributions
+                new_edges = duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model, stats_dict)
             else:
-                num_src_to_reuse = 0
-                num_new_reused = 0
+                log.log_assert(False, f'Generation method {gen_method} unknown!')
 
-            if num_src > num_new_reused: # Delete unused connections/synapses
-                syn_del_idx[syn_sel_idx] = src_syn_idx >= num_new_reused # Set global indices of connections to be deleted
-                syn_sel_idx[syn_del_idx] = False # Remove to-be-deleted indices from selection
-                stats_dict['num_syn_removed'] = stats_dict.get('num_syn_removed', []) + [np.sum(src_syn_idx >= num_new_reused)] # (Synapses)
-                stats_dict['num_conn_removed'] = stats_dict.get('num_conn_removed', []) + [num_src - num_new_reused] # (Connections)
-                src_syn_idx = src_syn_idx[src_syn_idx < num_new_reused]
-
-            if num_src_to_reuse < num_new: # Generate new synapses/connections, if needed
-                num_gen_conn = num_new - num_src_to_reuse # Number of new connections to generate
-                src_gen = src_new[-num_gen_conn:] # Split new sources into ones used for newly generated ...
-                src_new = src_new[:num_src_to_reuse] # ... and existing connections
-
-                if gen_method == 'duplicate_sample': # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
-                    new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict)
-                elif gen_method == 'duplicate_randomize': # Duplicate existing synapse position & randomize (non-morphology-related) property values based on pathway-specific model distributions
-                    new_edges = duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model, stats_dict)
-                else:
-                    log.log_assert(False, f'Generation method {gen_method} unknown!')
-
-                # Add new_edges to global new edges table [ignoring duplicate indices]
-                all_new_edges = all_new_edges.append(new_edges)
+            # Add new_edges to global new edges table [ignoring duplicate indices]
+            all_new_edges = all_new_edges.append(new_edges)
 
         # Assign new source nodes = rewiring of existing connections
         edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_syn_idx] # Source node IDs per connection expanded to synapses
