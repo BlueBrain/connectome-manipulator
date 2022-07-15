@@ -1402,7 +1402,6 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
         log.log_assert(dr_bins[0] == 0, 'ERROR: Radial bin range error!')
         plt.subplot(len(z_pos_model), 2, zidx * 2 + 1)
         plt.imshow(np.hstack([np.squeeze(p_conn_position[zidx, ::-1, :]).T, np.squeeze(p_conn_position[zidx, :, :]).T]), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max == 0.0 else p_max)
-        plt.imshow(), interpolation='nearest', extent=(-dr_bins[-1], dr_bins[-1], dz_bins[-1], dz_bins[0]), cmap=HOT, vmin=0.0, vmax=0.1 if p_max == 0.0 else p_max)
         plt.plot(np.zeros(2), plt.ylim(), color='lightgrey', linewidth=0.5)
         plt.text(np.min(plt.xlim()), np.max(plt.ylim()), f'z={zval}um', color='lightgrey', ha='left', va='top')
         plt.gca().invert_yaxis()
