@@ -266,13 +266,34 @@ def duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx,
     syn_conn_idx = np.concatenate([[i] * n for i, n in enumerate(num_syn_per_conn)]) # Create mapping from synapses to connections
     num_gen_syn = len(syn_conn_idx) # Total number of generated synapses
 
+#     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
+#     # => Duplicated synapses may belong to same connection!!
+#     num_sel = np.sum(syn_sel_idx)
+#     if num_sel > 0: # Duplicate only synapses of syn_class type
+#         sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+#     else: # Include all synapses, if no synapses of syn_class type are available
+#         sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+#     new_edges = edges_table.iloc[sel_dupl].copy()
+
     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
+    # => Unique per connection, so that no duplicated synapses belong to same connection!!
     num_sel = np.sum(syn_sel_idx)
-    if num_sel > 0: # Duplicate only synapses of syn_class type
-        sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-    else: # Include all synapses, if no synapses of syn_class type are available
-        sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+    sel_dupl = []
+    conns = np.unique(syn_conn_idx)
+    for cidx in conns:
+        if num_sel > 0: # Duplicate only synapses of syn_class type
+            sel_dupl.append(np.random.choice(np.where(syn_sel_idx)[0], np.sum(syn_conn_idx == cidx), replace=False)) # Random sampling from existing synapses WITHOUT replacement
+        else: # Include all synapses, if no synapses of syn_class type are available
+            sel_dupl.append(np.random.choice(np.where(syn_sel_idx_tgt)[0], np.sum(syn_conn_idx == cidx), replace=False)) # Random sampling from existing synapses WITHOUT replacement
+    sel_dupl = np.hstack(sel_dupl)
+    log.log_assert(len(sel_dupl) == num_gen_syn, 'ERROR: Wrong number of duplicated synapse positions!')
     new_edges = edges_table.iloc[sel_dupl].copy()
+
+    ##### [TESTING] #####
+    # Check if no duplicates per connection
+    for cidx in conns:
+        log.log_assert(np.all(np.unique(sel_dupl[syn_conn_idx == cidx], return_counts=True)[1] == 1), 'ERROR: Duplicated synapse positions within connection!')
+    ##### ######### #####
 
     # Assign new synapse values for non-morphology-related properties
     new_edges[duplicate_randomize_synapses.props_sel] = pd.concat(new_syn_props, ignore_index=True)[duplicate_randomize_synapses.props_sel].to_numpy()
