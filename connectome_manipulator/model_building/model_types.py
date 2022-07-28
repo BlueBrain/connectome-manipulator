@@ -420,9 +420,10 @@ class ConnPropsModel(AbstractModel):
     def get_model_str(self):
         """Return model string describing the model."""
         distr_types = {p: '/'.join(np.unique([[self.prop_stats[p][src][tgt]['type'] for src in self.src_types] for tgt in self.tgt_types])) for p in self.prop_names} # Extract distribution types
+        distr_dtypes = {p: '/'.join(np.unique([[self.prop_stats[p][src][tgt].get('dtype', '') for src in self.src_types] for tgt in self.tgt_types])) for p in self.prop_names} # Extract distribution data types
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  Connection/synapse property distributions between {len(self.src_types)}x{len(self.tgt_types)} M-types:\n'
-        model_str = model_str + '  ' + '; '.join([f'{p} <{distr_types[p]}>' for p in self.prop_names])
+        model_str = model_str + '  ' + '; '.join([f'{p} <{distr_types[p]}' + (f' ({distr_dtypes[p]})' if distr_dtypes[p] else '') + '>' for p in self.prop_names])
         return model_str
 
 
