@@ -1,11 +1,13 @@
-'''TODO: improve description'''
-# Connectome manipulation function
-#
-# Definition of apply(edges_table, nodes, ...):
-# - The first three parameters are always: edges_table, nodes, aux_dict
-# - aux_dict contains information about data splits; may also be used to pass global information from one split iteration to another
-# - Other parameters may be added (optional)
-# - Returns a manipulated edged_table
+"""
+Manipulation name: syn_prop_alteration
+Description: Modification of synaptic property values of a selected set of synapses, as given by
+               - absolute value
+               - relative scaling
+               - shuffling across synapses
+               - random absolute value drawn from given distribution
+               - random relative scaling drawn from given distribution
+               - random additive value drawn from given distribution
+"""
 
 import numpy as np
 

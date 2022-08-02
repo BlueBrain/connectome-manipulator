@@ -92,6 +92,10 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
 
     log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
 
+    # Init/reset static variables (function attributes) related to duplicate_... methods which need only be initialized once [for better performance]
+    duplicate_sample_synapses.reset = True
+    duplicate_randomize_synapses.reset = True
+
     # Run connection rewiring
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
@@ -191,19 +195,16 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
     """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_node_ids[tidx]>, by duplicating existing
        synapse position & sampling (non-morphology-related) property values independently from existing synapses."""
     # Init static variables (function attributes) related to this method which need only be initialized once [for better performance]
-    if not hasattr(duplicate_sample_synapses, 'per_mtype_dict'):
+    if duplicate_sample_synapses.reset:
         duplicate_sample_synapses.per_mtype_dict = {} # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
-
-    if not hasattr(duplicate_sample_synapses, 'props_sel'):
         duplicate_sample_synapses.props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length', 'delay']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
-
-    if not hasattr(duplicate_sample_synapses, 'syn_sel_idx_type'):
         if syn_class == 'EXC':
             duplicate_sample_synapses.syn_sel_idx_type = edges_table['syn_type_id'] >= 100
         elif syn_class == 'INH':
             duplicate_sample_synapses.syn_sel_idx_type = edges_table['syn_type_id'] < 100
         else:
             log.log_assert(False, f'Synapse class {syn_class} not supported!')
+        duplicate_sample_synapses.reset = False
 
     # Sample #synapses/connection from other existing synapses targetting neurons of the same mtype (or layer) as tgt (incl. tgt)
     tgt = tgt_node_ids[tidx]
@@ -218,6 +219,9 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
         syn_sel_idx_mtype = np.logical_and(duplicate_sample_synapses.syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_mtypes == tgt_mtype]))
         if np.sum(syn_sel_idx_mtype) == 0: # Ignore m-type, consider matching layer
             syn_sel_idx_mtype = np.logical_and(duplicate_sample_synapses.syn_sel_idx_type, np.isin(edges_table['@target_node'], tgt_node_ids[tgt_layers == tgt_layers[tidx]]))
+        if np.sum(syn_sel_idx_mtype) == 0: # Otherwise, ignore m-type & layer
+            syn_sel_idx_mtype = duplicate_sample_synapses.syn_sel_idx_type
+            log.warning(f'No synapses with matching m-type or layer to sample connection property values for target neuron {tgt} from!')
         log.log_assert(np.sum(syn_sel_idx_mtype) > 0, f'No synapses to sample connection property values for target neuron {tgt} from!')
         _, num_syn_per_conn = np.unique(edges_table[syn_sel_idx_mtype][['@source_node', '@target_node']], axis=0, return_counts=True)
         duplicate_sample_synapses.per_mtype_dict[tgt_mtype] = {'syn_sel_idx_mtype': syn_sel_idx_mtype, 'num_syn_per_conn': num_syn_per_conn}
@@ -254,9 +258,10 @@ def duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx,
     """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_id>, by duplicating existing
        synapse position & randomizing (non-morphology-related) properties based on pathway-specific model distributions."""
     # Init static variables (function attributes) related to this method which need only be initialized once [for better performance]
-    if not hasattr(duplicate_randomize_synapses, 'props_sel'):
+    if duplicate_randomize_synapses.reset:
         duplicate_randomize_synapses.props_sel = list(filter(lambda x: not np.any([excl in x for excl in ['_node', '_x', '_y', '_z', '_section', '_segment', '_length', 'delay']]), edges_table.columns)) # Non-morphology-related property selection (to be sampled/randomized)
         log.log_assert(np.all(np.isin(duplicate_randomize_synapses.props_sel, props_model.get_prop_names())), f'Required properties missing in properties model (must include: {duplicate_randomize_synapses.props_sel})!')
+        duplicate_randomize_synapses.reset = False
 
     # Generate new synapse properties based on properties model
     src_mtypes = nodes[0].get(src_gen, properties='mtype').to_numpy()
@@ -276,23 +281,34 @@ def duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx,
 #     new_edges = edges_table.iloc[sel_dupl].copy()
 
     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-    # => Unique per connection, so that no duplicated synapses belong to same connection!!
+    # => Unique per connection, so that no duplicated synapses belong to same connection (if possible)!!
+    unique_per_conn_warning = False
     num_sel = np.sum(syn_sel_idx)
     sel_dupl = []
     conns = np.unique(syn_conn_idx)
     for cidx in conns:
+        dupl_count = np.sum(syn_conn_idx == cidx)
         if num_sel > 0: # Duplicate only synapses of syn_class type
-            sel_dupl.append(np.random.choice(np.where(syn_sel_idx)[0], np.sum(syn_conn_idx == cidx), replace=False)) # Random sampling from existing synapses WITHOUT replacement
+            draw_from = np.where(syn_sel_idx)[0]
         else: # Include all synapses, if no synapses of syn_class type are available
-            sel_dupl.append(np.random.choice(np.where(syn_sel_idx_tgt)[0], np.sum(syn_conn_idx == cidx), replace=False)) # Random sampling from existing synapses WITHOUT replacement
+            draw_from = np.where(syn_sel_idx_tgt)[0]
+        if len(draw_from) >= dupl_count:
+            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=False)) # Random sampling from existing synapses WITHOUT replacement, if possible
+        else:
+            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=True)) # Random sampling from existing synapses WITH replacement, otherwise
+            unique_per_conn_warning = True
     sel_dupl = np.hstack(sel_dupl)
     log.log_assert(len(sel_dupl) == num_gen_syn, 'ERROR: Wrong number of duplicated synapse positions!')
     new_edges = edges_table.iloc[sel_dupl].copy()
 
+    if unique_per_conn_warning:
+        log.warning('Duplicated synapse position belonging to same connection! Unique synapse positions per connection not possible!')
+
     ##### [TESTING] #####
     # Check if no duplicates per connection
-    for cidx in conns:
-        log.log_assert(np.all(np.unique(sel_dupl[syn_conn_idx == cidx], return_counts=True)[1] == 1), 'ERROR: Duplicated synapse positions within connection!')
+    if not unique_per_conn_warning:
+        for cidx in conns:
+            log.log_assert(np.all(np.unique(sel_dupl[syn_conn_idx == cidx], return_counts=True)[1] == 1), 'ERROR: Duplicated synapse positions within connection!')
     ##### ######### #####
 
     # Assign new synapse values for non-morphology-related properties

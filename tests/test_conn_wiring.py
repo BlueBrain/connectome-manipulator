@@ -89,6 +89,7 @@ def test_apply():
         assert res.shape[0] == (len(src_ids) * len(tgt_ids) * pct / 100 - len(np.intersect1d(src_ids, tgt_ids)) * pct / 100) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
 
     # Case 4: Check src/tgt_sel
+    pct = 100.0
     for src_class in ['EXC', 'INH']:
         for tgt_class in ['EXC', 'INH']:
             sel_src = {'synapse_class': src_class}
@@ -97,8 +98,16 @@ def test_apply():
             assert np.all(np.isin(res['@source_node'], nodes[0].ids(sel_src))), 'ERROR: Source selection error!'
             assert np.all(np.isin(res['@target_node'], nodes[0].ids(sel_dest))), 'ERROR: Target selection error!'
 
-    # Case 5: Check delays (from PRE neuron (soma) to POST synapse position)
-    pct = 100.0
+    # Case 5: Check block-based processing
+    split_ids_list = [tgt_ids[:len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1:]]
+    res_list = []
+    for i_split, split_ids in enumerate(split_ids_list):
+        aux_dict_split = {'N_split': len(split_ids_list), 'i_split': i_split, 'split_ids': split_ids}
+        res_list.append(test_module.apply(edges_table_empty, nodes, aux_dict_split, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file))
+    res = pd.concat(res_list, ignore_index=True)
+    assert res.shape[0] == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
+
+    # Case 6: Check delays (from PRE neuron (soma) to POST synapse position)
     res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file, delay_model_file=delay_model_file)
     for i in range(res.shape[0]):
         delay_offset, delay_scale = delay_model.get_param_dict()['delay_mean_coefs']
@@ -108,7 +117,7 @@ def test_apply():
         delay = delay_scale * dist + delay_offset
         assert np.isclose(res.iloc[i]['delay'], delay), 'ERROR: Delay mismatch!'
 
-    # Case 6: Check connectivity with conn. prob. p=0.1
+    # Case 7: Check connectivity with conn. prob. p=0.1
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p1.json')
     np.random.seed(0)
     syn_counts = []
