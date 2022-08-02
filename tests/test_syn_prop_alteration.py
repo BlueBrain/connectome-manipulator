@@ -98,7 +98,7 @@ def test_apply():
     res = test_module.apply(edges_table.copy(), nodes, aux_dict, prop_sel, new_value, sel_src=None, sel_dest=None, syn_filter=None, amount_pct=pct)
     assert edges_table[props_nonsel].equals(res[props_nonsel]), 'ERROR: Non-selected property values changed!'
     assert np.all(res[prop_sel] == edges_table[prop_sel] + new_value['kwargs']['loc']), 'ERROR: Selected property values not modified correctly!'
-    
+
     # Case 5: Check range
     ## (a) Lower bound
     new_value = {'mode': 'scale', 'factor': -1.0, 'range': [0.0, 1.0]}
