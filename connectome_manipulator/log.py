@@ -2,6 +2,7 @@
 from datetime import datetime
 import importlib
 import logging
+import numpy as np
 import os
 import sys
 
@@ -35,6 +36,21 @@ def log_assert(cond, msg):
     if not cond:
         logging.log(ASSERTION_LOG_LEVEL, msg)
     assert cond, msg
+
+
+def data(filespec, **kwargs):
+    '''Data logging, i.e., writing data arrays given by kwargs to compressed .npz file
+       WARNING: Existing files will be overwritten'''
+
+    file_handler = logging.root.handlers[0]
+    base_name = os.path.splitext(file_handler.baseFilename)[0]
+    if len(filespec) > 0:
+        filespec = '.' + filespec
+    data_file = base_name + filespec + '.npz'
+    if os.path.exists(data_file):
+        warning(f'Data log file "{data_file}" already exists and will be overwritten!')
+    np.savez_compressed(data_file, **kwargs)
+    info(f'Data log ({", ".join(list(kwargs.keys()))}) written to "{data_file}"')
 
 
 def logging_init(log_path, name):
