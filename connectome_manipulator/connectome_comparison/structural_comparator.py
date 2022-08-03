@@ -105,7 +105,7 @@ def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no c
                 if not os.path.exists(os.path.split(res_file)[0]):
                     os.makedirs(os.path.split(res_file)[0])
                 with open(res_file, 'wb') as f:
-                    pickle.dump(res_dict, f)
+                    pickle.dump(res_dict, f, protocol=4)
             res_dicts.append(res_dict)
         res_dicts.append(results_diff(res_dicts[0], res_dicts[-1]))
 
@@ -114,11 +114,11 @@ def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no c
 
             # Determine common range of values for plotting
             range_prctile = plot_dict.get('range_prctile', 100)
-            all_data = np.concatenate([res_dicts[cidx][res_sel]['data'].flatten() for cidx in range(len(circuit_ids))])
+            all_data = np.concatenate([res_dicts[cidx][res_sel]['data'].data if hasattr(res_dicts[cidx][res_sel]['data'], 'data') else res_dicts[cidx][res_sel]['data'].flatten() for cidx in range(len(circuit_ids))])
             all_data = all_data[np.isfinite(all_data)]
             plot_range = [-np.percentile(-all_data[all_data < 0], range_prctile) if np.any(all_data < 0) else 0.0,
                           np.percentile(all_data[all_data > 0], range_prctile) if np.any(all_data > 0) else 0.0] # Common plot range
-            diff_data = res_dicts[-1][res_sel]['data'].flatten()
+            diff_data = res_dicts[-1][res_sel]['data'].data if hasattr(res_dicts[-1][res_sel]['data'], 'data') else res_dicts[-1][res_sel]['data'].flatten()
             plot_range_diff = max(np.percentile(diff_data[diff_data > 0], range_prctile) if np.any(diff_data > 0) else 0.0,
                                   np.percentile(-diff_data[diff_data < 0], range_prctile) if np.any(diff_data < 0) else 0.0) # Diff plot range
             if plot_range_diff == 0.0:

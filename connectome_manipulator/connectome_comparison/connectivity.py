@@ -16,13 +16,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
+from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
 def compute(circuit, group_by=None, sel_src=None, sel_dest=None, **_):
     """Compute connectivity grouped by given property."""
-    # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    # Select edge population
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
@@ -54,14 +54,16 @@ def compute(circuit, group_by=None, sel_src=None, sel_dest=None, **_):
         sel_pre = src_group_sel[idx_pre]
         for idx_post in range(len(tgt_group_sel)):
             sel_post = tgt_group_sel[idx_post]
-            it_conn = edges.iter_connections(sel_pre, sel_post, return_edge_count=True)
+            pre_ids = get_node_ids(src_nodes, sel_pre)
+            post_ids = get_node_ids(tgt_nodes, sel_post)
+            it_conn = edges.iter_connections(pre_ids, post_ids, return_edge_count=True)
             conns = np.array(list(it_conn))
 
             if conns.size > 0:
                 scounts = conns[:, 2] # Synapse counts per connection
                 ccount = len(scounts) # Connection count
-                pre_count = len(src_nodes.ids(sel_pre))
-                post_count = len(tgt_nodes.ids(sel_post))
+                pre_count = len(pre_ids)
+                post_count = len(post_ids)
 
                 syn_table[idx_pre, idx_post] = np.mean(scounts)
                 p_table[idx_pre, idx_post] = 100.0 * ccount / (pre_count * post_count)

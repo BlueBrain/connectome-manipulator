@@ -16,20 +16,21 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
+from scipy.sparse import csr_matrix
+from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
 def compute(circuit, sel_src=None, sel_dest=None, **_):
     """Extract adjacency and count matrices."""
-    # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    # Select edge population
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
     tgt_nodes = edges.target
 
-    src_node_ids = src_nodes.ids(sel_src)
-    tgt_node_ids = tgt_nodes.ids(sel_dest)
+    src_node_ids = get_node_ids(src_nodes, sel_src)
+    tgt_node_ids = get_node_ids(tgt_nodes, sel_dest)
 
     # Map source/target node ids to continuous range of indices for plotting
     src_gid_min = min(src_nodes.ids())
@@ -53,7 +54,6 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
 
     print(f'INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (sel_src={sel_src}, sel_dest={sel_dest})', flush=True)
 
-    count_matrix = np.zeros((len(src_node_ids), len(tgt_node_ids)), dtype=int)
 #     pbar = progressbar.ProgressBar()
 #     for post_idx in pbar(range(len(tgt_node_ids))):
 #         post_gid = tgt_node_ids[post_idx]
@@ -63,7 +63,7 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
 #             count_matrix[idx[idx >= 0], tgt_gid_to_idx(post_gid)] = conns[idx >= 0, 2]
 
     conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)))
-    count_matrix[src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1])] = conns[:, 2]
+    count_matrix = csr_matrix((conns[:, 2], (src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1]))))
 
     adj_matrix = count_matrix > 0
 
@@ -81,8 +81,8 @@ def plot(res_dict, _common_dict, fig_title=None, vmin=None, vmax=None, isdiff=Fa
         assert vmin == 0, 'ERROR: Plot range including 0 required!'
         cmap = 'hot_r' # Regular colormap [color at 0 should be white (not actually drawn), to match figure background!]
 
-    conns = np.array(np.where(res_dict['data'])).T
-    col_idx = res_dict['data'][conns[:, 0], conns[:, 1]]
+    conns = np.array(res_dict['data'].nonzero()).T
+    col_idx = res_dict['data'].data
     plt.scatter(conns[:, 1], conns[:, 0], marker=',', s=0.1, edgecolors='none', alpha=0.5, c=col_idx, cmap=cmap, vmin=vmin, vmax=vmax)
 
     if not res_dict['data'].dtype == bool:
