@@ -1,5 +1,6 @@
 '''Customized logging'''
 from datetime import datetime
+import importlib
 import logging
 import os
 import sys
@@ -42,6 +43,11 @@ def logging_init(log_path, name):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
 
+    # Reload logging module, in case it has already been initialized before
+    # [In future versions: logging.basicConfig(..., force=True, ...) supported instead!]
+    importlib.reload(logging)
+
+    # Initialize logging
     log_file = os.path.join(log_path, f'{name}.{datetime.today().strftime("%Y%m%dT%H%M%S")}.log')
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(logging.Formatter('%(asctime)s [%(module)s] %(levelname)s: %(message)s'))
