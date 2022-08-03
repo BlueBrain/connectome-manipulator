@@ -99,8 +99,9 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     # Run connection rewiring
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-    stats_dict['target_count'] = num_tgt # (Neurons)
-    stats_dict['unable_to_rewire_count'] = 0 # (Neurons)
+    stats_dict['input_syn_count'] = edges_table.shape[0]
+    stats_dict['target_nrn_count'] = num_tgt # (Neurons)
+    stats_dict['unable_to_rewire_nrn_count'] = 0 # (Neurons)
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
@@ -111,7 +112,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         num_sel = np.sum(syn_sel_idx)
 
         if (keep_indegree and num_sel == 0) or np.sum(syn_sel_idx_tgt) == 0:
-            stats_dict['unable_to_rewire_count'] += 1 # (Neurons)
+            stats_dict['unable_to_rewire_nrn_count'] += 1 # (Neurons)
             continue # Nothing to rewire (no synapses on target node)
 
         # Determine conn. prob. of all source nodes to be connected with target node
@@ -185,8 +186,11 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         log.info(f'Generated {all_new_edges.shape[0]} new synapses')
 
     # Print statistics
+    stats_dict['num_syn_unchanged'] = stats_dict['input_syn_count'] - np.sum(stats_dict['num_syn_removed']) - np.sum(stats_dict['num_syn_rewired'])
+    stats_dict['output_syn_count'] = edges_table.shape[0]
     stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
     log.info('STATISTICS:\n%s', '\n'.join(stat_str))
+    log.log_assert(stats_dict['num_syn_unchanged'] == stats_dict['output_syn_count'] - np.sum(stats_dict['num_syn_added']) - np.sum(stats_dict['num_syn_rewired']), 'ERROR: Unchanged synapse count mismtach!')
 
     return edges_table
 
