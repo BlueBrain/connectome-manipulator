@@ -9,6 +9,9 @@ Description: Rewiring of existing connectome, based on a given model of connecti
              Connection/synapse generation methods (gen_method):
                  "duplicate_sample" ... Duplicate existing synapse position & sample (non-morphology-related; w/o delay) property values independently from existing synapses
                  "duplicate_randomize" ... Duplicate existing synapse position & randomize (non-morphology-related; w/o delay) property values based on pathway-specific model distributions
+
+             NOTE: Input edges_table assumed to be sorted by @target_node.
+                   Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
 """
 
 import os
@@ -24,13 +27,9 @@ from connectome_manipulator.access_functions import get_node_ids
 
 def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None):
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
+    log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'ERROR: Edges table must be ordered by @target_node!')
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
-#     if keep_indegree:
-#         log.log_assert(gen_method is None, f'Generation method {gen_method} not compatible with "keep_indegree" option!')
-#         log.log_assert(reuse_conns == True, f'"keep_indegree" cannot be used without "reuse_conns" option!')
-#     else:
-#         log.log_assert(gen_method in ['duplicate_sample', 'duplicate_randomize'], 'Valid generation method required (must be "duplicate_sample" or "duplicate_randomize")!')
 
     if keep_indegree and reuse_conns:
         log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
@@ -96,10 +95,17 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     duplicate_sample_synapses.reset = True
     duplicate_randomize_synapses.reset = True
 
+    # Index of input connections (before rewiring) [for data logging]
+    inp_conns, inp_syn_conn_idx, inp_syn_per_conn = np.unique(edges_table[['@target_node', '@source_node']], axis=0, return_inverse=True, return_counts=True)
+    inp_conns = np.fliplr(inp_conns) # Restore ['@source_node', '@target_node'] order of elements
+    stats_dict['input_syn_count'] = edges_table.shape[0]
+    stats_dict['input_conn_count'] = len(inp_syn_per_conn)
+    stats_dict['input_syn_per_conn'] = list(inp_syn_per_conn)
+
     # Run connection rewiring
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
+    syn_rewire_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all rewired synapses [for data logging]
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-    stats_dict['input_syn_count'] = edges_table.shape[0]
     stats_dict['target_nrn_count'] = num_tgt # (Neurons)
     stats_dict['unable_to_rewire_nrn_count'] = 0 # (Neurons)
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
@@ -158,7 +164,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             if gen_method == 'duplicate_sample': # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
                 new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict)
             elif gen_method == 'duplicate_randomize': # Duplicate existing synapse position & randomize (non-morphology-related) property values based on pathway-specific model distributions
-                new_edges = duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model, stats_dict)
+                new_edges = duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model, stats_dict)
             else:
                 log.log_assert(False, f'Generation method {gen_method} unknown!')
 
@@ -166,12 +172,16 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             all_new_edges = all_new_edges.append(new_edges)
 
         # Assign new source nodes = rewiring of existing connections
+        syn_rewire_idx = np.logical_or(syn_rewire_idx, syn_sel_idx) # [for data logging]
         edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_syn_idx] # Source node IDs per connection expanded to synapses
         stats_dict['num_syn_rewired'] = stats_dict.get('num_syn_rewired', []) + [len(src_syn_idx)] # (Synapses)
         stats_dict['num_conn_rewired'] = stats_dict.get('num_conn_rewired', []) + [len(src_new)] # (Connections)
 
         # Assign new distance-dependent delays (in-place), based on (generative) delay model
         assign_delays_from_model(delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx)
+
+    # Update statistics
+    stats_dict['num_syn_unchanged'] = stats_dict['input_syn_count'] - np.sum(stats_dict['num_syn_removed']) - np.sum(stats_dict['num_syn_rewired'])
 
     # Delete unused synapses (if any)
     if np.any(syn_del_idx):
@@ -180,19 +190,110 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
 
     # Add new synapses to table, re-sort, and assign new index
     if all_new_edges.size > 0:
+        syn_new_dupl_idx = np.array(all_new_edges.index) # Index of duplicated synapses [for data logging]
+        min_idx = np.min(edges_table.index)
+        max_idx = np.max(edges_table.index)
+        all_new_edges.index = range(max_idx + 1, max_idx + 1 + all_new_edges.shape[0]) # Set index to new range, so as to keep track of new edges
         edges_table = edges_table.append(all_new_edges)
-        edges_table.sort_values(['@target_node', '@source_node'], inplace=True)
-        edges_table.reset_index(inplace=True, drop=True) # [No index offset required when merging files in block-based processing]
+        edges_table.sort_values('@target_node', kind='mergesort', inplace=True) # Stable sorting, i.e., preserving order of input edges!!
+        syn_new_idx = edges_table.index > max_idx # Global synapse indices to keep track of all new synapses [for data logging]
+        syn_new_dupl_idx = syn_new_dupl_idx[edges_table.index[syn_new_idx] - max_idx - 1] # Restore sorting, so that in same order as in merged & sorted edges table
         log.info(f'Generated {all_new_edges.shape[0]} new synapses')
+    else: # No new synapses
+        syn_new_dupl_idx = np.array([])
+        syn_new_idx = np.full(edges_table.shape[0], False)
 
-    # Print statistics
-    stats_dict['num_syn_unchanged'] = stats_dict['input_syn_count'] - np.sum(stats_dict['num_syn_removed']) - np.sum(stats_dict['num_syn_rewired'])
+    # Reset index
+    edges_table.reset_index(inplace=True, drop=True) # Reset index [No index offset required when merging files in block-based processing]
+
+    ##### [TESTING] #####
+    # Check if output indeed sorted
+    log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'ERROR: Output edges table not sorted by @target_node!')
+    ##### ######### #####
+
+    # Index of output connections (after rewiring) [for data logging]
+    out_conns, out_syn_conn_idx, out_syn_per_conn = np.unique(edges_table[['@target_node', '@source_node']], axis=0, return_inverse=True, return_counts=True)
+    out_conns = np.fliplr(out_conns) # Restore ['@source_node', '@target_node'] order of elements
     stats_dict['output_syn_count'] = edges_table.shape[0]
+    stats_dict['output_conn_count'] = len(out_syn_per_conn)
+    stats_dict['output_syn_per_conn'] = list(out_syn_per_conn)
+
+    # Log statistics
     stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
     log.info('STATISTICS:\n%s', '\n'.join(stat_str))
-    log.log_assert(stats_dict['num_syn_unchanged'] == stats_dict['output_syn_count'] - np.sum(stats_dict['num_syn_added']) - np.sum(stats_dict['num_syn_rewired']), 'ERROR: Unchanged synapse count mismtach!')
+    log.log_assert(stats_dict['num_syn_unchanged'] == stats_dict['output_syn_count'] - np.sum(stats_dict['num_syn_added']) - np.sum(stats_dict['num_syn_rewired']), 'ERROR: Unchanged synapse count mismtach!') # Consistency check
+    log.data(f'RewiringStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}', **stats_dict)
 
+    # Write index data log [book-keeping for validation purposes]
+    inp_syn_unch_idx = np.zeros_like(syn_del_idx) # Global synapse indices to keep track of all unchanged synapses [for data logging]
+    inp_syn_unch_idx = np.logical_and(~syn_del_idx, ~syn_rewire_idx)
+    out_syn_rew_idx = np.zeros_like(syn_new_idx) # Global output synapse indices to keep track of all rewired synapses [for data logging]
+    out_syn_rew_idx[~syn_new_idx] = syn_rewire_idx[~syn_del_idx] # [ASSUME: Input edges table order preserved]
+    out_syn_unch_idx = np.zeros_like(syn_new_idx) # Global output synapse indices to keep track of all unchanged synapses [for data logging]
+    out_syn_unch_idx[~syn_new_idx] = inp_syn_unch_idx[~syn_del_idx] # [ASSUME: Input edges table order preserved]
+    log.log_assert(np.sum(stats_dict['num_syn_rewired']) == np.sum(syn_rewire_idx), 'ERROR: Rewired (input) synapse count mismtach!')
+    log.log_assert(np.sum(stats_dict['num_syn_rewired']) == np.sum(out_syn_rew_idx), 'ERROR: Rewired (output) synapse count mismtach!')
+    log.log_assert(stats_dict['num_syn_unchanged'] == np.sum(inp_syn_unch_idx), 'ERROR: Unchanged (input) synapse count mismtach!')
+    log.log_assert(stats_dict['num_syn_unchanged'] == np.sum(out_syn_unch_idx), 'ERROR: Unchanged (output) synapse count mismtach!')
+
+    log.data(f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
+             inp_syn_del_idx=syn_del_idx, inp_syn_rew_idx=syn_rewire_idx, inp_syn_unch_idx=inp_syn_unch_idx,
+             out_syn_new_idx=syn_new_idx, syn_new_dupl_idx=syn_new_dupl_idx, out_syn_rew_idx=out_syn_rew_idx, out_syn_unch_idx=out_syn_unch_idx,
+             inp_conns=inp_conns, inp_syn_conn_idx=inp_syn_conn_idx, inp_syn_per_conn=inp_syn_per_conn,
+             out_conns=out_conns, out_syn_conn_idx=out_syn_conn_idx, out_syn_per_conn=out_syn_per_conn,
+             i_split=aux_dict['i_split'], N_split=aux_dict['N_split'], split_ids=aux_dict['split_ids'], tgt_node_ids=tgt_node_ids)
+    # inp_syn_del_idx ... Binary index vector of deleted synapses w.r.t. input edges table (of current block)
+    # inp_syn_rew_idx ... Binary index vector of rewired synapses w.r.t. input edges table (of current block)
+    # inp_syn_unch_idx ... Binary index vector of unchanged synapses w.r.t. input edges table (of current block)
+    # out_syn_new_idx ... Binary index vector of new synapses w.r.t. output edges table (of current block)
+    # syn_new_dupl_idx ... Index vector of duplicated synapses (positions) w.r.t. input edges table (globally, i.e., across all blocks), corresponding to new synapses in out_syn_new_idx
+    # out_syn_rew_idx ... Binary index vector of rewired synapses w.r.t. output edges table (of current block)
+    # out_syn_unch_idx ... Binary index vector of unchanged synapses w.r.t. output edges table (of current block)
+    
     return edges_table
+
+
+def duplicate_synapses(syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt):
+    """ Duplicate num_gen_syn synapse positions on target neuron
+        ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!] """
+
+#     # => Duplicated synapses may belong to same connection!!
+#     num_sel = np.sum(syn_sel_idx)
+#     if num_sel > 0: # Duplicate only synapses of syn_class type
+#         sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+#     else: # Include all synapses, if no synapses of syn_class type are available
+#         sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+
+    # => Unique per connection, so that no duplicated synapses belong to same connection (if possible)!!
+    unique_per_conn_warning = False
+    num_sel = np.sum(syn_sel_idx)
+    sel_dupl = []
+    conns = np.unique(syn_conn_idx)
+    for cidx in conns:
+        dupl_count = np.sum(syn_conn_idx == cidx)
+        if num_sel > 0: # Duplicate only synapses of syn_class type
+            draw_from = np.where(syn_sel_idx)[0]
+        else: # Include all synapses, if no synapses of syn_class type are available
+            draw_from = np.where(syn_sel_idx_tgt)[0]
+        if len(draw_from) >= dupl_count:
+            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=False)) # Random sampling from existing synapses WITHOUT replacement, if possible
+        else:
+            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=True)) # Random sampling from existing synapses WITH replacement, otherwise
+            unique_per_conn_warning = True
+    sel_dupl = np.hstack(sel_dupl)
+    log.log_assert(len(sel_dupl) == num_gen_syn, 'ERROR: Wrong number of duplicated synapse positions!')
+
+    if unique_per_conn_warning:
+        log.warning(f'Duplicated synapse position belonging to same connection (target neuron {tgt})! Unique synapse positions per connection not possible!')
+
+    ##### [TESTING] #####
+    # Check if indeed no duplicates per connection
+    if not unique_per_conn_warning:
+        for cidx in conns:
+            log.log_assert(np.all(np.unique(sel_dupl[syn_conn_idx == cidx], return_counts=True)[1] == 1), f'ERROR: Duplicated synapse positions within connection (target neuron {tgt})!')
+    ##### ######### #####
+
+    return sel_dupl
 
 
 def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict=None):
@@ -234,11 +335,7 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
     num_gen_syn = len(syn_conn_idx) # Number of synapses to generate
 
     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-    num_sel = np.sum(syn_sel_idx)
-    if num_sel > 0: # Duplicate only synapses of syn_class type
-        sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-    else: # Include all synapses, if no synapses of syn_class type are available
-        sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
+    sel_dupl = duplicate_synapses(syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt)
     new_edges = edges_table.iloc[sel_dupl].copy()
 
     # Sample (non-morphology-related) property values independently from other existing synapses targetting neurons of the same mtype as tgt (incl. tgt)
@@ -258,7 +355,7 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
     return new_edges
 
 
-def duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_id, delay_model, props_model, stats_dict=None):
+def duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_id, delay_model, props_model, stats_dict=None):
     """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_id>, by duplicating existing
        synapse position & randomizing (non-morphology-related) properties based on pathway-specific model distributions."""
     # Init static variables (function attributes) related to this method which need only be initialized once [for better performance]
@@ -275,45 +372,9 @@ def duplicate_randomize_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx,
     syn_conn_idx = np.concatenate([[i] * n for i, n in enumerate(num_syn_per_conn)]) # Create mapping from synapses to connections
     num_gen_syn = len(syn_conn_idx) # Total number of generated synapses
 
-#     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-#     # => Duplicated synapses may belong to same connection!!
-#     num_sel = np.sum(syn_sel_idx)
-#     if num_sel > 0: # Duplicate only synapses of syn_class type
-#         sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-#     else: # Include all synapses, if no synapses of syn_class type are available
-#         sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-#     new_edges = edges_table.iloc[sel_dupl].copy()
-
     # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-    # => Unique per connection, so that no duplicated synapses belong to same connection (if possible)!!
-    unique_per_conn_warning = False
-    num_sel = np.sum(syn_sel_idx)
-    sel_dupl = []
-    conns = np.unique(syn_conn_idx)
-    for cidx in conns:
-        dupl_count = np.sum(syn_conn_idx == cidx)
-        if num_sel > 0: # Duplicate only synapses of syn_class type
-            draw_from = np.where(syn_sel_idx)[0]
-        else: # Include all synapses, if no synapses of syn_class type are available
-            draw_from = np.where(syn_sel_idx_tgt)[0]
-        if len(draw_from) >= dupl_count:
-            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=False)) # Random sampling from existing synapses WITHOUT replacement, if possible
-        else:
-            sel_dupl.append(np.random.choice(draw_from, dupl_count, replace=True)) # Random sampling from existing synapses WITH replacement, otherwise
-            unique_per_conn_warning = True
-    sel_dupl = np.hstack(sel_dupl)
-    log.log_assert(len(sel_dupl) == num_gen_syn, 'ERROR: Wrong number of duplicated synapse positions!')
+    sel_dupl = duplicate_synapses(syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt_id)
     new_edges = edges_table.iloc[sel_dupl].copy()
-
-    if unique_per_conn_warning:
-        log.warning('Duplicated synapse position belonging to same connection! Unique synapse positions per connection not possible!')
-
-    ##### [TESTING] #####
-    # Check if no duplicates per connection
-    if not unique_per_conn_warning:
-        for cidx in conns:
-            log.log_assert(np.all(np.unique(sel_dupl[syn_conn_idx == cidx], return_counts=True)[1] == 1), 'ERROR: Duplicated synapse positions within connection!')
-    ##### ######### #####
 
     # Assign new synapse values for non-morphology-related properties
     new_edges[duplicate_randomize_synapses.props_sel] = pd.concat(new_syn_props, ignore_index=True)[duplicate_randomize_synapses.props_sel].to_numpy()
