@@ -249,7 +249,17 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     # syn_new_dupl_idx ... Index vector of duplicated synapses (positions) w.r.t. input edges table (globally, i.e., across all blocks), corresponding to new synapses in out_syn_new_idx
     # out_syn_rew_idx ... Binary index vector of rewired synapses w.r.t. output edges table (of current block)
     # out_syn_unch_idx ... Binary index vector of unchanged synapses w.r.t. output edges table (of current block)
-    
+    # inp_conns ... Input connections (of current block)
+    # inp_syn_conn_idx ... Index vector of input connections w.r.t. inp_conns (of current block)
+    # inp_syn_per_conn: Number of synapses per connection w.r.t. inp_conns (of current block)
+    # out_conns ... Input connections (of current block)
+    # out_syn_conn_idx ... Index vector of input connections w.r.t. out_conns (of current block)
+    # out_syn_per_conn ... Number of synapses per connection w.r.t. out_conns (of current block)
+    # i_split ... Index of current block
+    # N_split ... Total number of splits (blocks)
+    # split_ids ... Neuron ids of current block
+    # tgt_node_ids ... Selected target neuron ids within current block
+
     return edges_table
 
 
