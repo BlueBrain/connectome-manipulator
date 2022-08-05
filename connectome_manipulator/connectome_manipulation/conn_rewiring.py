@@ -84,10 +84,13 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     tgt_node_ids = np.intersect1d(tgt_node_ids, aux_dict['split_ids']) # Only select target nodes that are actually in current split of edges_table
     num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
     tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
+    tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
+
     if np.sum(tgt_sel) == 0: # Nothing to rewire
         log.info('No target nodes selected, nothing to rewire')
+        log.data(f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
+                 i_split=aux_dict['i_split'], N_split=aux_dict['N_split'], split_ids=aux_dict['split_ids'], tgt_node_ids=tgt_node_ids)
         return edges_table
-    tgt_node_ids = tgt_node_ids[tgt_sel] # Select subset of neurons (keeping order)
 
     log.info(f'Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})')
 
