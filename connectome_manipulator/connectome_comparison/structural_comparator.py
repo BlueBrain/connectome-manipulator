@@ -1,12 +1,10 @@
-'''Structural connectome comparison
-
-Main module for
-* loading two SONATA connectomes (or loading from database)
-* running structural comparison
-* producing output figures
-
-TODO: improve description
-'''
+"""
+Main module for structural connectome comparison:
+  - Loads two SONATA connectomes
+  - Extracts structural properties (compute_results), as specified by the structural comparator config dict (or re-loading them from disc, if computed earlier)
+  - Creates difference map between structural properties of the two connectomes
+  - Visualizes individual structural properties as well as their difference
+"""
 
 import importlib
 import os.path
@@ -109,16 +107,26 @@ def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no c
             res_dicts.append(res_dict)
         res_dicts.append(results_diff(res_dicts[0], res_dicts[-1]))
 
+        def get_flattened_data(d):
+            """ Returns raw (flattened) data from sparse matrix or numpy array """
+            if hasattr(d, 'flatten'): # Numpy arrays
+                return d.flatten()
+            else:
+                if hasattr(d, 'data') and hasattr(d.data, 'flatten'): # Sparse matrix
+                    return d.data.flatten()
+                else:
+                    assert False, 'ERROR: Flattened data extraction error!'
+
         # Plot results
         for res_sel in plot_dict['res_sel']:
 
             # Determine common range of values for plotting
             range_prctile = plot_dict.get('range_prctile', 100)
-            all_data = np.concatenate([res_dicts[cidx][res_sel]['data'].data if hasattr(res_dicts[cidx][res_sel]['data'], 'data') else res_dicts[cidx][res_sel]['data'].flatten() for cidx in range(len(circuit_ids))])
+            all_data = np.concatenate([get_flattened_data(res_dicts[cidx][res_sel]['data']) for cidx in range(len(circuit_ids))])
             all_data = all_data[np.isfinite(all_data)]
             plot_range = [-np.percentile(-all_data[all_data < 0], range_prctile) if np.any(all_data < 0) else 0.0,
                           np.percentile(all_data[all_data > 0], range_prctile) if np.any(all_data > 0) else 0.0] # Common plot range
-            diff_data = res_dicts[-1][res_sel]['data'].data if hasattr(res_dicts[-1][res_sel]['data'], 'data') else res_dicts[-1][res_sel]['data'].flatten()
+            diff_data = get_flattened_data(res_dicts[-1][res_sel]['data'])
             plot_range_diff = max(np.percentile(diff_data[diff_data > 0], range_prctile) if np.any(diff_data > 0) else 0.0,
                                   np.percentile(-diff_data[diff_data < 0], range_prctile) if np.any(diff_data < 0) else 0.0) # Diff plot range
             if plot_range_diff == 0.0:
