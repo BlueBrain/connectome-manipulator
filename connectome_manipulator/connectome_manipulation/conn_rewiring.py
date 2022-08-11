@@ -70,6 +70,12 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
 
     # Determine source/target nodes for rewiring
     stats_dict = {} # Keep track of statistics
+    stats_dict['num_syn_removed'] = []
+    stats_dict['num_conn_removed'] = []
+    stats_dict['num_syn_rewired'] = []
+    stats_dict['num_conn_rewired'] = []
+    stats_dict['num_syn_added'] = []
+    stats_dict['num_conn_added'] = []
     src_node_ids = get_node_ids(nodes[0], sel_src)
     src_class = nodes[0].get(src_node_ids, properties='synapse_class')
     src_node_ids = src_class[src_class == syn_class].index.to_numpy() # Select only source nodes with given synapse class (EXC/INH)
@@ -155,8 +161,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         if num_src > num_new_reused: # Delete unused connections/synapses
             syn_del_idx[syn_sel_idx] = src_syn_idx >= num_new_reused # Set global indices of connections to be deleted
             syn_sel_idx[syn_del_idx] = False # Remove to-be-deleted indices from selection
-            stats_dict['num_syn_removed'] = stats_dict.get('num_syn_removed', []) + [np.sum(src_syn_idx >= num_new_reused)] # (Synapses)
-            stats_dict['num_conn_removed'] = stats_dict.get('num_conn_removed', []) + [num_src - num_new_reused] # (Connections)
+            stats_dict['num_syn_removed'] = stats_dict['num_syn_removed'] + [np.sum(src_syn_idx >= num_new_reused)] # (Synapses)
+            stats_dict['num_conn_removed'] = stats_dict['num_conn_removed'] + [num_src - num_new_reused] # (Connections)
             src_syn_idx = src_syn_idx[src_syn_idx < num_new_reused]
 
         if num_src_to_reuse < num_new: # Generate new synapses/connections, if needed
@@ -177,8 +183,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         # Assign new source nodes = rewiring of existing connections
         syn_rewire_idx = np.logical_or(syn_rewire_idx, syn_sel_idx) # [for data logging]
         edges_table.loc[syn_sel_idx, '@source_node'] = src_new[src_syn_idx] # Source node IDs per connection expanded to synapses
-        stats_dict['num_syn_rewired'] = stats_dict.get('num_syn_rewired', []) + [len(src_syn_idx)] # (Synapses)
-        stats_dict['num_conn_rewired'] = stats_dict.get('num_conn_rewired', []) + [len(src_new)] # (Connections)
+        stats_dict['num_syn_rewired'] = stats_dict['num_syn_rewired'] + [len(src_syn_idx)] # (Synapses)
+        stats_dict['num_conn_rewired'] = stats_dict['num_conn_rewired'] + [len(src_new)] # (Connections)
 
         # Assign new distance-dependent delays (in-place), based on (generative) delay model
         assign_delays_from_model(delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx)
@@ -360,8 +366,8 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
     # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
     new_edges['@source_node'] = src_gen[syn_conn_idx]
     if stats_dict is not None:
-        stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
-        stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
+        stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [len(syn_conn_idx)] # (Synapses)
+        stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [len(src_gen)] # (Connections)
 
     # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
     assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
@@ -396,8 +402,8 @@ def duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_s
     # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
     new_edges['@source_node'] = src_gen[syn_conn_idx]
     if stats_dict is not None:
-        stats_dict['num_syn_added'] = stats_dict.get('num_syn_added', []) + [len(syn_conn_idx)] # (Synapses)
-        stats_dict['num_conn_added'] = stats_dict.get('num_conn_added', []) + [len(src_gen)] # (Connections)
+        stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [len(syn_conn_idx)] # (Synapses)
+        stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [len(src_gen)] # (Connections)
 
     # Assign distance-dependent delays (in-place), based on (generative) delay model
     assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
