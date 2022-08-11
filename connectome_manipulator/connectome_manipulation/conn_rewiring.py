@@ -228,7 +228,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     stats_dict['output_syn_per_conn'] = list(out_syn_per_conn)
 
     # Log statistics
-    stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) else f'      {k}: {v}' for k, v in stats_dict.items()]
+    stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) and len(v) > 0 else f'      {k}: {v}' for k, v in stats_dict.items()]
     log.info('STATISTICS:\n%s', '\n'.join(stat_str))
     log.log_assert(stats_dict['num_syn_unchanged'] == stats_dict['output_syn_count'] - np.sum(stats_dict['num_syn_added']) - np.sum(stats_dict['num_syn_rewired']), 'ERROR: Unchanged synapse count mismtach!') # Consistency check
     log.data(f'RewiringStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}', **stats_dict)
