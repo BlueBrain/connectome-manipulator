@@ -27,7 +27,7 @@ from connectome_manipulator.access_functions import get_node_ids
 
 def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None):
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
-    log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'ERROR: Edges table must be ordered by @target_node!')
+    log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'Edges table must be ordered by @target_node!')
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
 
@@ -164,6 +164,9 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             stats_dict['num_syn_removed'] = stats_dict['num_syn_removed'] + [np.sum(src_syn_idx >= num_new_reused)] # (Synapses)
             stats_dict['num_conn_removed'] = stats_dict['num_conn_removed'] + [num_src - num_new_reused] # (Connections)
             src_syn_idx = src_syn_idx[src_syn_idx < num_new_reused]
+        else:
+            stats_dict['num_syn_removed'] = stats_dict['num_syn_removed'] + [0] # (Synapses)
+            stats_dict['num_conn_removed'] = stats_dict['num_conn_removed'] + [0] # (Connections)
 
         if num_src_to_reuse < num_new: # Generate new synapses/connections, if needed
             num_gen_conn = num_new - num_src_to_reuse # Number of new connections to generate
@@ -171,14 +174,20 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             src_new = src_new[:num_src_to_reuse] # ... and existing connections
 
             if gen_method == 'duplicate_sample': # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
-                new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict)
+                new_edges = duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model)
             elif gen_method == 'duplicate_randomize': # Duplicate existing synapse position & randomize (non-morphology-related) property values based on pathway-specific model distributions
-                new_edges = duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model, stats_dict)
+                new_edges = duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt, delay_model, props_model)
             else:
                 log.log_assert(False, f'Generation method {gen_method} unknown!')
 
             # Add new_edges to global new edges table [ignoring duplicate indices]
             all_new_edges = all_new_edges.append(new_edges)
+
+            stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [new_edges.shape[0]] # (Synapses)
+            stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [len(src_gen)] # (Connections)
+        else:
+            stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [0] # (Synapses)
+            stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [0] # (Connections)
 
         # Assign new source nodes = rewiring of existing connections
         syn_rewire_idx = np.logical_or(syn_rewire_idx, syn_sel_idx) # [for data logging]
@@ -250,7 +259,7 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
              out_syn_new_idx=syn_new_idx, syn_new_dupl_idx=syn_new_dupl_idx, out_syn_rew_idx=out_syn_rew_idx, out_syn_unch_idx=out_syn_unch_idx,
              inp_conns=inp_conns, inp_syn_conn_idx=inp_syn_conn_idx, inp_syn_per_conn=inp_syn_per_conn,
              out_conns=out_conns, out_syn_conn_idx=out_syn_conn_idx, out_syn_per_conn=out_syn_per_conn,
-             i_split=aux_dict['i_split'], N_split=aux_dict['N_split'], split_ids=aux_dict['split_ids'], tgt_node_ids=tgt_node_ids, tgt_sel=tgt_sel)
+             i_split=aux_dict['i_split'], N_split=aux_dict['N_split'], split_ids=aux_dict['split_ids'], src_node_ids=src_node_ids, tgt_node_ids=tgt_node_ids, tgt_sel=tgt_sel)
     # inp_syn_del_idx ... Binary index vector of deleted synapses w.r.t. input edges table (of current block)
     # inp_syn_rew_idx ... Binary index vector of rewired synapses w.r.t. input edges table (of current block)
     # inp_syn_unch_idx ... Binary index vector of unchanged synapses w.r.t. input edges table (of current block)
@@ -267,8 +276,15 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     # i_split ... Index of current block
     # N_split ... Total number of splits (blocks)
     # split_ids ... Neuron ids of current block
+    # src_node_ids ... Selected source neuron ids
     # tgt_node_ids ... Selected target neuron ids within current block
     # tgt_sel ... Binary (random) target neuron selection index within current block, according to given amount_pct
+
+    ##### [TESTING] #####
+    # Overflow/value check
+    log.log_assert(np.all(np.abs(edges_table.max()) < 1e9), 'Value overflow in edges table!')
+    log.log_assert(np.all(edges_table['n_rrp_vesicles'] >= 1), 'Value error in edges table (n_rrp_vesicles)!')
+    ##### ######### #####
 
     return edges_table
 
@@ -316,7 +332,7 @@ def duplicate_synapses(syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, 
     return sel_dupl
 
 
-def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model, stats_dict=None):
+def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_node_ids, syn_class, delay_model):
     """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_node_ids[tidx]>, by duplicating existing
        synapse position & sampling (non-morphology-related) property values independently from existing synapses."""
     # Init static variables (function attributes) related to this method which need only be initialized once [for better performance]
@@ -365,9 +381,6 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
 
     # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
     new_edges['@source_node'] = src_gen[syn_conn_idx]
-    if stats_dict is not None:
-        stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [len(syn_conn_idx)] # (Synapses)
-        stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [len(src_gen)] # (Connections)
 
     # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
     assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
@@ -375,7 +388,7 @@ def duplicate_sample_synapses(src_gen, tidx, edges_table, nodes, syn_sel_idx, sy
     return new_edges
 
 
-def duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_id, delay_model, props_model, stats_dict=None):
+def duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_sel_idx_tgt, tgt_id, delay_model, props_model):
     """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_id>, by duplicating existing
        synapse position & randomizing (non-morphology-related) properties based on pathway-specific model distributions."""
     # Init static variables (function attributes) related to this method which need only be initialized once [for better performance]
@@ -401,12 +414,14 @@ def duplicate_randomize_synapses(src_gen, edges_table, nodes, syn_sel_idx, syn_s
 
     # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
     new_edges['@source_node'] = src_gen[syn_conn_idx]
-    if stats_dict is not None:
-        stats_dict['num_syn_added'] = stats_dict['num_syn_added'] + [len(syn_conn_idx)] # (Synapses)
-        stats_dict['num_conn_added'] = stats_dict['num_conn_added'] + [len(src_gen)] # (Connections)
 
     # Assign distance-dependent delays (in-place), based on (generative) delay model
     assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
+
+    ##### [TESTING] #####
+    for cidx in range(len(src_gen)):
+        log.log_assert(len(np.unique(new_edges[syn_conn_idx == cidx]['u_syn'])) == 1, f'u_syn not unique within connection {src_gen[cidx]}-{tgt_id}!')
+    ##### ######### #####
 
     return new_edges
 

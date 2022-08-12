@@ -42,7 +42,15 @@ def data(filespec, **kwargs):
     '''Data logging, i.e., writing data arrays given by kwargs to compressed .npz file
        WARNING: Existing files will be overwritten'''
 
+    if len(logging.root.handlers) == 0:
+        warning('Data logging not possible!')
+        return
+
     file_handler = logging.root.handlers[0]
+    if not hasattr(file_handler, 'baseFilename'):
+        warning('Data logging not possible!')
+        return
+
     base_name = os.path.splitext(file_handler.baseFilename)[0]
     if len(filespec) > 0:
         filespec = '.' + filespec

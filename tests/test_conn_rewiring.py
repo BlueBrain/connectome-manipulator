@@ -20,11 +20,19 @@ def test_apply():
     tgt_ids = nodes[1].ids()
     edges_table = edges.afferent_edges(tgt_ids, properties=edges.property_names)
 
-    aux_dict = {'N_split': 1, 'split_ids': tgt_ids}
+    aux_dict = {'i_split': 0, 'N_split': 1, 'split_ids': tgt_ids}
     delay_model_file = os.path.join(TEST_DATA_DIR, f'model_config__DistDepDelay.json') # Deterministic delay model w/o variation
     delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
     props_model_file = os.path.join(TEST_DATA_DIR, f'model_config__ConnProps.json') # Deterministic connection properties model w/o variation
     props_model = model_types.AbstractModel.model_from_file(props_model_file)
+
+    assert not np.all(np.diff(edges_table['@target_node']) >= 0), 'ERROR: Edges table assumed to be not sorted!'
+
+    with pytest.raises(AssertionError, match=re.escape('Edges table must be ordered by @target_node!')):
+        res = test_module.apply(edges_table.copy(), nodes, aux_dict, syn_class='EXC', prob_model_file=None, delay_model_file=delay_model_file)
+
+    # Use sorted edges table from now on
+    edges_table = edges_table.sort_values(['@target_node', '@source_node']).reset_index(drop=True)
 
     def check_delay(res, nodes, syn_class, delay_model):
         """ Check delays (from PRE neuron (soma) to POST synapse position) """
@@ -100,7 +108,7 @@ def test_apply():
         pct = 0.0
 
         res = test_module.apply(edges_table.copy(), nodes, aux_dict, syn_class=syn_class, prob_model_file=prob_model_file, delay_model_file=delay_model_file, sel_src=None, sel_dest=None, amount_pct=pct, keep_indegree=True, reuse_conns=True, gen_method=None, props_model_file=None, pos_map_file=None)
-        assert res.equals(edges_table), 'ERROR: Edges table has changed!'
+        assert res.equals(edges_table.reset_index(drop=True)), 'ERROR: Edges table has changed!'
 
         # Case 2: Rewire connectivity with conn. prob. p=0.0 (no connectivity)
         prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p0.json')
@@ -112,7 +120,7 @@ def test_apply():
 
         ## (b) Not keeping indegree => All selected (EXC or INH) connections should be removed
         res = test_module.apply(edges_table.copy(), nodes, aux_dict, syn_class=syn_class, prob_model_file=prob_model_file, delay_model_file=delay_model_file, sel_src=None, sel_dest=None, amount_pct=pct, keep_indegree=False, reuse_conns=False, gen_method='duplicate_sample', props_model_file=None, pos_map_file=None)
-        assert edges_table[~np.isin(edges_table['@source_node'], nodes[0].ids({'synapse_class': syn_class}))].equals(res), 'ERROR: Results table mismatch!'
+        assert edges_table[~np.isin(edges_table['@source_node'], nodes[0].ids({'synapse_class': syn_class}))].reset_index(drop=True).equals(res), 'ERROR: Results table mismatch!'
 
         # Case 3: Rewire connectivity with conn. prob. p=1.0 (full connectivity, w/o autapses)
         prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb1p0.json')
