@@ -1,17 +1,11 @@
-'''TODO: improve description'''
-# Structural comparison function
-#
-# Two functions need to be defined
-# (1) compute(circuit, ...):
-#     - The first parameter is always: circuit
-#     - Other parameters may be added (optional)
-#     - Returns a dict with different results (each containing data, name, unit) and common information needed for plotting
-# (2) plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None):
-#     - The first two parameters are always: res_dict...one selected results dictionary (in case of more than one) returned by compute()
-#                                            common_dict...dictionary with common properties/results returned by compute()
-#     -fig_title, vmin, vmax: optional parameters to control parameters across subplots
-# Comment: For performance reasons, different related results can be computed in one computation run and returned/saved together.
-#          They can then be plotted separately one at a time by specifying which of them to plot.
+"""
+Connectome comparison name: adjacency
+Description: Structural comparison of two connectomes in terms of adjacency matrices for selected pathways
+             (including synapse counts per connection), as specified by the config. For each connectome,
+             the underlying adjacency/count matrices are computed by the compute() function and will be saved
+             to a data file first. The individual adjacency/count matrices, together with a difference map
+             between the two connectomes, are then plotted by means of the plot() function.
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np

@@ -1,29 +1,22 @@
-'''TODO: improve description'''
-# Structural comparison function
-#
-# Two functions need to be defined
-# (1) compute(circuit, ...):
-#     - The first parameter is always: circuit
-#     - Other parameters may be added (optional)
-#     - Returns a dict with different results (each containing data, name, unit) and common information needed for plotting
-# (2) plot(res_dict, common_dict, fig_title=None, vmin=None, vmax=None):
-#     - The first two parameters are always: res_dict...one selected results dictionary (in case of more than one) returned by compute()
-#                                            common_dict...dictionary with common properties/results returned by compute()
-#     -fig_title, vmin, vmax: optional parameters to control parameters across subplots
-# Comment: For performance reasons, different related results can be computed in one computation run and returned/saved together.
-#          They can then be plotted separately one at a time by specifying which of them to plot.
+"""
+Connectome comparison name: properties
+Description: Structural comparison of two connectomes in terms of synapse properties per pathway, as specified by the config.
+             For each connectome, the underlying properties maps are computed by the compute() function and will be saved to
+             a data file first. The individual synapse properties maps, together with a difference map between the two connectomes,
+             are then plotted by means of the plot() function.
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import progressbar
+from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
 def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, per_conn=False, **_):
     """Compute mean/std/... values of all synapse properties grouped by given cell property."""
-    # Select edge population [assuming exactly one edge population in given edges file]
-    assert len(circuit.edges.population_names) == 1, 'ERROR: Only a single edge population per file supported!'
-    edges = circuit.edges[circuit.edges.population_names[0]]
+    # Select edge population
+    edges = get_edges_population(circuit)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
@@ -58,7 +51,9 @@ def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, 
         sel_pre = src_group_sel[idx_pre]
         for idx_post in range(len(tgt_group_sel)):
             sel_post = tgt_group_sel[idx_post]
-            e_sel = edges.pathway_edges(sel_pre, sel_post, edge_props)
+            pre_ids = get_node_ids(src_nodes, sel_pre)
+            post_ids = get_node_ids(tgt_nodes, sel_post)
+            e_sel = edges.pathway_edges(pre_ids, post_ids, edge_props)
             if e_sel.size > 0:
                 if per_conn: # Apply prop_fct to average value per connection
                     conn, conn_idx = np.unique(e_sel[['@source_node', '@target_node']], axis=0, return_inverse=True)
