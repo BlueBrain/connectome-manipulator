@@ -31,6 +31,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
 
+    column_types = {col: edges_table[col].dtype for col in edges_table.columns}
+
     if keep_indegree and reuse_conns:
         log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
     else:
@@ -221,8 +223,9 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         syn_new_dupl_idx = np.array([])
         syn_new_idx = np.full(edges_table.shape[0], False)
 
-    # Reset index
+    # Reset index & restore original column data types
     edges_table.reset_index(inplace=True, drop=True) # Reset index [No index offset required when merging files in block-based processing]
+    edges_table = edges_table.astype(column_types)
 
     ##### [TESTING] #####
     # Check if output indeed sorted
