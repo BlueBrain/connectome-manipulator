@@ -80,7 +80,10 @@ def edges_to_parquet(edges_table, output_file):
 
 
 def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_parquet=False):
-    """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!)."""
+    """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!).
+       [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!!
+                   Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
+    """
     log.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
     input_files = ' '.join(input_file_list)
 
@@ -322,13 +325,15 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
         else:
             # Load edge table containing all edge (=synapse) properties
             edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
+            column_types = {col: edges_table[col].dtype for col in edges_table.columns}
             log.info(f'Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties targeting {len(split_ids)} neurons')
             N_syn_in.append(edges_table.shape[0])
             resource_profiling(do_profiling, f'loaded-{i_split + 1}/{N_split}', csv_file=csv_file)
 
             # Apply connectome manipulation
             aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
-            edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
+            edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict).astype(column_types) # Apply manipulation & restore original column data types
+            ### [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
             log.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
             N_syn_out.append(edges_table_manip.shape[0])
             resource_profiling(do_profiling, f'manipulated-{i_split + 1}/{N_split}', csv_file=csv_file)

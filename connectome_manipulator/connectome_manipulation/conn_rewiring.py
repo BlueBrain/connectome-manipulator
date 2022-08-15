@@ -31,8 +31,6 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
 
-    column_types = {col: edges_table[col].dtype for col in edges_table.columns}
-
     if keep_indegree and reuse_conns:
         log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
     else:
@@ -223,9 +221,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
         syn_new_dupl_idx = np.array([])
         syn_new_idx = np.full(edges_table.shape[0], False)
 
-    # Reset index & restore original column data types
+    # Reset index
     edges_table.reset_index(inplace=True, drop=True) # Reset index [No index offset required when merging files in block-based processing]
-    edges_table = edges_table.astype(column_types)
 
     ##### [TESTING] #####
     # Check if output indeed sorted
@@ -286,7 +283,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     ##### [TESTING] #####
     # Overflow/value check
     log.log_assert(np.all(np.abs(edges_table.max()) < 1e9), 'Value overflow in edges table!')
-    log.log_assert(np.all(edges_table['n_rrp_vesicles'] >= 1), 'Value error in edges table (n_rrp_vesicles)!')
+    if 'n_rrp_vesicles' in edges_table.columns:
+        log.log_assert(np.all(edges_table['n_rrp_vesicles'] >= 1), 'Value error in edges table (n_rrp_vesicles)!')
     ##### ######### #####
 
     return edges_table
