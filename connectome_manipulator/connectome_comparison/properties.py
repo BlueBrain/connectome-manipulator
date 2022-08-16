@@ -13,7 +13,7 @@ import progressbar
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
-def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, per_conn=False, **_):
+def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, per_conn=False, skip_empty_groups=False, **_):
     """Compute mean/std/... values of all synapse properties grouped by given cell property."""
     # Select edge population
     edges = get_edges_population(circuit)
@@ -34,9 +34,13 @@ def compute(circuit, fct='np.mean', group_by=None, sel_src=None, sel_dest=None, 
             sel_dest = {}
         else:
             assert isinstance(sel_dest, dict), 'ERROR: Target node selection must be a dict or empty!' # Otherwise, it cannot be merged with pathway selection
-        src_group_values = sorted(src_nodes.property_values(group_by))
+        if skip_empty_groups: # Take only group property values that exist within given src/tgt selection
+            src_group_values = np.unique(src_nodes.get(get_node_ids(src_nodes, sel_src), properties=group_by))
+            tgt_group_values = np.unique(tgt_nodes.get(get_node_ids(tgt_nodes, sel_dest), properties=group_by))
+        else: # Keep all group property values, even if not present in given src/tgt selection, to get the full matrix
+            src_group_values = sorted(src_nodes.property_values(group_by))
+            tgt_group_values = sorted(tgt_nodes.property_values(group_by))
         src_group_sel = [{group_by: src_group_values[idx], **sel_src} for idx in range(len(src_group_values))]
-        tgt_group_values = sorted(tgt_nodes.property_values(group_by))
         tgt_group_sel = [{group_by: tgt_group_values[idx], **sel_dest} for idx in range(len(tgt_group_values))]
 
     print(f'INFO: Extracting synapse properties (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups, per_conn={per_conn})', flush=True)
