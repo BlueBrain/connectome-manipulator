@@ -43,4 +43,8 @@ def apply(edges_table, nodes, _aux_dict, target_name=None, node_sets_file=None):
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], target_gids), np.isin(edges_table['@target_node'], target_gids))
     edges_table_manip = edges_table[syn_sel_idx].copy()
 
+    ### TESTING/DEBUGGING ###
+    log.log_assert(not np.any(edges_table_manip.sum(1) == 0), f'Empty edges table entries found!\ntarget_gids={target_gids}\np.sum(syn_sel_idx)={np.sum(syn_sel_idx)}\nedges_table_manip.size={edges_table_manip.size}')
+    ### ################# ###
+
     return edges_table_manip

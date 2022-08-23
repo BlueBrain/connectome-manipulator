@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 
 import numpy as np
+import pyarrow.parquet as pq
 from bluepysnap.circuit import Circuit
 
 from connectome_manipulator import log
@@ -83,8 +84,13 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_par
     """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!).
        [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!!
                    Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
+       [IMPORTANT: All .parquet files used for conversion must be non-empty!!
+                   Otherwise, value errors (zeros) may occur in resulting SONATA file!!]
     """
-    log.info(f'Converting {len(input_file_list)} .parquet file(s) to SONATA')
+    total_num_files = len(input_file_list)
+    input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file mayh occur!!
+    log.info(f'Converting {len(input_file_list)} of {total_num_files} non-empty .parquet file(s) to SONATA')
+    log.log_assert(len(input_file_list) > 0, 'All .parquet files empty - nothing to convert!')
     input_files = ' '.join(input_file_list)
 
     if os.path.exists(output_file):
