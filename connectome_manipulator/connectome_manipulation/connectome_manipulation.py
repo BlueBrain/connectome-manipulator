@@ -410,8 +410,11 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
                 log.info(f'Creating symbolic link ...{symlink_dst} -> {symlink_src}')
 
         # Create bbp-workflow config from template to register manipulated circuit
-        if not manip_config.get('workflow_template') is None:
-            create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
+        if manip_config.get('workflow_template') is not None:
+            if os.path.exists(manip_config['workflow_template']):
+                create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
+            else:
+                log.log_error(f'Unable to create workflow config! Workflow template file "{manip_config["workflow_template"]}" not found!')
 
     resource_profiling(do_profiling, 'final', csv_file=csv_file)
 
