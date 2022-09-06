@@ -70,6 +70,19 @@ class AbstractModel(metaclass=ABCMeta):
 
         return model
 
+    @staticmethod
+    def model_from_dict(model_dict, data_dict=None):
+        """Wrapper function to create model object from dict."""
+        log.log_assert('model' in model_dict, 'ERROR: Model type not found!')
+        if data_dict is None:
+            data_dict = {}
+
+        model_type = model_dict.pop('model')
+        model_class = getattr(sys.modules[__class__.__module__], model_type) # Get model subclass
+        model = model_class(**model_dict, **data_dict) # Initialize model object
+
+        return model
+
     def __init__(self, **kwargs):
         """Model initialization from file or kwargs."""
         if 'model_file' in kwargs: # Load model from file [must be of same type/class]
