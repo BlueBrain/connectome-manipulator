@@ -88,7 +88,7 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_par
                    Otherwise, value errors (zeros) may occur in resulting SONATA file!!]
     """
     total_num_files = len(input_file_list)
-    input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file mayh occur!!
+    input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file may occur!!
     log.info(f'Converting {len(input_file_list)} of {total_num_files} non-empty .parquet file(s) to SONATA')
     log.log_assert(len(input_file_list) > 0, 'All .parquet files empty - nothing to convert!')
     input_files = ' '.join(input_file_list)

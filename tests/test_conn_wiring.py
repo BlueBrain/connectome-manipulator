@@ -33,7 +33,7 @@ def test_apply():
     delay_model_file = os.path.join(TEST_DATA_DIR, f'model_config__DistDepDelay.json') # Deterministic delay model w/o variation
     delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
     pct = 100.0
-
+    print(edges_table_empty.columns)
     # Case 1: Check connectivity with conn. prob. p=0.0 (no connectivity)
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p0.json')
 

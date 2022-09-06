@@ -88,7 +88,7 @@ def test_parquet_to_sonata():
     class FakeNode():
         name = ''
 
-    infiles = []
+    infiles = ['dummy']
     nodes = [FakeNode(), FakeNode()]
     nodefiles = ['fake/path', 'another/one']
 
@@ -100,20 +100,36 @@ def test_parquet_to_sonata():
         def communicate():
             return [''.encode()]
 
+    class MockReadMetadataEmpty():
+        def __init__(self, *args, **kwargs):
+            pass
+        num_rows = 0
+
+    class MockReadMetadata():
+        def __init__(self, *args, **kwargs):
+            pass
+        num_rows = 1
+
     with setup_tempdir(__name__) as tempdir:
         outfile = os.path.join(tempdir, 'test.sonata')
 
         with open(outfile, 'w') as fd:
             fd.write('')
 
-        with patch('subprocess.Popen', MockPopen):
-
-            # check that error is raised if file does not exist after
-            with pytest.raises(AssertionError, match='SONATA'):
+        with patch('pyarrow.parquet.read_metadata', MockReadMetadataEmpty):
+            # check that error is raised if empty input file(s)
+            with pytest.raises(AssertionError, match='All .parquet files empty'):
                 test_module.parquet_to_sonata(infiles, outfile, nodes, nodefiles) 
 
-            # check that the file was removed
-            assert not os.path.exists(outfile)
+        with patch('pyarrow.parquet.read_metadata', MockReadMetadata):
+            with patch('subprocess.Popen', MockPopen):
+
+                # check that error is raised if file does not exist after
+                with pytest.raises(AssertionError, match='SONATA'):
+                    test_module.parquet_to_sonata(infiles, outfile, nodes, nodefiles) 
+
+                # check that the file was removed
+                assert not os.path.exists(outfile)
 
 
 def test_create_new_file_from_template():
