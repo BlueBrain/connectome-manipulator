@@ -45,7 +45,9 @@ def compute(circuit, group_by=None, sel_src=None, sel_dest=None, skip_empty_grou
 
     print(f'INFO: Computing connectivity (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups)', flush=True)
 
-    syn_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))
+    syn_table = np.zeros((len(src_group_sel), len(tgt_group_sel))) # Mean
+    syn_table_min = np.zeros((len(src_group_sel), len(tgt_group_sel))) # Min
+    syn_table_max = np.zeros((len(src_group_sel), len(tgt_group_sel))) # Max
     p_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))
     pbar = progressbar.ProgressBar()
     for idx_pre in pbar(range(len(src_group_sel))):
@@ -64,14 +66,18 @@ def compute(circuit, group_by=None, sel_src=None, sel_dest=None, skip_empty_grou
                 post_count = len(post_ids)
 
                 syn_table[idx_pre, idx_post] = np.mean(scounts)
+                syn_table_min[idx_pre, idx_post] = np.min(scounts)
+                syn_table_max[idx_pre, idx_post] = np.max(scounts)
                 p_table[idx_pre, idx_post] = 100.0 * ccount / (pre_count * post_count)
 
     syn_table_name = 'Synapses per connection'
-    syn_table_unit = 'Mean #syn/conn'
+    syn_table_unit = '#syn/conn'
     p_table_name = 'Connection probability'
     p_table_unit = 'Conn. prob. (%)'
 
-    return {'nsyn_conn': {'data': syn_table, 'name': syn_table_name, 'unit': syn_table_unit},
+    return {'nsyn_conn': {'data': syn_table, 'name': syn_table_name, 'unit': 'Mean ' + syn_table_unit},
+            'nsyn_conn_min': {'data': syn_table_min, 'name': syn_table_name, 'unit': 'Min ' + syn_table_unit},
+            'nsyn_conn_max': {'data': syn_table_max, 'name': syn_table_name, 'unit': 'Max ' + syn_table_unit},
             'conn_prob': {'data': p_table, 'name': p_table_name, 'unit': p_table_unit},
             'common': {'src_group_values': src_group_values, 'tgt_group_values': tgt_group_values}}
 
