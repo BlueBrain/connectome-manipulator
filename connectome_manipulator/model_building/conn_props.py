@@ -194,7 +194,7 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
     return model
 
 
-def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, **_):
+def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, **_):  # pragma: no cover
     """Visualize data vs. model."""
     model_params = model.get_param_dict()
     prop_names = model.get_prop_names()
