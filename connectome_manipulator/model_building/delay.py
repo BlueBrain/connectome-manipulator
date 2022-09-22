@@ -91,7 +91,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     return model
 
 
-def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, model, **_):
+def plot(out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, model, **_):  # pragma: no cover
     """Visualize data vs. model."""
     bin_width = np.diff(dist_bins[:2])[0]
 
