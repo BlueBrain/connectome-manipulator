@@ -77,6 +77,7 @@ class AbstractModel(metaclass=ABCMeta):
         if data_dict is None:
             data_dict = {}
 
+        model_dict = model_dict.copy()
         model_type = model_dict.pop('model')
         model_class = getattr(sys.modules[__class__.__module__], model_type) # Get model subclass
         model = model_class(**model_dict, **data_dict) # Initialize model object
