@@ -658,6 +658,24 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, count_conn, count_all, dist_bins, s
     log.info(f'Saving {out_fn}...')
     plt.savefig(out_fn)
 
+    # Data counts
+    plt.figure(figsize=(6, 4), dpi=300)
+    bip_dist = np.concatenate((-dist_bins[:-1][::-1] - bin_offset, [0.0], dist_bins[:-1] + bin_offset))
+    bip_count_all = np.concatenate((count_all[::-1, 0], [np.nan], count_all[:, 1]))
+    bip_count_conn = np.concatenate((count_conn[::-1, 0], [np.nan], count_conn[:, 1]))
+    plt.bar(bip_dist, bip_count_all, width=1.5 * bin_offset, label='All pair count')
+    plt.bar(bip_dist, bip_count_conn, width=1.0 * bin_offset, label='Connection count')
+    plt.gca().set_yscale('log')
+    plt.grid()
+    plt.xlabel('sign($\\Delta$z) * Distance [$\\mu$m]')
+    plt.ylabel('Count')
+    plt.title(f'Bipolar distance-dependent connection counts (N = {src_cell_count}x{tgt_cell_count} cells)\n<Position mapping: {pos_map_file}>')
+    plt.legend()
+    plt.tight_layout()
+    out_fn = os.path.abspath(os.path.join(out_dir, 'data_counts.png'))
+    log.info(f'Saving {out_fn}...')
+    plt.savefig(out_fn)
+
 
 ###################################################################################################
 # Generative models for circuit connectivity from [Gal et al. 2020]:
