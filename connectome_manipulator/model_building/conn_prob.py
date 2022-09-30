@@ -356,33 +356,74 @@ def extract_2nd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     return {'p_conn_dist': p_conn_dist, 'count_conn': count_conn, 'count_all': count_all, 'dist_bins': dist_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_2nd_order(p_conn_dist, dist_bins, rel_fit_err_th=None, strict_fit=False, **_):
+def build_2nd_order(p_conn_dist, dist_bins, count_all, model_specs=None, rel_fit_err_th=None, strict_fit=False, **_):
     """Build 2nd order model (exponential distance-dependent conn. prob.)."""
-    bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
+    if model_specs is None:
+        model_specs = {'type': 'SimpleExponential'}
 
-    exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
+    bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     X = dist_bins[:-1][np.isfinite(p_conn_dist)] + bin_offset
     y = p_conn_dist[np.isfinite(p_conn_dist)]
-    if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
-        a_opt = b_opt = 0.0
-    else:
-        try:
-            (a_opt, b_opt), pcov = curve_fit(exp_model, X, y, p0=[0.0, 0.0])
-            assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
-            assert b_opt >= 0.0, '"Exponent" must be non-negative!'
-            rel_err = np.sqrt(np.diag(pcov)) / np.array([a_opt, b_opt]) # Rel. standard error of the coefficients
-            log.info(f'Rel. error of 2nd-order model fit: {rel_err}')
-            if rel_fit_err_th is not None:
-                assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
-            if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                assert np.isfinite(p_conn_dist[0]), 'Strict fit violation: Lowest-distance bin empty!'
-        except Exception as e:
-            log.warning(e)
-            (a_opt, b_opt) = (np.nan, np.nan)
 
-    # Create model
-    model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
+    if model_specs.get('type') == 'SimpleExponential': # Exponential curve fit with 2 parameters
+        # Fit simple model
+        exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
+        if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+            a_opt = b_opt = 0.0
+        else:
+            try:
+                p0 = model_specs.get('p0', [0.0, 0.0])
+                bounds = model_specs.get('bounds', [0.0, np.inf])
+                (a_opt, b_opt), pcov = curve_fit(exp_model, X, y, p0=p0, bounds=bounds)
+                assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
+                rel_err = np.sqrt(np.diag(pcov)) / np.array([a_opt, b_opt]) # Rel. standard error of the coefficients
+                log.info(f'Rel. error of simple 2nd-order model fit: {rel_err}')
+                if rel_fit_err_th is not None:
+                    assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+                if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    assert np.isfinite(p_conn_dist[0]), 'Strict fit violation: Lowest-distance bin empty!'
+            except Exception as e:
+                log.warning(e)
+                (a_opt, b_opt) = (np.nan, np.nan)
+
+        # Create simple model
+        model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
+
+    elif model_specs.get('type') == 'ComplexExponential': # Complex (dual) exponential curve fit with 5 parameters [capturing deflection towards distance zero and slowly decaying offset at large distances]
+        # Fit complex model
+        exp_model = lambda x, a, b, c, d, e: a * np.exp(-b * np.array(x)**c) + d * np.exp(-e * np.array(x))
+        if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+            a_opt = b_opt = 0.0
+        else:
+            try:
+                p0 = model_specs.get('p0', [0.0, 0.0, 1.0, 0.0, 0.0])
+                bounds = model_specs.get('bounds', [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]])
+                (a_opt, b_opt, c_opt, d_opt, e_opt), pcov = curve_fit(exp_model, X, y, p0=p0, bounds=bounds)
+                assert 0.0 <= a_opt <= 1.0, 'Proximal "scale" must be between 0 and 1!'
+                assert 0.0 <= d_opt <= 1.0, 'Distal "scale" must be between 0 and 1!'
+                rel_err = np.sqrt(np.diag(pcov)) / np.array([a_opt, b_opt, c_opt, d_opt, e_opt]) # Rel. standard error of the coefficients
+                log.info(f'Rel. error of complex 2nd-order model fit: {rel_err}')
+                if rel_fit_err_th is not None:
+                    assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+                if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    assert np.isfinite(p_conn_dist[0]), 'Strict fit violation: Lowest-distance bin empty!'
+            except Exception as e:
+                log.warning(e)
+                (a_opt, b_opt, c_opt, d_opt, e_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
+
+        # Create complex model
+        model = model_types.ConnProb2ndOrderComplexExpModel(prox_scale=a_opt, prox_exp=b_opt, prox_exp_pow=c_opt, dist_scale=d_opt, dist_exp=e_opt)
+
+    else:
+        log.log_assert(False, f'ERROR: Model type not specified or unknown!')
+
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_dist * count_all).astype(int)
+    p_conn_model = model.get_conn_prob(distance=dist_bins[:-1] + bin_offset)
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
@@ -393,7 +434,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
     model_params = model.get_param_dict()
-    model_str = f'f(x) = {model_params["scale"]:.3f} * exp(-{model_params["exponent"]:.3f} * x)'
+    model_str = model.get_model_str().split('\n')[1].split('=')[-1].strip()
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -405,7 +446,7 @@ def plot_2nd_order(out_dir, p_conn_dist, count_conn, count_all, dist_bins, src_c
     plt.xlabel('Distance [$\\mu$m]')
     plt.ylabel('Conn. prob.')
     plt.title('Data vs. model fit')
-    plt.legend()
+    plt.legend(fontsize=6)
 
     # 2D connection probability (model)
     plt.subplot(1, 2, 2)
@@ -482,54 +523,98 @@ def extract_3rd_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     dist_bins = np.arange(0, num_dist_bins + 1) * bin_size_um
     bip_bins = [np.min(bip_mat), 0, np.max(bip_mat)]
 
-    p_conn_dist_bip, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat, bip_mat], [dist_bins, bip_bins], min_count_per_bin)
+    p_conn_dist_bip, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dist_mat, bip_mat], [dist_bins, bip_bins], min_count_per_bin)
 
-    return {'p_conn_dist_bip': p_conn_dist_bip, 'dist_bins': dist_bins, 'bip_bins': bip_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_dist_bip': p_conn_dist_bip, 'count_conn': count_conn, 'count_all': count_all, 'dist_bins': dist_bins, 'bip_bins': bip_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_3rd_order(p_conn_dist_bip, dist_bins, rel_fit_err_th=None, strict_fit=False, **_):
+def build_3rd_order(p_conn_dist_bip, dist_bins, count_all, model_specs=None, rel_fit_err_th=None, strict_fit=False, **_):
     """Build 3rd order model (bipolar exp. distance-dependent conn. prob.)."""
-    bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
+    if model_specs is None:
+        model_specs = {'type': 'SimpleExponential'}
 
+    bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     X = dist_bins[:-1][np.all(np.isfinite(p_conn_dist_bip), 1)] + bin_offset
     y = p_conn_dist_bip[np.all(np.isfinite(p_conn_dist_bip), 1), :]
 
-    exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
-    if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
-        aN_opt = bN_opt = 0.0
-        aP_opt = bP_opt = 0.0
-    else:
-        try:
-            (aN_opt, bN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=[0.0, 0.0])
-            (aP_opt, bP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=[0.0, 0.0])
-            assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, '"Scale" must be between 0 and 1!'
-            assert bN_opt >= 0.0 and bP_opt >= 0.0, '"Exponent" must not be negative!'
-            rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array([aN_opt, bN_opt, aP_opt, bP_opt]) # Rel. standard error of the coefficients
-            log.info(f'Rel. error of 3rd-order model fit: {rel_err}')
-            if rel_fit_err_th is not None:
-                assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
-            if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                assert np.all(np.isfinite(p_conn_dist_bip[0, :])), 'Strict fit violation: Lowest-distance bin empty!'
-        except Exception as e:
-            log.warning(e)
-            (aN_opt, bN_opt) = (np.nan, np.nan)
-            (aP_opt, bP_opt) = (np.nan, np.nan)
+    if model_specs.get('type') == 'SimpleExponential': # Exponential curve fit with 2x2 parameters
+        # Fit simple model
+        exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
+        if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+            aN_opt = bN_opt = 0.0
+            aP_opt = bP_opt = 0.0
+        else:
+            try:
+                p0 = model_specs.get('p0', [0.0, 0.0])
+                bounds = model_specs.get('bounds', [0.0, np.inf])
+                (aN_opt, bN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=p0, bounds=bounds)
+                (aP_opt, bP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=p0, bounds=bounds)
+                assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, '"Scale" must be between 0 and 1!'
+                rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array([aN_opt, bN_opt, aP_opt, bP_opt]) # Rel. standard error of the coefficients
+                log.info(f'Rel. error of simple 3rd-order model fit: {rel_err}')
+                if rel_fit_err_th is not None:
+                    assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+                if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    assert np.all(np.isfinite(p_conn_dist_bip[0, :])), 'Strict fit violation: Lowest-distance bin empty!'
+            except Exception as e:
+                log.warning(e)
+                (aN_opt, bN_opt) = (np.nan, np.nan)
+                (aP_opt, bP_opt) = (np.nan, np.nan)
 
-    # Create model
-    model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
+        # Create simple model
+        model = model_types.ConnProb3rdOrderExpModel(scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
+
+    elif model_specs.get('type') == 'ComplexExponential': # Complex (dual) exponential curve fit with 2x5 parameters [capturing deflection towards distance zero and slowly decaying offset at large distances]
+        # Fit complex model
+        exp_model = lambda x, a, b, c, d, e: a * np.exp(-b * np.array(x)**c) + d * np.exp(-e * np.array(x))
+        if np.sum(y) == 0.0: # Special case: No connections at all, skipping model fit
+            aN_opt = bN_opt = cN_opt = dN_opt = eN_opt = 0.0
+            aP_opt = bP_opt = cP_opt = dP_opt = eP_opt = 0.0
+        else:
+            try:
+                p0 = model_specs.get('p0', [0.0, 0.0, 1.0, 0.0, 0.0])
+                bounds = model_specs.get('bounds', [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]])
+                (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=p0, bounds=bounds)
+                (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=p0, bounds=bounds)
+                assert 0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0, 'Proximal "scale" must be between 0 and 1!'
+                assert 0.0 <= dN_opt <= 1.0 and 0.0 <= dP_opt <= 1.0, 'Distal "scale" must be between 0 and 1!'
+                rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array([aN_opt, bN_opt, cN_opt, dN_opt, eN_opt, aP_opt, bP_opt, cP_opt, dP_opt, eP_opt]) # Rel. standard error of the coefficients
+                log.info(f'Rel. error of complex 3rd-order model fit: {rel_err}')
+                if rel_fit_err_th is not None:
+                    assert max(rel_err) <= rel_fit_err_th, f'Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!'
+                if strict_fit: # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    assert np.isfinite(p_conn_dist[0]), 'Strict fit violation: Lowest-distance bin empty!'
+            except Exception as e:
+                log.warning(e)
+                (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
+                (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
+
+        # Create complex model
+        model = model_types.ConnProb3rdOrderComplexExpModel(prox_scale_N=aN_opt, prox_exp_N=bN_opt, prox_exp_pow_N=cN_opt, dist_scale_N=dN_opt, dist_exp_N=eN_opt,
+                                                            prox_scale_P=aP_opt, prox_exp_P=bP_opt, prox_exp_pow_P=cP_opt, dist_scale_P=dP_opt, dist_exp_P=eP_opt,
+                                                            bip_coord=2) # [bip_coord=2 ... bipolar along z-axis]
+    else:
+        log.log_assert(False, f'ERROR: Model type not specified or unknown!')
+
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_dist_bip * count_all).astype(int)
+    p_conn_model = np.array([model.get_conn_prob(distance=dist_bins[:-1] + bin_offset, bip=bip) for bip in [-1, 1]]).T
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
 
-def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell_count, model, pos_map_file=None, **_):  # pragma: no cover
+def plot_3rd_order(out_dir, p_conn_dist_bip, count_conn, count_all, dist_bins, src_cell_count, tgt_cell_count, model, pos_map_file=None, **_):  # pragma: no cover
     """Visualize data vs. model (3rd order)."""
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
     model_params = model.get_param_dict()
-    model_strN = f'{model_params["scale_N"]:.3f} * exp(-{model_params["exponent_N"]:.3f} * x)'
-    model_strP = f'{model_params["scale_P"]:.3f} * exp(-{model_params["exponent_P"]:.3f} * x)'
+    model_strN = model.get_model_str().split('\n')[1].split('=')[-1].strip()
+    model_strP = model.get_model_str().split('\n')[2].split('=')[-1].strip()
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -544,7 +629,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, dist_bins, src_cell_count, tgt_cell
     plt.xlabel('sign($\\Delta$z) * Distance [$\\mu$m]')
     plt.ylabel('Conn. prob.')
     plt.title('Data vs. model fit')
-    plt.legend(loc='upper left')
+    plt.legend(loc='upper left', fontsize=6)
 
     # 2D connection probability (model)
     plt.subplot(1, 2, 2)

@@ -557,7 +557,7 @@ class ConnProb2ndOrderComplexExpModel(AbstractModel):
             log.log_assert(0.0 <= self.dist_scale <= 1.0, 'ERROR: "dist_scale" must be between 0 and 1!')
             log.log_assert(self.dist_exp >= 0.0, 'ERROR: "dist_exp" must be non-negative!')
             test_distance = 1000.0
-            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp, self.prox_exp_pow) < self.exp_fct(test_distance, 1.0, self.dist_exp, 1.0), 'ERROR: Proximal exponential must decay faster than distal exponential!')
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp, self.prox_exp_pow) < self.exp_fct(test_distance, 1.0, self.dist_exp, 1.0), f'ERROR: Proximal exponential must decay faster than distal exponential ({self.get_param_dict()})!')
 
     @staticmethod
     def exp_fct(distance, scale, exponent, exp_power=1.0):
@@ -688,8 +688,8 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
             log.log_assert(self.dist_exp_P >= 0.0 and self.dist_exp_N >= 0.0, 'ERROR: "dist_exp_P/N" must be non-negative!')
             log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
             test_distance = 1000.0
-            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_P, self.prox_exp_pow_P) < self.exp_fct(test_distance, 1.0, self.dist_exp_P, 1.0), 'ERROR: Proximal (P) exponential must decay faster than distal (P) exponential!')
-            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_N, self.prox_exp_pow_N) < self.exp_fct(test_distance, 1.0, self.dist_exp_N, 1.0), 'ERROR: Proximal (N) exponential must decay faster than distal (N) exponential!')
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_P, self.prox_exp_pow_P) < self.exp_fct(test_distance, 1.0, self.dist_exp_P, 1.0), f'ERROR: Proximal (P) exponential must decay faster than distal (P) exponential ({self.get_param_dict()})!')
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_N, self.prox_exp_pow_N) < self.exp_fct(test_distance, 1.0, self.dist_exp_N, 1.0), f'ERROR: Proximal (N) exponential must decay faster than distal (N) exponential ({self.get_param_dict()})!')
 
     @staticmethod
     def exp_fct(distance, scale, exponent, exp_power=1.0):
