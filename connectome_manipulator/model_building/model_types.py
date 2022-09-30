@@ -500,9 +500,14 @@ class ConnProb2ndOrderExpModel(AbstractModel):
             log.log_assert(0.0 <= self.scale <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
             log.log_assert(self.exponent >= 0.0, 'ERROR: "Exponent" must be non-negative!')
 
+    @staticmethod
+    def exp_fct(distance, scale, exponent):
+        """Distance-dependent exponential probability function."""
+        return scale * np.exp(-exponent * np.array(distance))
+
     def get_conn_prob(self, distance):
         """Return (distance-dependent) connection probability."""
-        return self.scale * np.exp(-self.exponent * np.array(distance))
+        return self.exp_fct(distance, self.scale, self.exponent)
 
     @staticmethod
     def compute_dist_matrix(src_pos, tgt_pos):
@@ -527,6 +532,65 @@ class ConnProb2ndOrderExpModel(AbstractModel):
         return model_str
 
 
+class ConnProb2ndOrderComplexExpModel(AbstractModel):
+    """ 2nd order connection probability model (complex exponential distance-dependent),
+        based on a complex (proximal) exponential and a simple (distal) exponential function:
+        -Returns (distance-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = ['prox_scale', 'prox_exp', 'prox_exp_pow', 'dist_scale', 'dist_exp']
+    data_names = []
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        if np.all(np.isnan([getattr(self, p) for p in self.param_names])):
+            log.warning('Empty/invalid model!')
+        else:
+            log.log_assert(0.0 <= self.prox_scale <= 1.0, 'ERROR: "prox_scale" must be between 0 and 1!')
+            log.log_assert(self.prox_exp >= 0.0, 'ERROR: "prox_exp" must be non-negative!')
+            log.log_assert(self.prox_exp_pow >= 0.0, 'ERROR: "prox_exp_pow" must be non-negative!')
+            log.log_assert(0.0 <= self.dist_scale <= 1.0, 'ERROR: "dist_scale" must be between 0 and 1!')
+            log.log_assert(self.dist_exp >= 0.0, 'ERROR: "dist_exp" must be non-negative!')
+            test_distance = 1000.0
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp, self.prox_exp_pow) < self.exp_fct(test_distance, 1.0, self.dist_exp, 1.0), 'ERROR: Proximal exponential must decay faster than distal exponential!')
+
+    @staticmethod
+    def exp_fct(distance, scale, exponent, exp_power=1.0):
+        """Distance-dependent (complex) exponential probability function."""
+        return scale * np.exp(-exponent * np.array(distance)**exp_power)
+
+    def get_conn_prob(self, distance):
+        """Return (distance-dependent) connection probability."""
+        return self.exp_fct(distance, self.prox_scale, self.prox_exp, self.prox_exp_pow) + self.exp_fct(distance, self.dist_scale, self.dist_exp, 1.0)
+
+    @staticmethod
+    def compute_dist_matrix(src_pos, tgt_pos):
+        """Compute distance matrix between pairs of neurons."""
+        dist_mat = distance_matrix(src_pos, tgt_pos)
+        dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+        return dist_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        dist_mat = self.compute_dist_matrix(src_pos, tgt_pos)
+        return self.get_conn_prob(dist_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn(d) = {self.prox_scale:.3f} * exp(-{self.prox_exp:.6f} * d^{self.prox_exp_pow:.3f}) + {self.dist_scale:.3f} * exp(-{self.dist_exp:.3f} * d)\n'
+        model_str = model_str +  '  d...distance'
+        return model_str
+
+
 class ConnProb3rdOrderExpModel(AbstractModel):
     """ 3rd order connection probability model (bipolar exponential distance-dependent):
         -Returns (bipolar distance-dependent) connection probabilities for given source/target neuron positions
@@ -546,13 +610,18 @@ class ConnProb3rdOrderExpModel(AbstractModel):
             log.warning('Empty/invalid model!')
         else:
             log.log_assert(0.0 <= self.scale_P <= 1.0 and 0.0 <= self.scale_N <= 1.0, 'ERROR: "Scale" must be between 0 and 1!')
-            log.log_assert(self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must not be negative!')
+            log.log_assert(self.exponent_P >= 0.0 and self.exponent_N >= 0.0, 'ERROR: "Exponent" must be non-negative!')
             log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
+
+    @staticmethod
+    def exp_fct(distance, scale, exponent):
+        """Distance-dependent exponential probability function."""
+        return scale * np.exp(-exponent * np.array(distance))
 
     def get_conn_prob(self, distance, bip):
         """Return (bipolar distance-dependent) connection probability."""
-        p_conn_N = self.scale_N * np.exp(-self.exponent_N * np.array(distance))
-        p_conn_P = self.scale_P * np.exp(-self.exponent_P * np.array(distance))
+        p_conn_N = self.exp_fct(distance, self.scale_N, self.exponent_N)
+        p_conn_P = self.exp_fct(distance, self.scale_P, self.exponent_P)
         p_conn = np.select([np.array(bip) < 0.0, np.array(bip) > 0.0], [p_conn_N, p_conn_P], default=0.5 * (p_conn_N + p_conn_P))
         return p_conn
 
@@ -588,6 +657,84 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         model_str = f'{self.__class__.__name__}\n'
         model_str = model_str + f'  p_conn(d, delta) = {self.scale_N:.3f} * exp(-{self.exponent_N:.3f} * d) if delta < 0\n'
         model_str = model_str + f'                     {self.scale_P:.3f} * exp(-{self.exponent_P:.3f} * d) if delta > 0\n'
+        model_str = model_str + f'                     AVERAGE OF BOTH MODELS  if delta == 0\n'
+        model_str = model_str + f'  d...distance, delta...difference (tgt minus src) in {coord_str} coordinate'
+        return model_str
+
+
+class ConnProb3rdOrderComplexExpModel(AbstractModel):
+    """ 3rd order connection probability model (bipolar complex exponential distance-dependent),
+        based on a complex (proximal) exponential and a simple (distal) exponential function
+        -Returns (bipolar distance-dependent) connection probabilities for given source/target neuron positions
+    """
+
+    # Names of model inputs, parameters and data frames which are part if this model
+    param_names = ['prox_scale_P', 'prox_scale_N', 'prox_exp_P', 'prox_exp_N', 'prox_exp_pow_P', 'prox_exp_pow_N', 'dist_scale_P', 'dist_scale_N', 'dist_exp_P', 'dist_exp_N', 'bip_coord']
+    data_names = []
+    input_names = ['src_pos', 'tgt_pos']
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        if np.all(np.isnan([getattr(self, p) for p in np.setdiff1d(self.param_names, 'bip_coord')])):
+            log.warning('Empty/invalid model!')
+        else:
+            log.log_assert(0.0 <= self.prox_scale_P <= 1.0 and 0.0 <= self.prox_scale_N <= 1.0, 'ERROR: "prox_scale_P/N" must be between 0 and 1!')
+            log.log_assert(self.prox_exp_P >= 0.0 and self.prox_exp_N >= 0.0, 'ERROR: "prox_exp_P/N" must be non-negative!')
+            log.log_assert(self.prox_exp_pow_P >= 0.0 and self.prox_exp_pow_N >= 0.0, 'ERROR: "prox_exp_pow_P/N" must be non-negative!')
+            log.log_assert(0.0 <= self.dist_scale_P <= 1.0 and 0.0 <= self.dist_scale_N <= 1.0, 'ERROR: "dist_scale_P/N" must be between 0 and 1!')
+            log.log_assert(self.dist_exp_P >= 0.0 and self.dist_exp_N >= 0.0, 'ERROR: "dist_exp_P/N" must be non-negative!')
+            log.log_assert(isinstance(self.bip_coord, int) and self.bip_coord >= 0, 'ERROR: Bipolar coordinate "bip_coord" must be a non-negative integer!')
+            test_distance = 1000.0
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_P, self.prox_exp_pow_P) < self.exp_fct(test_distance, 1.0, self.dist_exp_P, 1.0), 'ERROR: Proximal (P) exponential must decay faster than distal (P) exponential!')
+            log.log_assert(self.exp_fct(test_distance, 1.0, self.prox_exp_N, self.prox_exp_pow_N) < self.exp_fct(test_distance, 1.0, self.dist_exp_N, 1.0), 'ERROR: Proximal (N) exponential must decay faster than distal (N) exponential!')
+
+    @staticmethod
+    def exp_fct(distance, scale, exponent, exp_power=1.0):
+        """Distance-dependent (complex) exponential probability function."""
+        return scale * np.exp(-exponent * np.array(distance)**exp_power)
+
+    def get_conn_prob(self, distance, bip):
+        """Return (bipolar distance-dependent) connection probability."""   
+        p_conn_N = self.exp_fct(distance, self.prox_scale_N, self.prox_exp_N, self.prox_exp_pow_N) + self.exp_fct(distance, self.dist_scale_N, self.dist_exp_N, 1.0)
+        p_conn_P = self.exp_fct(distance, self.prox_scale_P, self.prox_exp_P, self.prox_exp_pow_P) + self.exp_fct(distance, self.dist_scale_P, self.dist_exp_P, 1.0)
+        p_conn = np.select([np.array(bip) < 0.0, np.array(bip) > 0.0], [p_conn_N, p_conn_P], default=0.5 * (p_conn_N + p_conn_P))
+        return p_conn
+
+    @staticmethod
+    def compute_dist_matrix(src_pos, tgt_pos):
+        """Compute distance matrix between pairs of neurons."""
+        dist_mat = distance_matrix(src_pos, tgt_pos)
+        dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
+        return dist_mat
+
+    @staticmethod
+    def compute_bip_matrix(src_pos, tgt_pos, bip_coord=2):
+        """Computes bipolar matrix between pairs of neurons along specified coordinate axis (default: 2..z-axis),
+           defined as sign of target (POST-synaptic) minus source (PRE-synaptic) coordinate value
+           (i.e., POST-synaptic neuron below (delta < 0) or above (delta > 0) PRE-synaptic neuron assuming
+            axis values increasing from lower to upper layers)"""
+        bip_mat = np.sign(np.diff(np.meshgrid(src_pos[:, bip_coord], tgt_pos[:, bip_coord], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in specified coordinate
+        return bip_mat
+
+    def get_model_output(self, **kwargs):
+        """Return (bipolar distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        src_pos = kwargs['src_pos']
+        tgt_pos = kwargs['tgt_pos']
+        log.log_assert(src_pos.shape[1] == tgt_pos.shape[1], 'ERROR: Dimension mismatch of source/target neuron positions!')
+        dist_mat = self.compute_dist_matrix(src_pos, tgt_pos)
+        bip_mat = self.compute_bip_matrix(src_pos, tgt_pos, self.bip_coord)
+        return self.get_conn_prob(dist_mat, bip_mat)
+
+    def get_model_str(self):
+        """Return model string describing the model."""
+        coord_nr = self.bip_coord + 1
+        coord_str = f'{coord_nr}{"st" if coord_nr == 1 else "nd" if coord_nr == 2 else "rd" if coord_nr == 3 else "th"}'
+        model_str = f'{self.__class__.__name__}\n'
+        model_str = model_str + f'  p_conn(d, delta) = {self.prox_scale_N:.3f} * exp(-{self.prox_exp_N:.6f} * d^{self.prox_exp_pow_N:.3f}) + {self.dist_scale_N:.3f} * exp(-{self.dist_exp_N:.3f} * d) if delta < 0\n'
+        model_str = model_str + f'                     {self.prox_scale_P:.3f} * exp(-{self.prox_exp_P:.6f} * d^{self.prox_exp_pow_P:.3f}) + {self.dist_scale_P:.3f} * exp(-{self.dist_exp_P:.3f} * d) if delta > 0\n'
         model_str = model_str + f'                     AVERAGE OF BOTH MODELS  if delta == 0\n'
         model_str = model_str + f'  d...distance, delta...difference (tgt minus src) in {coord_str} coordinate'
         return model_str
