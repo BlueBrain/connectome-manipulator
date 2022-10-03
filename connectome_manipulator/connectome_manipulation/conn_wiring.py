@@ -86,61 +86,6 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
 
     # Run connection wiring
     all_new_edges = connectome_wiring_wrapper(src_node_ids, src_pos, src_mtypes, src_class, tgt_node_ids, tgt_pos, tgt_mtypes, get_tgt_morph, p_model, nsynconn_model, delay_model, edges_table_init=edges_table)
-#     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-#     progress_pct = np.maximum(0, np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int))
-#     for tidx, tgt in enumerate(tgt_node_ids):
-#         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
-#             print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
-
-#         # Determine conn. prob. of all source nodes to be connected with target node
-#         tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_acc is None else pos_acc, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-#         p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten()
-#         p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
-#         p_src[src_node_ids == tgt] = 0.0 # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
-
-#         # Sample new presynaptic neurons from list of source nodes according to conn. prob.
-#         src_new_sel = np.random.rand(len(src_node_ids)) < p_src
-#         src_new = src_node_ids[src_new_sel] # New source node IDs per connection
-#         num_new = len(src_new)
-#         if num_new == 0:
-#             continue # Nothing to wire
-
-#         # Sample number of synapses per connection
-#         num_syn_per_conn = [nsynconn_model.draw(model_types.N_SYN_PER_CONN_NAME, src_type=s, tgt_type=tgt_mtypes[tidx])[0] for s in src_mtypes[src_new_sel]]
-#         syn_conn_idx = np.concatenate([[i] * n for i, n in enumerate(num_syn_per_conn)]) # Create mapping from synapses to connections
-#         num_gen_syn = len(syn_conn_idx) # Number of synapses to generate
-
-#         # Create new synapses
-#         new_edges = edges_table.loc[[]].copy() # Initialize empty
-#         new_edges['@source_node'] = src_new[syn_conn_idx] # Source node IDs per connection expanded to synapses
-#         new_edges['@target_node'] = tgt
-        
-#         # Place synapses randomly on soma/dendrite sections
-#         # [TODO: Add model for synapse placement??]
-#         morph = get_tgt_morph(tgt)
-#         sec_ind = np.hstack([[-1], np.where(np.isin(morph.section_types, [nm.BASAL_DENDRITE, nm.APICAL_DENDRITE]))[0]]) # Soma/dendrite section indices; soma...-1
-
-#         sec_sel = np.random.choice(sec_ind, len(syn_conn_idx)) # Randomly choose section indices
-#         off_sel = np.random.rand(len(syn_conn_idx)) # Randomly choose fractional offset within each section
-#         off_sel[sec_sel == -1] = 0.0 # Soma offsets must be zero
-#         type_sel = [int(morph.section(sec).type) if sec >= 0 else 0 for sec in sec_sel] # Type 0: Soma (1: Axon, 2: Basal, 3: Apical)
-#         pos_sel = np.array([nm.morphmath.path_fraction_point(morph.section(sec).points, off) if sec >= 0 else morph.soma.center.astype(float) for sec, off in zip(sec_sel, off_sel)]) # Synapse positions, computed from section & offset
-#         syn_type = np.select([src_class[new_edges['@source_node']].to_numpy() == 'INH', src_class[new_edges['@source_node']].to_numpy() == 'EXC'], [np.full(num_gen_syn, 0), np.full(num_gen_syn, 100)]) # INH: 0-99 (Using 0); EXC: >=100 (Using 100)
-
-#         new_edges['afferent_section_id'] = sec_sel + 1 # IMPORTANT: Section IDs in NeuroM morphology don't include soma, so they need to be shifted by 1 (Soma ID is 0 in edges table)
-#         new_edges['afferent_section_pos'] = off_sel
-#         new_edges['afferent_section_type'] = type_sel
-#         new_edges[['afferent_center_x', 'afferent_center_y', 'afferent_center_z']] = pos_sel
-#         new_edges['syn_type_id'] = syn_type
-
-#         # Assign distance-dependent delays, based on (generative) delay model (optional)
-#         if delay_model is not None:
-#             src_new_pos = nodes[0].positions(src_new).to_numpy()
-#             syn_dist = np.sqrt(np.sum((pos_sel - src_new_pos[syn_conn_idx, :])**2, 1)) # Distance from source neurons (soma) to synapse positions on target neuron
-#             new_edges['delay'] = delay_model.apply(distance=syn_dist)
-
-#         # Add new_edges to edges table
-#         all_new_edges = all_new_edges.append(new_edges)
 
     # Drop empty (NaN) columns [OTHERWISE: Problem converting to SONATA]
     init_prop_count = all_new_edges.shape[1]

@@ -338,7 +338,9 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
 
             # Apply connectome manipulation
             aux_dict.update({'N_split': N_split, 'i_split': i_split, 'split_ids': split_ids})
-            edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict).astype(column_types) # Apply manipulation & restore original column data types
+            edges_table_manip = apply_manipulation(edges_table, nodes, manip_config, aux_dict) # Apply manipulation
+            column_types = {col: column_types[col] for col in edges_table_manip.columns} # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
+            edges_table_manip = edges_table_manip.astype(column_types) # Restore original column data types
             ### [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
             log.log_assert(edges_table_manip['@target_node'].is_monotonic_increasing, 'Target nodes not monotonically increasing!') # [TESTING/DEBUGGING]
             N_syn_out.append(edges_table_manip.shape[0])
