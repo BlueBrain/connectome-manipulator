@@ -11,6 +11,7 @@ import os
 import neurom as nm
 import numpy as np
 import pandas as pd
+import tqdm
 
 from bluepysnap.morph import MorphHelper
 from connectome_manipulator import log
@@ -241,3 +242,44 @@ def connectome_wiring_wrapper(src_node_ids, src_positions, src_mtypes, src_class
         all_new_edges = pd.concat([all_new_edges, new_edges])
 
     return all_new_edges
+
+
+def connectome_wiring_per_pathway(nodes, pathway_models, seed=0):
+    """ Stand-alone connectome wiring per pathway, i.e., wiring pathways using pathway-specific probability/nsynconn/delay models. """
+
+    # Init random seed for connectome building and sampling from parameter distributions
+    np.random.seed(seed)
+
+    # Prepare to load target (dendritic) morphologies
+    morph_dir = nodes.config['morphologies_dir']
+    tgt_morph = MorphHelper(morph_dir, nodes, {'h5v1': os.path.join(morph_dir, 'h5v1'), 'neurolucida-asc': os.path.join(morph_dir, 'ascii')})
+    tgt_morph_access = lambda node_id: tgt_morph.get(node_id, transform=True, extension='h5') # Access function to retrieve morphology for given ID (incl. transformation!), using specified format (swc/h5/...)
+
+    # Loop over pathways
+    new_edges_per_pathway = []
+    for (pre_type, post_type, prob_model, nsynconn_model, delay_model) in tqdm.tqdm(list(zip(pathway_models['pre'], pathway_models['post'], pathway_models['prob_model'], pathway_models['nsynconn_model'], pathway_models['delay_model']))):
+        # [OPTIMIZATION: Run wiring of pathways in parallel]
+
+        # Select source/target nodes
+        src_node_ids = nodes.ids({'mtype': pre_type})
+        src_class = nodes.get(src_node_ids, properties='synapse_class').to_numpy()
+        src_mtypes = nodes.get(src_node_ids, properties='mtype').to_numpy()
+        src_positions = nodes.positions(src_node_ids).to_numpy() # OPTIONAL: Coordinate system transformation may be added here
+
+        tgt_node_ids = nodes.ids({'mtype': post_type})
+        tgt_mtypes = nodes.get(tgt_node_ids, properties='mtype').to_numpy()
+        tgt_positions = nodes.positions(tgt_node_ids).to_numpy() # OPTIONAL: Coordinate system transformation may be added here
+
+        # Create edges per pathway
+        new_edges_per_pathway.append(connectome_wiring_wrapper(src_node_ids, src_positions, src_mtypes, src_class, tgt_node_ids, tgt_positions, tgt_mtypes, tgt_morph_access, prob_model, nsynconn_model, delay_model))
+
+        # ALTERNATIVE: Write to .parquet file and merge/convert to SONATA later
+        # ... connectome_manipulation.edges_to_parquet(edges_table, output_file)
+        # ... connectome_manipulation.parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_parquet=False)
+
+    # Merge edges, re-sort, and assign new index
+    edges_table = pd.concat(new_edges_per_pathway)
+    edges_table.sort_values(['@target_node', '@source_node'], inplace=True)
+    edges_table.reset_index(inplace=True, drop=True)
+
+    return edges_table
