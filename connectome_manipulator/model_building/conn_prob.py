@@ -716,12 +716,12 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
     dy_bins = np.arange(0, num_bins_dy + 1) * bin_size_dy + dy_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_offset, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dx_mat, dy_mat, dz_mat], [dx_bins, dy_bins, dz_bins], min_count_per_bin)
+    p_conn_offset, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dx_mat, dy_mat, dz_mat], [dx_bins, dy_bins, dz_bins], min_count_per_bin)
 
-    return {'p_conn_offset': p_conn_offset, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_offset': p_conn_offset, 'count_conn': count_conn, 'count_all': count_all, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
@@ -779,6 +779,13 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, model_specs=None, 
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
+    dxv, dyv, dzv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
+    p_conn_model = model.get_conn_prob(dx=dxv, dy=dyv, dz=dzv)
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
@@ -960,12 +967,12 @@ def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size
     dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_offset, count_conn_offset, count_all_offset = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dr_mat, dz_mat], [dr_bins, dz_bins], min_count_per_bin)
+    p_conn_offset, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [dr_mat, dz_mat], [dr_bins, dz_bins], min_count_per_bin)
 
-    return {'p_conn_offset': p_conn_offset, 'count_conn_offset': count_conn_offset, 'count_all_offset': count_all_offset, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_offset': p_conn_offset, 'count_conn': count_conn, 'count_all': count_all, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build reduced 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
@@ -1012,6 +1019,13 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, model_specs=None, s
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
+    drv, dzv = np.meshgrid(dr_pos, dz_pos, indexing='ij')
+    p_conn_model = model.get_conn_prob(dr=drv, dz=dzv)
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
@@ -1128,12 +1142,12 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
     dy_bins = np.arange(0, num_bins_dy + 1) * bin_size_dy + dy_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat], [x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins], min_count_per_bin)
+    p_conn_position, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [x_mat, y_mat, z_mat, dx_mat, dy_mat, dz_mat], [x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins], min_count_per_bin)
 
-    return {'p_conn_position': p_conn_position, 'x_bins': x_bins, 'y_bins': y_bins, 'z_bins': z_bins, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_position': p_conn_position, 'count_conn': count_conn, 'count_all': count_all, 'x_bins': x_bins, 'y_bins': y_bins, 'z_bins': z_bins, 'dx_bins': dx_bins, 'dy_bins': dy_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
@@ -1200,6 +1214,13 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
+    xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos, indexing='ij')
+    p_conn_model = model.get_conn_prob(x=xv, y=yv, z=zv, dx=dxv, dy=dyv, dz=dzv)
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
@@ -1415,12 +1436,12 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
     dr_bins = np.arange(0, num_bins_dr + 1) * bin_size_dr + dr_range[0]
     dz_bins = np.arange(0, num_bins_dz + 1) * bin_size_dz + dz_range[0]
 
-    p_conn_position, _, _ = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [z_mat, dr_mat, dz_mat], [z_bins, dr_bins, dz_bins], min_count_per_bin)
+    p_conn_position, count_conn, count_all = extract_dependent_p_conn(src_node_ids, tgt_node_ids, edges, [z_mat, dr_mat, dz_mat], [z_bins, dr_bins, dz_bins], min_count_per_bin)
 
-    return {'p_conn_position': p_conn_position, 'z_bins': z_bins, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
+    return {'p_conn_position': p_conn_position, 'count_conn': count_conn, 'count_all': count_all, 'z_bins': z_bins, 'dr_bins': dr_bins, 'dz_bins': dz_bins, 'src_cell_count': len(src_node_ids), 'tgt_cell_count': len(tgt_node_ids)}
 
 
-def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_specs=None, smoothing_sigma_um=None, **_):
+def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build reduced 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {'name': 'LinearInterpolation'}
@@ -1468,6 +1489,13 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, model_spe
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
+
+    # Check model prediction of total number of connections
+    conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
+    zv, drv, dzv = np.meshgrid(z_pos, dr_pos, dz_pos, indexing='ij')
+    p_conn_model = model.get_conn_prob(z=zv, dr=drv, dz=dzv)
+    conn_count_model = np.nansum(p_conn_model * count_all).astype(int)
+    log.info(f'Model prediction of total number of connections: {conn_count_model} (model) vs. {conn_count_data} (data); DIFF {conn_count_model - conn_count_data} ({100.0 * (conn_count_model - conn_count_data) / conn_count_data:.2f}%)')
 
     return model
 
