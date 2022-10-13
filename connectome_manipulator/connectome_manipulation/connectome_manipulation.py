@@ -8,6 +8,7 @@ Main module for connectome manipulations:
 import importlib
 import json
 import os
+import shutil
 import pandas as pd
 import resource
 import subprocess
@@ -73,6 +74,7 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     return edges_table
 
 
+### CODE for parquet-converters/0.5.7 from archive/2021-07 ###
 def edges_to_parquet(edges_table, output_file):
     """Write edge properties table to parquet file."""
     edges_table = edges_table.rename(columns={'@target_node': 'connected_neurons_post', '@source_node': 'connected_neurons_pre'}) # Convert column names
@@ -108,6 +110,58 @@ def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_par
         log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s)')
         for fn in input_file_list:
             os.remove(fn)
+### ### ### ### ### ### ### ### ### ### ### ###
+
+
+### CODE for parquet-converters/0.6.0 and higher => ERROR: No proper SONATA file [edges_manip.source => Unable to open the attribute "node_population": (Attribute) Object not found]
+# def edges_to_parquet(edges_table, output_file):
+#     """Write edge properties table to parquet file."""
+#     edges_table = edges_table.rename(columns={'@target_node': 'target_node_id', '@source_node': 'source_node_id'}) # Convert column names
+#     edges_table['synapse_type_id'] = 0 # Add type ID, required for SONATA
+#     edges_table.to_parquet(output_file, index=False)
+
+
+# def parquet_to_sonata(input_file_list, output_file, _nodes, _nodes_files, keep_parquet=False):
+#     """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!).
+#        [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!!
+#                    Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
+#        [IMPORTANT: All .parquet files used for conversion must be non-empty!!
+#                    Otherwise, value errors (zeros) may occur in resulting SONATA file!!]
+#     """
+#     total_num_files = len(input_file_list)
+#     input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file may occur!!
+#     log.info(f'Converting {len(input_file_list)} of {total_num_files} non-empty .parquet file(s) to SONATA')
+#     log.log_assert(len(input_file_list) > 0, 'All .parquet files empty - nothing to convert!')
+#     input_files = ' '.join(input_file_list)
+
+#     if os.path.exists(output_file):
+#         os.remove(output_file)
+
+#     # Creating temporary folder with symbolic links to .parquet files [parquet converter >= 0.6.0 works within a input directory]
+#     base_dir = os.path.split(input_file_list[0])[0]
+#     tmp_dir = os.path.join(base_dir, f'_tmp_{"".join([hex(x)[2:] for x in np.random.randint(16, size=16)])}_')
+#     assert not os.path.exists(tmp_dir), 'ERROR: Temp. directory already exists!'
+#     os.makedirs(tmp_dir)
+#     for file in input_file_list:
+#         fn = os.path.split(file)[1]
+#         os.symlink(os.path.join('..', fn), os.path.join(tmp_dir, fn))
+
+#     # Running parquet conversion [Requires parquet-converters/0.6.0 from archive/2021-07 or higher (which should be used by used JupyterLab kernel)]
+#     proc = subprocess.Popen(f'module load parquet-converters;\
+#                               parquet2hdf5 {tmp_dir} {output_file} default',
+#                             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#     log.info(proc.communicate()[0].decode())
+#     log.log_assert(os.path.exists(output_file), 'Parquet conversion error - SONATA file not created successfully!')
+
+#     # Delete temporary folder
+#     shutil.rmtree(tmp_dir)
+
+#     # Delete temporary parquet files (optional)
+#     if not keep_parquet:
+#         log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s)')
+#         for fn in input_file_list:
+#             os.remove(fn)
+### ### ### ### ### ### ### ### ### ### ### ###
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
