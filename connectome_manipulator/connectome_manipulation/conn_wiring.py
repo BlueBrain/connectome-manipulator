@@ -202,8 +202,14 @@ def connectome_wiring_per_pathway(nodes, pathway_models, seed=0):
 
     # Loop over pathways
     new_edges_per_pathway = []
-    for (pre_type, post_type, prob_model, nsynconn_model, delay_model) in tqdm.tqdm(list(zip(pathway_models['pre'], pathway_models['post'], pathway_models['prob_model'], pathway_models['nsynconn_model'], pathway_models['delay_model']))):
+    for pathway_dict in tqdm.tqdm(pathway_models):
         # [OPTIMIZATION: Run wiring of pathways in parallel]
+
+        pre_type = pathway_dict['pre']
+        post_type = pathway_dict['post']
+        prob_model = pathway_dict['prob_model']
+        nsynconn_model = pathway_dict['nsynconn_model']
+        delay_model = pathway_dict['delay_model']
 
         # Select source/target nodes
         src_node_ids = nodes.ids({'mtype': pre_type})
