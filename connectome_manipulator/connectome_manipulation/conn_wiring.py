@@ -19,33 +19,50 @@ from connectome_manipulator.model_building import model_types, conn_prob
 from connectome_manipulator.access_functions import get_node_ids
 
 # IDEAs for improvements:
-#   Accept model file name OR model dict for prob_model_file, nsynconn_model_file, delay_model_file
 #   Add model for synapse placement
 
 def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, sel_src=None, sel_dest=None, delay_model_file=None, pos_map_file=None, amount_pct=100.0, morph_ext='swc'):
     """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
-       => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays"""
+       => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
+       => Model dict can be passed instead of files: prob_model_file, nsynconn_model_file, delay_model_file (NOT for pos_map_file)
+    """
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
-    if edges_table.shape[0] > 0:
+    if edges_table is None:
+        edges_table = init_edges_table(with_delay=delay_model_file is not None) # Create empty edges table
+    elif edges_table.shape[0] == 0:
+        log.warning(f'Empty connectome with {edges_table.shape[1]} properties! Existing properties may be removed to match newly generated synapses.')
+    else:
         log.warning(f'Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses.')
 
-    # Load connection probability model
-    log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
-    log.info(f'Loading conn. prob. model from {prob_model_file}')
-    p_model = model_types.AbstractModel.model_from_file(prob_model_file)
+    # Load connection probability model (from file OR dict)
+    if isinstance(prob_model_file, dict):
+        p_model = model_types.AbstractModel.model_from_dict(prob_model_file)
+        log.info(f'Loading conn. prob. model from dict')
+    else:
+        log.log_assert(os.path.exists(prob_model_file), 'Conn. prob. model file not found!')
+        log.info(f'Loading conn. prob. model from {prob_model_file}')
+        p_model = model_types.AbstractModel.model_from_file(prob_model_file)
     log.log_assert(p_model.input_names == ['src_pos', 'tgt_pos'], 'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!')
     log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
-    # Load #synapses/connection model
-    log.log_assert(os.path.exists(nsynconn_model_file), '#synapses/connection model file not found!')
-    log.info(f'Loading #synapses/connection model from {nsynconn_model_file}')
-    nsynconn_model = model_types.AbstractModel.model_from_file(nsynconn_model_file)
+    # Load #synapses/connection model (from file OR dict)
+    if isinstance(nsynconn_model_file, dict):
+        nsynconn_model = model_types.AbstractModel.model_from_dict(nsynconn_model_file)
+        log.info(f'Loading #synapses/connection model from dict')
+    else:
+        log.log_assert(os.path.exists(nsynconn_model_file), '#synapses/connection model file not found!')
+        log.info(f'Loading #synapses/connection model from {nsynconn_model_file}')
+        nsynconn_model = model_types.AbstractModel.model_from_file(nsynconn_model_file)
 
     # Load delay model (optional)
     if delay_model_file is not None:
-        log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
-        log.info(f'Loading delay model from {delay_model_file}')
-        delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
+        if isinstance(delay_model_file, dict):
+            delay_model = model_types.AbstractModel.model_from_dict(delay_model_file)
+            log.info(f'Loading delay model from dict')
+        else:
+            log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
+            log.info(f'Loading delay model from {delay_model_file}')
+            delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
         log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
     else:
         delay_model = None
@@ -97,7 +114,6 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
 
     # Add new synapses to table, re-sort, and assign new index
     init_edge_count = edges_table.shape[0]
-#     edges_table = edges_table.append(all_new_edges)
     edges_table = pd.concat([edges_table, all_new_edges])
     final_edge_count = edges_table.shape[0]
     if final_edge_count > init_edge_count:
@@ -112,21 +128,29 @@ def apply(edges_table, nodes, aux_dict, prob_model_file, nsynconn_model_file, se
 SYNAPSE_PROPERTIES = ['@target_node', '@source_node', 'afferent_section_id', 'afferent_section_pos', 'afferent_section_type', 'afferent_center_x', 'afferent_center_y', 'afferent_center_z', 'syn_type_id', 'delay']
 PROPERTY_TYPES = {'@target_node': 'int64', '@source_node': 'int64', 'afferent_section_id': 'int32', 'afferent_section_pos': 'float32', 'afferent_section_type': 'int16', 'afferent_center_x': 'float32', 'afferent_center_y': 'float32', 'afferent_center_z': 'float32', 'syn_type_id': 'int16', 'delay': 'float32'}
 
-def connectome_wiring_wrapper(src_node_ids, src_positions, src_mtypes, src_class, tgt_node_ids, tgt_positions, tgt_mtypes, tgt_morph_access, p_model, nsynconn_model, delay_model, edges_table_init=None):
-    """ Stand-alone wrapper for connectome wiring. """
-    if delay_model is None:
-        required_properties = list(filter(lambda x: x != 'delay', SYNAPSE_PROPERTIES))
-    else:
+def init_edges_table(with_delay=True, from_table=None):
+    """ Initializes empty edges table. """
+    if with_delay:
         required_properties = SYNAPSE_PROPERTIES
+    else:
+        required_properties = list(filter(lambda x: x != 'delay', SYNAPSE_PROPERTIES))
 
-    # Create new edges table to collect all generated synapses
-    if edges_table_init is None: # Create empty table
+    if from_table is None: # Create empty table
         all_new_edges = pd.DataFrame([], columns=required_properties).astype(PROPERTY_TYPES)
     else: # Init from existing table
-        all_new_edges = edges_table_init.loc[[]].copy()
+        all_new_edges = from_table.loc[[]].copy()
         log.log_assert(np.all(np.isin(required_properties, all_new_edges.columns)), 'Required synapse properties missing!')
         if not np.all([PROPERTY_TYPES[k] == v for k, v in all_new_edges[required_properties].dtypes.items()]):
             log.warning('Unexpected property data types!')
+
+    return all_new_edges
+
+
+def connectome_wiring_wrapper(src_node_ids, src_positions, src_mtypes, src_class, tgt_node_ids, tgt_positions, tgt_mtypes, tgt_morph_access, p_model, nsynconn_model, delay_model, edges_table_init=None):
+    """ Stand-alone wrapper for connectome wiring. """
+    
+    # Create new edges table to collect all generated synapses
+    all_new_edges = init_edges_table(with_delay=delay_model is not None, from_table=edges_table_init)
 
     # Run connection wiring
 #     progress_pct = np.maximum(0, np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int))

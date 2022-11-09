@@ -28,6 +28,22 @@ def get_node_ids(nodes, sel_spec):
     return gids
 
 
+def get_nodes_population(circuit, popul_name=None):
+    """Select default edge population. Optionally, the population name can be specified."""
+
+    log.log_assert(len(circuit.nodes.population_names) > 0, 'No node population found!')
+    if popul_name is None:
+        if len(circuit.nodes.population_names) == 1:
+            popul_name = circuit.nodes.population_names[0] # Select the only existing population
+        else:
+            popul_name = 'All' # Use default name
+            log.warning(f'Multiple node populations found - Trying to load "{popul_name}" population!')
+    log.log_assert(popul_name in circuit.nodes.population_names, f'Population "{popul_name}" not found in edges file!')
+    nodes = circuit.nodes[popul_name]
+
+    return nodes
+
+
 def get_edges_population(circuit, popul_name=None):
     """Select default edge population. Optionally, the population name can be specified."""
 #     log.log_assert(len(circuit.edges.population_names) == 1, 'Only a single edge population per file supported!')
