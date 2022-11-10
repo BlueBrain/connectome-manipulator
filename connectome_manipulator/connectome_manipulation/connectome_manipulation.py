@@ -30,7 +30,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     log.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
     c = Circuit(sonata_config)
 
-    if 'edges' in c.config['networks'] and len(c.config['networks']['edges']) > 0:
+    if hasattr(c, 'edges') and hasattr(c.edges, 'population_names') and len(c.edges.population_names) > 0:
         # Select edge population
         edges = get_edges_population(c, popul_name)
         edges_file = c.config['networks']['edges'][0]['edges_file']
@@ -596,12 +596,13 @@ def main_wrapper():
          do_profiling (optional): Disable (0; default) or enable (1) resource profiling
          do_resume (optional): Disable (0; default) or enable (1) resume option in case .parquet file(s) already exist
          keep_parquet (optional): Disable (0; default) or enable (1) keeping temporary .parquet file(s) after completion
+         wiring_from_scratch: Disable (0: default) or enable (1) to run connectome wiring from scratch for circuits w/o connectome (rather than manipulations of existing connectomes)
     """
 
     # Parse inputs
     args = sys.argv[1:]
     if len(args) < 1:
-        print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet]')
+        print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet] [wiring_from_scratch]')
         sys.exit(2)
 
     # Load config dict
@@ -626,8 +627,17 @@ def main_wrapper():
     else:
         keep_parquet = False
 
+    # Read wiring_from_scratch flag
+    if len(args) > 4:
+        wiring_from_scratch = bool(int(args[4]))
+    else:
+        wiring_from_scratch = False
+
     # Call main function
-    main(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
+    if wiring_from_scratch:
+        main_wiring(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
+    else:
+        main(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
 
 
 if __name__ == "__main__":

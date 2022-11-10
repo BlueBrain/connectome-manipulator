@@ -5,7 +5,7 @@ import pytest
 from mock import patch, Mock
 
 from bluepysnap import Circuit
-from bluepysnap.nodes import NodePopulation
+from bluepysnap.nodes import NodePopulation, Nodes
 from bluepysnap.edges import EdgePopulation
 
 from utils import create_fake_module, setup_tempdir, TEST_DATA_DIR
@@ -14,14 +14,31 @@ import connectome_manipulator.connectome_manipulation.connectome_manipulation as
 
 
 def test_load_circuit():
-    # Check error handling if no edge population exists
-    with patch(f'connectome_manipulator.connectome_manipulation.connectome_manipulation.Circuit'
-               ) as patched:
-        patched.return_value = Mock(edges=Mock(population_names=[]))
+    config_path = os.path.join(TEST_DATA_DIR, 'circuit_sonata.json')
 
-        expected_error = 'No edge population found!'
-        with pytest.raises(AssertionError, match=expected_error):
-            test_module.load_circuit('fake_config')
+    # Check error handling if no edge population exists
+    with patch(f'connectome_manipulator.connectome_manipulation.connectome_manipulation.Circuit.edges'
+               ) as patched:
+        patched.return_value = Mock(population_names=[])
+        # patched.return_value = Mock(edges=Mock(population_names=[]))
+
+        # UPDATE 10/11/2022: Circuits w/o edge population can be loaded and won't rise an error any more.
+        #                    Returned edges-related values will be None.
+        # expected_error = 'No edge population found!'
+        # with pytest.raises(AssertionError, match=expected_error):
+        #     test_module.load_circuit('fake_config')
+        res = test_module.load_circuit(config_path)
+
+        # Check that there are 2 instances of NodePopulation in first item
+        assert len(res[0]) == 2
+        assert all(isinstance(r, NodePopulation) for r in res[0])
+
+        # Check that two paths are returned and they're correct
+        assert len(res[1]) == 2
+        assert all(r == os.path.join(TEST_DATA_DIR, 'nodes.h5') for r in res[1])
+
+        # Check that edges-related values are None
+        assert res[3] is res[4] is res[5] is None
 
     # Check error handling if more than one non-default populations exist and no population name is specified
     with patch(f'connectome_manipulator.connectome_manipulation.connectome_manipulation.Circuit'
@@ -32,7 +49,6 @@ def test_load_circuit():
         with pytest.raises(AssertionError, match=expected_error):
             test_module.load_circuit('fake_config')
 
-    config_path = os.path.join(TEST_DATA_DIR, 'circuit_sonata.json')
     n_split = 2
     res = test_module.load_circuit(config_path, N_split=n_split)
 
