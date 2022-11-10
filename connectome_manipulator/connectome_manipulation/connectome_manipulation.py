@@ -30,7 +30,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     log.info(f'Loading circuit from {sonata_config} (N_split={N_split})')
     c = Circuit(sonata_config)
 
-    if 'edges' in c.config['networks']:
+    if 'edges' in c.config['networks'] and len(c.config['networks']['edges']) > 0:
         # Select edge population
         edges = get_edges_population(c, popul_name)
         edges_file = c.config['networks']['edges'][0]['edges_file']
@@ -40,7 +40,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
         tgt_nodes = edges.target
         if src_nodes is not tgt_nodes:
             log.log_assert(len(np.intersect1d(src_nodes.ids(), tgt_nodes.ids())) == 0, 'Node IDs must be unique across different node populations!')
-    else:
+    else: # Circuit w/o edges
         edges = None
         edges_file = None
         popul_name = None
@@ -195,7 +195,7 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
         file.write(content)
 
 
-def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, orig_base_dir=None, popul_name=None):
+def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_edges_fn, orig_base_dir=None, popul_name=None, rel_edges_path=None):
     """Create new SONATA config (.JSON) from original, incl. modifications."""
     log.info(f'Creating SONATA config {new_config_file}')
 
@@ -220,6 +220,14 @@ def create_sonata_config(new_config_file, new_edges_fn, orig_config_file, orig_e
         config['manifest'] = {'$ORIG_BASE_DIR': orig_base_dir, **config['manifest'], '$BASE_DIR': '.'}
         if '$NETWORK_EDGES_DIR' in config['manifest']:
             config['manifest']['$MANIP_NETWORK_EDGES_DIR'] = config['manifest']['$NETWORK_EDGES_DIR'].replace('$ORIG_BASE_DIR', '$BASE_DIR')
+
+    if not 'edges' in config['networks']: # Circuit w/o edges section
+        config['networks']['edges'] = []
+    if len(config['networks']['edges']) == 0: # Circuit w/o edges populations
+        log.log_assert(not '$NETWORK_EDGES_DIR' in config['manifest'], '"$NETWORK_EDGES_DIR" already defined in circuit w/o connectome!')
+        log.log_assert(rel_edges_path is not None, '"rel_edges_path" required for circuits w/o connectome!')
+        config['networks']['edges'].append({'edges_file': os.path.join('$NETWORK_EDGES_DIR', os.path.split(rel_edges_path)[-1], new_edges_fn), 'edge_types_file': None})
+        config['manifest']['$NETWORK_EDGES_DIR'] = os.path.join('$BASE_DIR', os.path.split(rel_edges_path)[0])
 
     with open(new_config_file, 'w') as f:
         json.dump(config, f, indent=2)
@@ -372,11 +380,15 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
     log.log_assert(edges is None, 'Circuit w/o edges required for connectome wiring! Use "main" for running connectome manipulations instead!')
 
     # Prepare output edges & parquet path
-    rel_edges_path = 'sonata/networks/edges/functional/All'
+    rel_edges_path = 'networks/edges/functional/All'
     edges_fn = f'edges_{manip_config["manip"]["name"]}.h5'
     edges_file = os.path.join(output_path, rel_edges_path, edges_fn)
-    log.log_assert(not os.path.exists(edges_file), f'Edges file "{edges_fn}" already exists!')
-    # TODO: Add overwrite flag!
+    if manip_config.get('overwrite_edges_file', False):
+        if os.path.exists(edges_file):
+            os.remove(edges_file)
+            log.info(f'Edges file "{edges_file}" already exists - Overwriting!')
+    else:
+        log.log_assert(not os.path.exists(edges_file), f'Edges file "{edges_file}" already exists! Use "overwrite_edges_file" to overwrite!')
     parquet_path = os.path.join(output_path, rel_edges_path, 'parquet')
     if not os.path.exists(parquet_path):
         os.makedirs(parquet_path)
@@ -417,10 +429,8 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
     parquet_to_sonata(parquet_file_list, edges_file, nodes, nodes_files, keep_parquet)
 
     # Create new SONATA config (.JSON) from original config file
-    # TODO: Create proper SONATA config!!
     sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
-#     create_sonata_config(sonata_config_manip, edges_fn, sonata_config, edges_fn, orig_base_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None, popul_name=popul_name)
-    log.warning('### NOT YET IMPLEMENTED ###: SONATA config creation!')
+    create_sonata_config(sonata_config_manip, edges_fn, sonata_config, orig_edges_fn=None, orig_base_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None, rel_edges_path=rel_edges_path)
 
     # Write manipulation config to JSON file
     json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
