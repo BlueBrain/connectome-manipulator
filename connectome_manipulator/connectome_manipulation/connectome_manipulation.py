@@ -380,7 +380,7 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
     log.log_assert(edges is None, 'Circuit w/o edges required for connectome wiring! Use "main" for running connectome manipulations instead!')
 
     # Prepare output edges & parquet path
-    rel_edges_path = 'networks/edges/functional/All'
+    rel_edges_path = 'sonata/networks/edges/functional/All'
     edges_fn = f'edges_{manip_config["manip"]["name"]}.h5'
     edges_file = os.path.join(output_path, rel_edges_path, edges_fn)
     if manip_config.get('overwrite_edges_file', False):
@@ -430,7 +430,8 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
 
     # Create new SONATA config (.JSON) from original config file
     sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
-    create_sonata_config(sonata_config_manip, edges_fn, sonata_config, orig_edges_fn=None, orig_base_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None, rel_edges_path=rel_edges_path)
+    rel_edges_path_cfg = os.path.relpath(rel_edges_path, os.path.split(manip_config['circuit_config'])[0]) # Path rel. to config location
+    create_sonata_config(sonata_config_manip, edges_fn, sonata_config, orig_edges_fn=None, orig_base_dir=os.path.join(manip_config['circuit_path'], os.path.split(manip_config['circuit_config'])[0]) if manip_config['circuit_path'] != output_path else None, rel_edges_path=rel_edges_path_cfg)
 
     # Write manipulation config to JSON file
     json_file = os.path.join(os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json')
