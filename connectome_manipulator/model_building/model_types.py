@@ -332,6 +332,8 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!')
         log.log_assert(np.all([[['type' in self.prop_stats[p][src][tgt].keys() for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution type missing!')
         log.log_assert(np.all([[[np.all(np.isin(self.DISTRIBUTION_ATTRIBUTES[self.prop_stats[p][src][tgt]['type']], list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {self.DISTRIBUTION_ATTRIBUTES})!')
+        log.log_assert(np.all([[[self.prop_stats[p][src][tgt]['lower_bound'] <= self.prop_stats[p][src][tgt]['upper_bound'] for p in self.prop_names
+                                 if 'lower_bound' in self.prop_stats[p][src][tgt].keys() and 'upper_bound' in self.prop_stats[p][src][tgt].keys()] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Data bounds error!')
 
     def get_prop_names(self):
         """Return list of connection/synapse property names."""

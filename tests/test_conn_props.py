@@ -65,14 +65,10 @@ def test_extract():
     for k in nsyn_data.keys():
         assert_array_equal(res['syns_per_conn_data'][k], np.full_like(nsyn_data[k], np.nan))
     for k in prop_data.keys():
-        assert_array_almost_equal(res['conn_prop_data'][k], np.full_like(prop_data[k], np.nan))
+        assert_array_equal(res['conn_prop_data'][k], np.full_like(prop_data[k], np.nan))
 
 
 def test_build():
-#     c = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
-#     m_types = [list(c.nodes.property_values('mtype'))] * 2 # src/tgt mtypes
-#     m_type_class = [c.nodes.get({'mtype': m})['synapse_class'] for m in m_types[0]]
-
     m_types = [['L4_MC', 'L4_PC', 'L5_PC']] * 2
     m_type_class = [['INH', 'EXC', 'EXC']] * 2
     m_type_layer = [[4, 4, 5]] * 2
@@ -122,7 +118,7 @@ def test_build():
         test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={pp: 'WRONG_TYPE' for pp in props}, data_types={}, data_bounds={})
 
     # Check data types
-    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={pp: 'int' for pp in props[1:]}, data_bounds={})
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={pp: 'int' for pp in props}, data_bounds={})
     for sidx, s_mt in enumerate(src_mtypes):
         for tidx, t_mt in enumerate(tgt_mtypes):
             for pidx, pp in enumerate(props):
@@ -131,12 +127,121 @@ def test_build():
                 assert isinstance(res.draw(prop_name=pp, src_type=s_mt, tgt_type=t_mt)[0], np.int64)
 
     # Check data bounds
-    # TODO
+    test_bound = 10.0
+    with pytest.raises(AssertionError, match='ERROR: Data bounds error!'):
+        test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={}, data_bounds={pp: [2 * test_bound, test_bound] for pp in props})
+
+    res_l = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={}, data_bounds={pp: [test_bound, np.inf] for pp in props})
+    res_u = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={}, data_bounds={pp: [-np.inf, -test_bound] for pp in props})
+    for sidx, s_mt in enumerate(src_mtypes):
+        for tidx, t_mt in enumerate(tgt_mtypes):
+            for pidx, pp in enumerate(props):
+                model_distr_l = res_l.get_distr_props(prop_name=pp, src_type=s_mt, tgt_type=t_mt)
+                model_distr_u = res_u.get_distr_props(prop_name=pp, src_type=s_mt, tgt_type=t_mt)
+                assert model_distr_l['lower_bound'] == test_bound
+                assert model_distr_u['upper_bound'] == -test_bound
+                assert res_l.draw(prop_name=pp, src_type=s_mt, tgt_type=t_mt)[0] == test_bound
+                assert res_u.draw(prop_name=pp, src_type=s_mt, tgt_type=t_mt)[0] == -test_bound
 
     # Check synapse generation (w/o randomization)
-    # syn = res.apply()
-    # assert syn.shape[0] == 
-    # assert np.all([pp in syn.columns for pp in props])
+    n_syn = 5.0
+    p_val = 2.0
+    prop_data = {k: np.full((len(src_mtypes), len(tgt_mtypes), len(props)), p_val) for k in ['mean', 'min', 'max']}
+    prop_data.update({k: np.zeros((len(src_mtypes), len(tgt_mtypes), len(props))) for k in ['std', 'std-within']})
+    nsyn_data = {k: np.full((len(src_mtypes), len(tgt_mtypes)), n_syn) for k in ['mean', 'min', 'max']}
+    nsyn_data.update({'std': np.zeros((len(src_mtypes), len(tgt_mtypes)))})
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, props, distr_types={}, data_types={}, data_bounds={})
+    for sidx, s_mt in enumerate(src_mtypes):
+        for tidx, t_mt in enumerate(tgt_mtypes):
+            syn = res.apply(src_type=s_mt, tgt_type=t_mt)
+            assert syn.shape[0] == n_syn
+            assert syn.shape[1] == len(props)
+            assert np.all(syn == p_val)
 
     # Check interpolation
-    # TODO
+    m_types = [['L4_PC:A', 'L4_PC:B', 'L5_PC', 'L5_MC']] * 2
+    m_type_class = [['EXC', 'EXC', 'EXC', 'INH']] * 2
+    m_type_layer = [[4, 4, 5, 5]] * 2
+
+    prop = 'conductance'
+    src_mtypes = m_types[0]
+    tgt_mtypes = m_types[1]
+    np.random.seed(0)
+    nsyn_data = {k: np.random.randint(low=1, high=10, size=(len(src_mtypes), len(tgt_mtypes))).astype(float) for k in ['mean', 'std', 'min', 'max']}
+    prop_data = {k: np.random.rand(len(src_mtypes), len(tgt_mtypes), 1) for k in ['mean', 'std', 'std-within', 'min', 'max']}
+
+    test_src = 'L4_PC:A'
+    test_tgt = 'L4_PC:A'
+    test_src_idx = np.where(np.array(src_mtypes) == test_src)[0][0]
+    test_tgt_idx = np.where(np.array(tgt_mtypes) == test_tgt)[0][0]
+
+    ## No interpolation
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    assert model_distr['mean'] == prop_data['mean'][test_src_idx, test_tgt_idx, 0]
+    assert model_distr['std'] == prop_data['std'][test_src_idx, test_tgt_idx, 0]
+    assert model_distr['min'] == prop_data['min'][test_src_idx, test_tgt_idx, 0]
+    assert model_distr['max'] == prop_data['max'][test_src_idx, test_tgt_idx, 0]
+
+    ## Level0 interpolation (source m-type & target layer/synapse class value)
+    prop_data['mean'][test_src_idx, test_tgt_idx, 0] = np.nan
+    nsyn_data['mean'][test_src_idx, test_tgt_idx] = np.nan
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    tgt_sel = np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][test_tgt_idx], np.array(m_type_class[1]) == m_type_class[1][test_tgt_idx])
+    assert model_distr['mean'] == np.nanmean(prop_data['mean'][test_src_idx, tgt_sel, 0])
+    assert model_distr['std'] == np.nanmean(prop_data['std'][test_src_idx, tgt_sel, 0])
+    assert model_distr['std-within'] == np.nanmean(prop_data['std-within'][test_src_idx, tgt_sel, 0])
+    assert model_distr['min'] == np.nanmin(prop_data['min'][test_src_idx, tgt_sel, 0])
+    assert model_distr['max'] == np.nanmax(prop_data['max'][test_src_idx, tgt_sel, 0])
+
+    ## Level1 interpolation (source m-type & target synapse class value)
+    prop_data['mean'][test_src_idx, tgt_sel, 0] = np.nan
+    nsyn_data['mean'][test_src_idx, tgt_sel] = np.nan
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    tgt_sel = np.array(m_type_class[1]) == m_type_class[1][test_tgt_idx]
+    assert model_distr['mean'] == np.nanmean(prop_data['mean'][test_src_idx, tgt_sel, 0])
+    assert model_distr['std'] == np.nanmean(prop_data['std'][test_src_idx, tgt_sel, 0])
+    assert model_distr['std-within'] == np.nanmean(prop_data['std-within'][test_src_idx, tgt_sel, 0])
+    assert model_distr['min'] == np.nanmin(prop_data['min'][test_src_idx, tgt_sel, 0])
+    assert model_distr['max'] == np.nanmax(prop_data['max'][test_src_idx, tgt_sel, 0])
+
+    ## Level2 interpolation (source & target per layer/synapse class value)
+    prop_data['mean'][test_src_idx, tgt_sel, 0] = np.nan
+    nsyn_data['mean'][test_src_idx, tgt_sel] = np.nan
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    src_sel = np.logical_and(np.array(m_type_layer[0]) == m_type_layer[0][test_src_idx], np.array(m_type_class[0]) == m_type_class[0][test_src_idx])
+    tgt_sel = np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][test_tgt_idx], np.array(m_type_class[1]) == m_type_class[1][test_tgt_idx])
+    assert model_distr['mean'] == np.nanmean(prop_data['mean'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['std'] == np.nanmean(prop_data['std'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['std-within'] == np.nanmean(prop_data['std-within'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['min'] == np.nanmin(prop_data['min'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['max'] == np.nanmax(prop_data['max'][src_sel, :, 0][:, tgt_sel])
+
+    ## Level3 interpolation (source & target per synapse class value)
+    for tidx in np.where(tgt_sel)[0]:
+        prop_data['mean'][src_sel, tidx, 0] = np.nan
+        nsyn_data['mean'][src_sel, tidx] = np.nan
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    src_sel = np.array(m_type_class[0]) == m_type_class[0][test_src_idx]
+    tgt_sel = np.array(m_type_class[1]) == m_type_class[1][test_tgt_idx]
+    assert model_distr['mean'] == np.nanmean(prop_data['mean'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['std'] == np.nanmean(prop_data['std'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['std-within'] == np.nanmean(prop_data['std-within'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['min'] == np.nanmin(prop_data['min'][src_sel, :, 0][:, tgt_sel])
+    assert model_distr['max'] == np.nanmax(prop_data['max'][src_sel, :, 0][:, tgt_sel])
+
+    ## Level4 interpolation (overall value)
+    for tidx in np.where(tgt_sel)[0]:
+        prop_data['mean'][src_sel, tidx, 0] = np.nan
+        nsyn_data['mean'][src_sel, tidx] = np.nan
+    res = test_module.build(nsyn_data, prop_data, m_types, m_type_class, m_type_layer, [prop], distr_types={prop: 'truncnorm'}, data_types={}, data_bounds={})
+    model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
+    assert model_distr['mean'] == np.nanmean(prop_data['mean'])
+    assert model_distr['std'] == np.nanmean(prop_data['std'])
+    assert model_distr['std-within'] == np.nanmean(prop_data['std-within'])
+    assert model_distr['min'] == np.nanmin(prop_data['min'])
+    assert model_distr['max'] == np.nanmax(prop_data['max'])
