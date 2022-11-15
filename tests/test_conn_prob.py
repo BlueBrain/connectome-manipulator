@@ -6,6 +6,7 @@ import pytest
 from bluepysnap import Circuit
 from mock import Mock, patch
 from numpy.testing import assert_array_equal
+from scipy.spatial import distance_matrix
 
 from utils import TEST_DATA_DIR, setup_tempdir
 import connectome_manipulator.model_building.conn_prob as test_module
@@ -226,3 +227,265 @@ def test_extract_dependant_p_conn():
 #         # The failing line is:
 #         #     test_conn_prob.py:192
 #         res = test_module.extract_dependent_p_conn(np.array([0]), np.array([0]), edges, [], [])
+
+
+def test_get_value_ranges():
+
+    np.random.seed(0)
+
+    # Check special case: 0-dim
+    ndim = 0
+    rng = np.nan
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == ndim
+
+    # Check special case: 1-dim
+    ndim = 1
+
+    ## (a) Symmetric range
+    rng = 100.0 * np.random.rand()
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == 2
+    assert res == [-rng, rng]
+
+    ## (a) Arbitrary range
+    rng = [-100.0 * np.random.rand(), 100.0 * np.random.rand()]
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == 2
+    assert res == [rng[0], rng[1]]
+
+    # Check same range for all dims
+    ndim = 10
+    rng = 100.0 * np.random.rand()
+
+    ## (a) Pos./neg. range
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == ndim
+    assert np.all([r == [-rng, rng] for r in res])
+
+    ## (b) Pos. range only
+    res = test_module.get_value_ranges(rng, ndim, True)
+    assert len(res) == ndim
+    assert np.all([r == [0, rng] for r in res])
+    
+    # Check different ranges for differnt dims
+    rng = [100.0 * np.random.rand() for d in range(ndim)]
+
+    ## (a) Pos./neg. range
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == ndim
+    assert np.all([res[i] == [-rng[i], rng[i]] for i in range(len(res))])
+
+    ## (b) Pos. range only
+    res = test_module.get_value_ranges(rng, ndim, True)
+    assert len(res) == ndim
+    assert np.all([res[i] == [0, rng[i]] for i in range(len(res))])
+
+    ## (c) Mixed range
+    pos_range = np.random.choice(2, ndim).astype(bool)
+    res = test_module.get_value_ranges(rng, ndim, pos_range)
+    assert len(res) == ndim
+    assert np.all([res[i] == [0, rng[i]] for i in range(len(res)) if pos_range[i]])
+    assert np.all([res[i] == [-rng[i], rng[i]] for i in range(len(res)) if not pos_range[i]])
+
+    ## (d) Wrong numbers
+    with pytest.raises(AssertionError, match=f'ERROR: max_range must have {ndim} elements!'):
+        res = test_module.get_value_ranges(rng[:-1], ndim, pos_range)
+    with pytest.raises(AssertionError, match=f'ERROR: pos_range must have {ndim} elements!'):
+        res = test_module.get_value_ranges(rng, ndim, pos_range[:-1])
+
+    # Check arbitrary ranges
+    ndim = 10
+
+    ## (a) Correct ranges (pos./neg.)
+    rng = [[-100.0 * np.random.rand(), 100.0 * np.random.rand()] for i in range(ndim)]
+    res = test_module.get_value_ranges(rng, ndim)
+    assert len(res) == ndim
+    assert np.all([res[i] == [rng[i][0], rng[i][1]] for i in range(len(res))])
+
+    ## (b) Correct ranges (pos. only)
+    rng = [[0.0, 100.0 * np.random.rand()] for i in range(ndim)]
+    res = test_module.get_value_ranges(rng, ndim, True)
+    assert len(res) == ndim
+    assert np.all([res[i] == [rng[i][0], rng[i][1]] for i in range(len(res))])
+
+    ## (c) Wrong pos./neg.
+    rng = [[-100.0 * np.random.rand(), 100.0 * np.random.rand()] for i in range(ndim)]
+    with pytest.raises(AssertionError, match=f'ERROR: Range of coord 0 must include 0!'):
+        res = test_module.get_value_ranges(rng, ndim, True)
+
+    ## (d) Wrong ranges
+    rng = [[100.0 * np.random.rand(), -100.0 * np.random.rand()] for i in range(ndim)]
+    with pytest.raises(AssertionError, match=f'ERROR: Range of coord 0 invalid!'):
+        res = test_module.get_value_ranges(rng, ndim)
+
+
+def test_extract_1st_order():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    for n in range(10):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+        nconn = len(list(edges.iter_connections(source=src_sel, target=tgt_sel)))
+
+        for min_nbins in [1, 10, 100]:
+            res = test_module.extract_1st_order(nodes, edges, src_sel, tgt_sel, min_count_per_bin=min_nbins)
+            if nsrc * ntgt >= min_nbins:
+                assert np.isclose(res['p_conn'], nconn / (nsrc * ntgt))
+            else:
+                assert np.isnan(res['p_conn']) # Not enought data points
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_1st_order():
+    np.random.seed(0)
+    for p_conn in np.random.rand(10):
+        model = test_module.build_1st_order(p_conn)
+        assert np.isclose(model.p_conn, p_conn)
+
+
+def test_extract_2nd_order():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    bin_size_um = 100
+    for rep in range(10):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        dist = distance_matrix(src_pos, tgt_pos) # Distance matrix
+        dist[dist == 0.0] = np.nan
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+        
+        num_bins = np.ceil(np.nanmax(dist) / bin_size_um).astype(int) # Distance binning
+        dist_bins = np.arange(0, num_bins + 1) * bin_size_um
+        dist_bins[-1] += 1e-3 # So that max. value is always included in last bin
+        conn_cnt = np.full(num_bins, -1) # Conn. count
+        all_cnt = np.full(num_bins, -1) # All pair count
+        for bidx in range(num_bins):
+            dsel = np.logical_and(dist >= dist_bins[bidx], dist < dist_bins[bidx + 1])
+            conn_cnt[bidx] = np.sum(nconn[dsel])
+            all_cnt[bidx] = np.sum(dsel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_2nd_order(nodes, edges, src_sel, tgt_sel, bin_size_um=bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_dist'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.array_equal(res['dist_bins'], dist_bins)
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_2nd_order():
+
+    dist_bins = np.arange(0, 1001, 10)
+    d = np.array([np.mean(dist_bins[i : i + 2]) for i in range(len(dist_bins) - 1)])
+
+    # Check simple exponential model building
+    np.random.seed(0)
+    for rep in range(10):
+        exp_coefs = [1e-1 * np.random.rand(), 1e-2 * np.random.rand()]
+        exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
+        exp_data = exp_model(d, *exp_coefs)
+
+        model = test_module.build_2nd_order(exp_data, dist_bins, np.zeros_like(exp_data), model_specs={'type': 'SimpleExponential'})
+        model_coefs = [model.get_param_dict()[k] for k in ['scale', 'exponent']]
+        assert np.allclose(exp_coefs, model_coefs)
+
+    # Check complex exponential model building [EXPERIMENTAL: Just one working test example, since model fitting not so robust]
+    exp_coefs = [1e-1, 1e-4, 2.0, 1e-1, 1e-4]
+    exp_model = lambda x, a, b, c, d, e: a * np.exp(-b * np.array(x)**c) + d * np.exp(-e * np.array(x))
+    exp_data = exp_model(d, *exp_coefs)
+
+    model = test_module.build_2nd_order(exp_data, dist_bins, np.zeros_like(exp_data), model_specs={'type': 'ComplexExponential'})
+    model_coefs = [model.get_param_dict()[k] for k in ['prox_scale', 'prox_exp', 'prox_exp_pow', 'dist_scale', 'dist_exp']]
+    assert np.allclose(exp_coefs, model_coefs)
+
+
+def test_extract_3rd_order():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    bin_size_um = 100
+    for rep in range(10):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        dist = distance_matrix(src_pos, tgt_pos) # Distance matrix
+        dist[dist == 0.0] = np.nan
+        bip = np.array([[np.sign(tgt_pos['z'].loc[t] - src_pos['z'].loc[s]) for t in tgt_sel] for s in src_sel])
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+
+        num_bins = np.ceil(np.nanmax(dist) / bin_size_um).astype(int) # Distance binning
+        dist_bins = np.arange(0, num_bins + 1) * bin_size_um
+        dist_bins[-1] += 1e-3 # So that max. value is always included in last bin
+        conn_cnt = np.full((num_bins, 2), -1) # Conn. count
+        all_cnt = np.full((num_bins, 2), -1) # All pair count
+        for bidx in range(num_bins):
+            for bipidx, bipval in enumerate([-1, 1]):
+                dsel = np.logical_and(np.logical_and(dist >= dist_bins[bidx], dist < dist_bins[bidx + 1]), bip == bipval)
+                conn_cnt[bidx, bipidx] = np.sum(nconn[dsel])
+                all_cnt[bidx, bipidx] = np.sum(dsel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_3rd_order(nodes, edges, src_sel, tgt_sel, bin_size_um=bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_dist_bip'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.array_equal(res['dist_bins'], dist_bins)
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_3rd_order():
+
+    dist_bins = np.arange(0, 1001, 10)
+    d = np.array([np.mean(dist_bins[i : i + 2]) for i in range(len(dist_bins) - 1)])
+
+    # Check simple exponential model building
+    np.random.seed(0)
+    for rep in range(10):
+        exp_coefs = [1e-1 * np.random.rand(), 1e-2 * np.random.rand(), 1e-1 * np.random.rand(), 1e-2 * np.random.rand()] # 'scale_N', 'exponent_N', 'scale_P', 'exponent_P'
+        exp_model = lambda x, a, b: a * np.exp(-b * np.array(x))
+        exp_data = np.array([exp_model(d, *exp_coefs[:2]), exp_model(d, *exp_coefs[2:])]).T
+
+        model = test_module.build_3rd_order(exp_data, dist_bins, np.zeros_like(exp_data), model_specs={'type': 'SimpleExponential'})
+        model_coefs = [model.get_param_dict()[k] for k in ['scale_N', 'exponent_N', 'scale_P', 'exponent_P']]
+        assert np.allclose(exp_coefs, model_coefs)
+
+    # Check complex exponential model building [EXPERIMENTAL: Just one working test example, since model fitting not so robust]
+    exp_coefs = [1e-1, 1e-4, 2.0, 1e-1, 1e-4, 2e-1, 2e-4, 1.75, 2e-1, 2e-4] # 'prox_scale_N', 'prox_exp_N', 'prox_exp_pow_N', 'dist_scale_N', 'dist_exp_N', 'prox_scale_P', 'prox_exp_P', 'prox_exp_pow_P', 'dist_scale_P', 'dist_exp_P'
+    exp_model = lambda x, a, b, c, d, e: a * np.exp(-b * np.array(x)**c) + d * np.exp(-e * np.array(x))
+    exp_data = np.array([exp_model(d, *exp_coefs[:5]), exp_model(d, *exp_coefs[5:])]).T
+
+    model = test_module.build_3rd_order(exp_data, dist_bins, np.zeros_like(exp_data), model_specs={'type': 'ComplexExponential'})
+    model_coefs = [model.get_param_dict()[k] for k in ['prox_scale_N', 'prox_exp_N', 'prox_exp_pow_N', 'dist_scale_N', 'dist_exp_N', 'prox_scale_P', 'prox_exp_P', 'prox_exp_pow_P', 'dist_scale_P', 'dist_exp_P']]
+    assert np.allclose(exp_coefs, model_coefs)
