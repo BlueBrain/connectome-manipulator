@@ -6,6 +6,7 @@ import pytest
 from bluepysnap import Circuit
 from mock import Mock, patch
 from numpy.testing import assert_array_equal
+from scipy.ndimage import gaussian_filter
 from scipy.spatial import distance_matrix
 
 from utils import TEST_DATA_DIR, setup_tempdir
@@ -327,6 +328,7 @@ def test_extract_1st_order():
     src_ids = nodes[0].ids()
     tgt_ids = nodes[1].ids()
 
+    np.random.seed(0)
     for n in range(10):
         src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
         tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
@@ -359,6 +361,7 @@ def test_extract_2nd_order():
     tgt_ids = nodes[1].ids()
 
     bin_size_um = 100
+    np.random.seed(0)
     for rep in range(10):
         src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
         tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
@@ -428,6 +431,7 @@ def test_extract_3rd_order():
     tgt_ids = nodes[1].ids()
 
     bin_size_um = 100
+    np.random.seed(0)
     for rep in range(10):
         src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
         tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
@@ -489,3 +493,347 @@ def test_build_3rd_order():
     model = test_module.build_3rd_order(exp_data, dist_bins, np.zeros_like(exp_data), model_specs={'type': 'ComplexExponential'})
     model_coefs = [model.get_param_dict()[k] for k in ['prox_scale_N', 'prox_exp_N', 'prox_exp_pow_N', 'dist_scale_N', 'dist_exp_N', 'prox_scale_P', 'prox_exp_P', 'prox_exp_pow_P', 'dist_scale_P', 'dist_exp_P']]
     assert np.allclose(exp_coefs, model_coefs)
+
+
+def test_extract_4th_order():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    bin_size_um = 200
+    np.random.seed(0)
+    for rep in range(5):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        offmat = np.array([[[tgt_pos[coord].loc[t] - src_pos[coord].loc[s] for coord in ['x', 'y', 'z']] for t in tgt_sel] for s in src_sel])
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+
+        ranges = [[np.nanmin(offmat[:, :, coord]), np.nanmax(offmat[:, :, coord])] for coord in range(offmat.shape[2])]
+        num_bins = [np.ceil((ranges[coord][1] - ranges[coord][0]) / bin_size_um).astype(int) for coord in range(len(ranges))]
+        off_bins = [np.arange(0, num_bins[coord] + 1) * bin_size_um + ranges[coord][0] for coord in range(len(ranges))]
+
+        conn_cnt = np.full(num_bins, -1) # Conn. count
+        all_cnt = np.full(num_bins, -1) # All pair count
+        for xidx in range(num_bins[0]):
+            for yidx in range(num_bins[1]):
+                for zidx in range(num_bins[2]):
+                    xsel = np.logical_and(offmat[:, :, 0] >= off_bins[0][xidx], offmat[:, :, 0] < off_bins[0][xidx + 1])
+                    ysel = np.logical_and(offmat[:, :, 1] >= off_bins[1][yidx], offmat[:, :, 1] < off_bins[1][yidx + 1])
+                    zsel = np.logical_and(offmat[:, :, 2] >= off_bins[2][zidx], offmat[:, :, 2] < off_bins[2][zidx + 1])
+                    sel = np.logical_and(np.logical_and(xsel, ysel), zsel)
+                    conn_cnt[xidx, yidx, zidx] = np.sum(nconn[sel])
+                    all_cnt[xidx, yidx, zidx] = np.sum(sel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_4th_order(nodes, edges, src_sel, tgt_sel, bin_size_um=bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_offset'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.all([np.array_equal(res[k], off_bins[i]) for i, k in enumerate(['dx_bins', 'dy_bins', 'dz_bins'])])
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_4th_order():
+
+    np.random.seed(0)
+    bin_sizes = [100, 200, 400]
+    dx_bins = np.arange(0, 1001, bin_sizes[0])
+    dy_bins = np.arange(0, 1001, bin_sizes[1])
+    dz_bins = np.arange(0, 1001, bin_sizes[2])
+    dx = np.array([np.mean(dx_bins[i : i + 2]) for i in range(len(dx_bins) - 1)])
+    dy = np.array([np.mean(dy_bins[i : i + 2]) for i in range(len(dy_bins) - 1)])
+    dz = np.array([np.mean(dz_bins[i : i + 2]) for i in range(len(dz_bins) - 1)])
+    p = 1e-2 * np.random.rand(len(dx_bins) - 1, len(dy_bins) - 1, len(dz_bins) - 1)
+
+    # Check linear interpolation model building
+    model = test_module.build_4th_order(p, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'})
+    p_model = np.array([[[model.get_conn_prob(dx=_dx, dy=_dy, dz=_dz)[0] for _dz in dz] for _dy in dy] for _dx in dx])
+    assert np.allclose(p, p_model)
+
+    # Check linear interpolation model building with Gaussian filtering
+    smoothing_sigma_um = 100.0
+    sigmas = [smoothing_sigma_um / b for b in bin_sizes]
+    p_filt = gaussian_filter(p, sigmas, mode='constant')
+    model = test_module.build_4th_order(p, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'}, smoothing_sigma_um=smoothing_sigma_um)
+    p_model = np.array([[[model.get_conn_prob(dx=_dx, dy=_dy, dz=_dz)[0] for _dz in dz] for _dy in dy] for _dx in dx])
+    assert np.allclose(p_filt, p_model)
+
+    # Check random forest regressor model building [Not yet implemented]
+    with pytest.raises(AssertionError, match=f'ERROR: No model class implemented for RandomForestRegressor!'):
+        model = test_module.build_4th_order(p, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'RandomForestRegressor'})
+
+
+def test_extract_4th_order_reduced():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    bin_size_um = 200
+    np.random.seed(0)
+    for rep in range(5):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        offmat = np.array([[[tgt_pos[coord].loc[t] - src_pos[coord].loc[s] for coord in ['x', 'y', 'z']] for t in tgt_sel] for s in src_sel])
+        offmat = np.stack([np.sqrt(offmat[:, :, 0]**2 + offmat[:, :, 1]**2), offmat[:, :, 2]], axis=2)
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+
+        ranges = [[0.0, np.nanmax(offmat[:, :, 0])], [np.nanmin(offmat[:, :, 1]), np.nanmax(offmat[:, :, 1])]]
+        num_bins = [np.ceil((ranges[coord][1] - ranges[coord][0]) / bin_size_um).astype(int) for coord in range(len(ranges))]
+        off_bins = [np.arange(0, num_bins[coord] + 1) * bin_size_um + ranges[coord][0] for coord in range(len(ranges))]
+
+        conn_cnt = np.full(num_bins, -1) # Conn. count
+        all_cnt = np.full(num_bins, -1) # All pair count
+        for ridx in range(num_bins[0]):
+            for zidx in range(num_bins[1]):
+                rsel = np.logical_and(offmat[:, :, 0] >= off_bins[0][ridx], offmat[:, :, 0] < off_bins[0][ridx + 1])
+                zsel = np.logical_and(offmat[:, :, 1] >= off_bins[1][zidx], offmat[:, :, 1] < off_bins[1][zidx + 1])
+                sel = np.logical_and(rsel, zsel)
+                conn_cnt[ridx, zidx] = np.sum(nconn[sel])
+                all_cnt[ridx, zidx] = np.sum(sel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_4th_order_reduced(nodes, edges, src_sel, tgt_sel, bin_size_um=bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_offset'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.all([np.array_equal(res[k], off_bins[i]) for i, k in enumerate(['dr_bins', 'dz_bins'])])
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_4th_order_reduced():
+
+    np.random.seed(0)
+    bin_sizes = [100, 200]
+    dr_bins = np.arange(0, 1001, bin_sizes[0])
+    dz_bins = np.arange(0, 1001, bin_sizes[1])
+    dr = np.array([np.mean(dr_bins[i : i + 2]) for i in range(len(dr_bins) - 1)])
+    dz = np.array([np.mean(dz_bins[i : i + 2]) for i in range(len(dz_bins) - 1)])
+    p = 1e-2 * np.random.rand(len(dr_bins) - 1, len(dz_bins) - 1)
+
+    # Check linear interpolation model building
+    model = test_module.build_4th_order_reduced(p, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'})
+    p_model = np.array([[model.get_conn_prob(dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr])
+    assert np.allclose(p, p_model)
+
+    # Check linear interpolation model building with Gaussian filtering
+    smoothing_sigma_um = 100.0
+    sigmas = [smoothing_sigma_um / b for b in bin_sizes]
+    p_reflect = np.vstack([p[::-1, :], p]) # Mirror along radial axis at dr==0, to avoid edge effect
+    p_reflect = gaussian_filter(p_reflect, sigmas, mode='constant')
+    p_filt = p_reflect[p.shape[0]:, :] # Cut original part of the data
+    model = test_module.build_4th_order_reduced(p, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'}, smoothing_sigma_um=smoothing_sigma_um)
+    p_model = np.array([[model.get_conn_prob(dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr])
+    assert np.allclose(p_filt, p_model)
+
+    # Check random forest regressor model building [Not yet implemented]
+    with pytest.raises(AssertionError, match=f'ERROR: No model class implemented for RandomForestRegressor!'):
+        model = test_module.build_4th_order_reduced(p, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'RandomForestRegressor'})
+
+
+def test_extract_5th_order():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    off_bin_size_um = 500
+    pos_bin_size_um = 1000
+    np.random.seed(0)
+    for rep in range(5):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        posmat = np.array([np.repeat(src_pos[[coord]].to_numpy(), ntgt, axis=1).T for coord in ['x', 'y', 'z']]).T
+        posmat2 = np.array([np.repeat(tgt_pos[[coord]].to_numpy(), ntgt, axis=1).T for coord in ['x', 'y', 'z']]).T
+        offmat = np.array([[[tgt_pos[coord].loc[t] - src_pos[coord].loc[s] for coord in ['x', 'y', 'z']] for t in tgt_sel] for s in src_sel])
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+
+        pos_ranges = [[np.minimum(np.nanmin(posmat[:, :, coord]), np.nanmin(posmat2[:, :, coord])), np.maximum(np.nanmax(posmat[:, :, coord]), np.nanmax(posmat2[:, :, coord]))] for coord in range(posmat.shape[2])] # Set range based on pre- AND post-neurons
+        off_ranges = [[np.nanmin(offmat[:, :, coord]), np.nanmax(offmat[:, :, coord])] for coord in range(offmat.shape[2])]
+        pos_num_bins = [np.ceil((pos_ranges[coord][1] - pos_ranges[coord][0]) / pos_bin_size_um).astype(int) for coord in range(len(pos_ranges))]
+        off_num_bins = [np.ceil((off_ranges[coord][1] - off_ranges[coord][0]) / off_bin_size_um).astype(int) for coord in range(len(off_ranges))]
+        pos_bins = [np.arange(0, pos_num_bins[coord] + 1) * pos_bin_size_um + pos_ranges[coord][0] for coord in range(len(pos_ranges))]
+        off_bins = [np.arange(0, off_num_bins[coord] + 1) * off_bin_size_um + off_ranges[coord][0] for coord in range(len(off_ranges))]
+
+        conn_cnt = np.full(pos_num_bins + off_num_bins, -1) # Conn. count
+        all_cnt = np.full(pos_num_bins + off_num_bins, -1) # All pair count
+        for xidx in range(pos_num_bins[0]):
+            for yidx in range(pos_num_bins[1]):
+                for zidx in range(pos_num_bins[2]):
+                    for dxidx in range(off_num_bins[0]):
+                        for dyidx in range(off_num_bins[1]):
+                            for dzidx in range(off_num_bins[2]):
+                                xsel = np.logical_and(posmat[:, :, 0] >= pos_bins[0][xidx], posmat[:, :, 0] < pos_bins[0][xidx + 1])
+                                ysel = np.logical_and(posmat[:, :, 1] >= pos_bins[1][yidx], posmat[:, :, 1] < pos_bins[1][yidx + 1])
+                                zsel = np.logical_and(posmat[:, :, 2] >= pos_bins[2][zidx], posmat[:, :, 2] < pos_bins[2][zidx + 1])
+                                dxsel = np.logical_and(offmat[:, :, 0] >= off_bins[0][dxidx], offmat[:, :, 0] < off_bins[0][dxidx + 1])
+                                dysel = np.logical_and(offmat[:, :, 1] >= off_bins[1][dyidx], offmat[:, :, 1] < off_bins[1][dyidx + 1])
+                                dzsel = np.logical_and(offmat[:, :, 2] >= off_bins[2][dzidx], offmat[:, :, 2] < off_bins[2][dzidx + 1])
+                                sel = np.logical_and(np.logical_and(np.logical_and(xsel, dxsel), np.logical_and(ysel, dysel)), np.logical_and(zsel, dzsel))
+                                conn_cnt[xidx, yidx, zidx, dxidx, dyidx, dzidx] = np.sum(nconn[sel])
+                                all_cnt[xidx, yidx, zidx, dxidx, dyidx, dzidx] = np.sum(sel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_5th_order(nodes, edges, src_sel, tgt_sel, position_bin_size_um=pos_bin_size_um, offset_bin_size_um=off_bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_position'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.all([np.array_equal(res[k], pos_bins[i]) for i, k in enumerate(['x_bins', 'y_bins', 'z_bins'])])
+            assert np.all([np.array_equal(res[k], off_bins[i]) for i, k in enumerate(['dx_bins', 'dy_bins', 'dz_bins'])])
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_5th_order():
+
+    np.random.seed(0)
+    bin_sizes = [500, 500, 500, 200, 300, 400]
+    x_bins = np.arange(0, 1001, bin_sizes[0])
+    y_bins = np.arange(0, 1001, bin_sizes[1])
+    z_bins = np.arange(0, 2001, bin_sizes[2])
+    dx_bins = np.arange(0, 1001, bin_sizes[3])
+    dy_bins = np.arange(0, 1001, bin_sizes[4])
+    dz_bins = np.arange(0, 1001, bin_sizes[5])
+    x = np.array([np.mean(x_bins[i : i + 2]) for i in range(len(x_bins) - 1)])
+    y = np.array([np.mean(y_bins[i : i + 2]) for i in range(len(y_bins) - 1)])
+    z = np.array([np.mean(z_bins[i : i + 2]) for i in range(len(z_bins) - 1)])
+    dx = np.array([np.mean(dx_bins[i : i + 2]) for i in range(len(dx_bins) - 1)])
+    dy = np.array([np.mean(dy_bins[i : i + 2]) for i in range(len(dy_bins) - 1)])
+    dz = np.array([np.mean(dz_bins[i : i + 2]) for i in range(len(dz_bins) - 1)])
+    p = 1e-2 * np.random.rand(len(x_bins) - 1, len(y_bins) - 1, len(z_bins) - 1, len(dx_bins) - 1, len(dy_bins) - 1, len(dz_bins) - 1)
+
+    # Check linear interpolation model building
+    model = test_module.build_5th_order(p, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'})
+    p_model = np.array([[[[[[model.get_conn_prob(x=_x, y=_y, z=_z, dx=_dx, dy=_dy, dz=_dz)[0] for _dz in dz] for _dy in dy] for _dx in dx] for _z in z] for _y in y] for _x in x])
+    assert np.allclose(p, p_model)
+
+    # Check linear interpolation model building with Gaussian filtering
+    smoothing_sigma_um = 100.0
+    sigmas = [smoothing_sigma_um / b for b in bin_sizes]
+    p_filt = gaussian_filter(p, sigmas, mode='constant')
+    model = test_module.build_5th_order(p, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'}, smoothing_sigma_um=smoothing_sigma_um)
+    p_model = np.array([[[[[[model.get_conn_prob(x=_x, y=_y, z=_z, dx=_dx, dy=_dy, dz=_dz)[0] for _dz in dz] for _dy in dy] for _dx in dx] for _z in z] for _y in y] for _x in x])
+    assert np.allclose(p_filt, p_model)
+
+    # Check random forest regressor model building [Not yet implemented]
+    with pytest.raises(AssertionError, match=f'ERROR: No model class implemented for RandomForestRegressor!'):
+        model = test_module.build_5th_order(p, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'RandomForestRegressor'})
+
+
+def test_extract_5th_order_reduced():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
+    nodes = [circuit.nodes['nodeA']] * 2 # Src/tgt populations
+    edges = circuit.edges['nodeA__nodeA__chemical']
+    src_ids = nodes[0].ids()
+    tgt_ids = nodes[1].ids()
+
+    off_bin_size_um = 250
+    pos_bin_size_um = 1000
+    np.random.seed(0)
+    for rep in range(5):
+        src_sel = np.random.choice(src_ids, np.random.choice(len(src_ids)) + 1, replace=False)
+        tgt_sel = np.random.choice(tgt_ids, np.random.choice(len(tgt_ids)) + 1, replace=False)
+        nsrc = len(src_sel)
+        ntgt = len(tgt_sel)
+
+        src_pos = nodes[0].positions(src_sel)
+        tgt_pos = nodes[0].positions(tgt_sel)
+        posmat = np.repeat(src_pos[['z']].to_numpy(), ntgt, axis=1)
+        posmat2 = np.repeat(tgt_pos[['z']].to_numpy(), ntgt, axis=1)
+        offmat = np.array([[[tgt_pos[coord].loc[t] - src_pos[coord].loc[s] for coord in ['x', 'y', 'z']] for t in tgt_sel] for s in src_sel])
+        offmat = np.stack([np.sqrt(offmat[:, :, 0]**2 + offmat[:, :, 1]**2), offmat[:, :, 2]], axis=2)
+        nconn = np.array([[len(list(edges.iter_connections(source=s, target=t))) for t in tgt_sel] for s in src_sel]) # Number of connection matrix
+
+        pos_ranges = [np.minimum(np.nanmin(posmat), np.nanmin(posmat2)), np.maximum(np.nanmax(posmat), np.nanmax(posmat2))] # Set range based on pre- AND post-neurons
+        off_ranges = [[0.0, np.nanmax(offmat[:, :, 0])], [np.nanmin(offmat[:, :, 1]), np.nanmax(offmat[:, :, 1])]]
+        pos_num_bins = np.ceil((pos_ranges[1] - pos_ranges[0]) / pos_bin_size_um).astype(int)
+        off_num_bins = [np.ceil((off_ranges[coord][1] - off_ranges[coord][0]) / off_bin_size_um).astype(int) for coord in range(len(off_ranges))]
+        pos_bins = np.arange(0, pos_num_bins + 1) * pos_bin_size_um + pos_ranges[0]
+        off_bins = [np.arange(0, off_num_bins[coord] + 1) * off_bin_size_um + off_ranges[coord][0] for coord in range(len(off_ranges))]
+
+        conn_cnt = np.full([pos_num_bins] + off_num_bins, -1) # Conn. count
+        all_cnt = np.full([pos_num_bins] + off_num_bins, -1) # All pair count
+        for zidx in range(pos_num_bins):
+            for dridx in range(off_num_bins[0]):
+                for dzidx in range(off_num_bins[1]):
+                    zsel = np.logical_and(posmat >= pos_bins[zidx], posmat < pos_bins[zidx + 1])
+                    drsel = np.logical_and(offmat[:, :, 0] >= off_bins[0][dridx], offmat[:, :, 0] < off_bins[0][dridx + 1])
+                    dzsel = np.logical_and(offmat[:, :, 1] >= off_bins[1][dzidx], offmat[:, :, 1] < off_bins[1][dzidx + 1])
+                    sel = np.logical_and(zsel, np.logical_and(drsel, dzsel))
+                    conn_cnt[zidx, dridx, dzidx] = np.sum(nconn[sel])
+                    all_cnt[zidx, dridx, dzidx] = np.sum(sel)
+        p = conn_cnt / all_cnt # Conn. prob.
+
+        for min_nbins in [1, 3, 5]:
+            res = test_module.extract_5th_order_reduced(nodes, edges, src_sel, tgt_sel, position_bin_size_um=pos_bin_size_um, offset_bin_size_um=off_bin_size_um, min_count_per_bin=min_nbins)
+            p_sel = p.copy()
+            p_sel[all_cnt < min_nbins] = np.nan
+            assert np.array_equal(res['p_conn_position'], p_sel, equal_nan=True)
+            assert np.array_equal(res['count_conn'], conn_cnt)
+            assert np.array_equal(res['count_all'], all_cnt)
+            assert np.array_equal(res['z_bins'], pos_bins)
+            assert np.all([np.array_equal(res[k], off_bins[i]) for i, k in enumerate(['dr_bins', 'dz_bins'])])
+            assert res['src_cell_count'] == nsrc
+            assert res['tgt_cell_count'] == ntgt
+
+
+def test_build_5th_order_reduced():
+
+    np.random.seed(0)
+    bin_sizes = [500, 100, 200]
+    z_bins = np.arange(0, 2001, bin_sizes[0])
+    dr_bins = np.arange(0, 1001, bin_sizes[1])
+    dz_bins = np.arange(0, 1001, bin_sizes[2])
+    z = np.array([np.mean(z_bins[i : i + 2]) for i in range(len(z_bins) - 1)])
+    dr = np.array([np.mean(dr_bins[i : i + 2]) for i in range(len(dr_bins) - 1)])
+    dz = np.array([np.mean(dz_bins[i : i + 2]) for i in range(len(dz_bins) - 1)])
+    p = 1e-2 * np.random.rand(len(z_bins) - 1, len(dr_bins) - 1, len(dz_bins) - 1)
+
+    # Check linear interpolation model building
+    model = test_module.build_5th_order_reduced(p, z_bins, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'})
+    p_model = np.array([[[model.get_conn_prob(z=_z, dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr] for _z in z])
+    assert np.allclose(p, p_model)
+
+    # Check linear interpolation model building with Gaussian filtering
+    smoothing_sigma_um = 100.0
+    sigmas = [smoothing_sigma_um / b for b in bin_sizes]
+    p_reflect = np.concatenate([p[:, ::-1, :], p], axis=1) # Mirror along radial axis at dr==0, to avoid edge effect
+    p_reflect = gaussian_filter(p_reflect, sigmas, mode='constant')
+    p_filt = p_reflect[:, p.shape[1]:, :] # Cut original part of the data
+    model = test_module.build_5th_order_reduced(p, z_bins, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'LinearInterpolation'}, smoothing_sigma_um=smoothing_sigma_um)
+    p_model = np.array([[[model.get_conn_prob(z=_z, dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr] for _z in z])
+    assert np.allclose(p_filt, p_model)
+
+    # Check random forest regressor model building [Not yet implemented]
+    with pytest.raises(AssertionError, match=f'ERROR: No model class implemented for RandomForestRegressor!'):
+        model = test_module.build_5th_order_reduced(p, z_bins, dr_bins, dz_bins, np.zeros_like(p), model_specs={'type': 'RandomForestRegressor'})

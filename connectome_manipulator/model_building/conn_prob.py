@@ -681,7 +681,7 @@ def plot_3rd_order(out_dir, p_conn_dist_bip, count_conn, count_all, dist_bins, s
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   4th order (offset-dependent)
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -724,7 +724,7 @@ def extract_4th_order(nodes, edges, src_node_ids, tgt_node_ids, bin_size_um=100,
 def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
     if model_specs is None:
-        model_specs = {'name': 'LinearInterpolation'}
+        model_specs = {'type': 'LinearInterpolation'}
 
     bin_sizes = [np.diff(dx_bins[:2])[0], np.diff(dy_bins[:2])[0], np.diff(dz_bins[:2])[0]]
 
@@ -752,16 +752,16 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, count_all, model_s
         p_conn_offset = gaussian_filter(p_conn_offset, sigmas, mode='constant')
 
     model_inputs = ['dx', 'dy', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+    if model_specs.get('type') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("type")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([dx_pos, dy_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=['p'])
         model = model_types.ConnProb4thOrderLinInterpnModel(p_conn_table=df)
 
-    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+    elif model_specs.get('type') == 'RandomForestRegressor': # Random Forest Regressor model
 
         log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
@@ -776,7 +776,7 @@ def build_4th_order(p_conn_offset, dx_bins, dy_bins, dz_bins, count_all, model_s
 #         model = model_types...
 
     else:
-        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
 
@@ -854,7 +854,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
     ax.set_ylabel('$\\Delta$y [$\\mu$m]')
     ax.set_zlabel('$\\Delta$z [$\\mu$m]')
     plt.colorbar(p_color_map, label='Conn. prob.')
-    plt.title(f'Model: {model_specs.get("name")}')
+    plt.title(f'Model: {model_specs.get("type")}')
 
     plt.suptitle(f'Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
@@ -934,7 +934,7 @@ def plot_4th_order(out_dir, p_conn_offset, dx_bins, dy_bins, dz_bins, src_cell_c
 #   Reduced 4th order (offset-dependent), modified from [Gal et al. 2020]
 #     => Radial/axial offsets only
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -975,7 +975,7 @@ def extract_4th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, bin_size
 def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build reduced 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
     if model_specs is None:
-        model_specs = {'name': 'LinearInterpolation'}
+        model_specs = {'type': 'LinearInterpolation'}
 
     bin_sizes = [np.diff(dr_bins[:2])[0], np.diff(dz_bins[:2])[0]]
 
@@ -1003,20 +1003,20 @@ def build_4th_order_reduced(p_conn_offset, dr_bins, dz_bins, count_all, model_sp
         p_conn_offset = p_reflect[p_conn_offset.shape[0]:, :] # Cut original part of the data
 
     model_inputs = ['dr', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+    if model_specs.get('type') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("type")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([dr_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=['p'])
         model = model_types.ConnProb4thOrderLinInterpnReducedModel(p_conn_table=df)
 
-    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+    elif model_specs.get('type') == 'RandomForestRegressor': # Random Forest Regressor model
         log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
     else:
-        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
 
@@ -1072,7 +1072,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
     plt.xlabel('$\\Delta$r [$\\mu$m]')
     plt.ylabel('$\\Delta$z [$\\mu$m]')
     plt.colorbar(label='Conn. prob.')
-    plt.title(f'Model: {model_specs.get("name")}')
+    plt.title(f'Model: {model_specs.get("type")}')
 
     plt.suptitle(f'Reduced offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
@@ -1085,7 +1085,7 @@ def plot_4th_order_reduced(out_dir, p_conn_offset, dr_bins, dz_bins, src_cell_co
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   5th order (position-dependent)
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -1150,7 +1150,7 @@ def extract_5th_order(nodes, edges, src_node_ids, tgt_node_ids, position_bin_siz
 def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
     if model_specs is None:
-        model_specs = {'name': 'LinearInterpolation'}
+        model_specs = {'type': 'LinearInterpolation'}
 
     bin_sizes = [ np.diff(x_bins[:2])[0],  np.diff(y_bins[:2])[0],  np.diff(z_bins[:2])[0],
                  np.diff(dx_bins[:2])[0], np.diff(dy_bins[:2])[0], np.diff(dz_bins[:2])[0]]
@@ -1187,16 +1187,16 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
         p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
 
     model_inputs = ['x', 'y', 'z', 'dx', 'dy', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+    if model_specs.get('type') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("type")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=['p'])
         model = model_types.ConnProb5thOrderLinInterpnModel(p_conn_table=df)
 
-    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+    elif model_specs.get('type') == 'RandomForestRegressor': # Random Forest Regressor model
 
         log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
@@ -1211,7 +1211,7 @@ def build_5th_order(p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy_bins, d
 #         model = model_types...
 
     else:
-        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
 
@@ -1304,7 +1304,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
                 ax.set_ylabel('$\\Delta$y [$\\mu$m]')
                 ax.set_zlabel('$\\Delta$z [$\\mu$m]')
                 plt.colorbar(p_color_map, label='Conn. prob.')
-                plt.title(f'Model: {model_specs.get("name")}')
+                plt.title(f'Model: {model_specs.get("type")}')
 
                 plt.suptitle(f'Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={x_pos_model[ix]:.0f}$\\mu$m, Y={y_pos_model[iy]:.0f}$\\mu$m, Z={z_pos_model[iz]:.0f}$\\mu$m')
                 plt.tight_layout()
@@ -1392,7 +1392,7 @@ def plot_5th_order(out_dir, p_conn_position, x_bins, y_bins, z_bins, dx_bins, dy
 #     => Axial position only
 #     => Radial/axial offsets only
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'name' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -1418,7 +1418,7 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
     z_bins = np.arange(0, num_bins_z + 1) * bin_size_z + z_range[0]
 
     if offset_max_range_um is None:
-        dr_range, dz_range = zip([np.nanmin(dr_mat), np.nanmin(dz_mat)], [np.nanmax(dr_mat), np.nanmax(dz_mat)])
+        dr_range, dz_range = zip([0, np.nanmin(dz_mat)], [np.nanmax(dr_mat), np.nanmax(dz_mat)])
     else:
         dr_range, dz_range = get_value_ranges(offset_max_range_um, 2, pos_range=[True, False])
 
@@ -1444,7 +1444,7 @@ def extract_5th_order_reduced(nodes, edges, src_node_ids, tgt_node_ids, position
 def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_):
     """Build reduced 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
     if model_specs is None:
-        model_specs = {'name': 'LinearInterpolation'}
+        model_specs = {'type': 'LinearInterpolation'}
 
     bin_sizes = [np.diff(z_bins[:2])[0], np.diff(dr_bins[:2])[0], np.diff(dz_bins[:2])[0]]
 
@@ -1470,23 +1470,25 @@ def build_5th_order_reduced(p_conn_position, z_bins, dr_bins, dz_bins, count_all
         log.log_assert(np.all(np.array(smoothing_sigma_um) >= 0.0), 'ERROR: Smoothing sigma must be non-negative!')
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
         log.info(f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms')
-        p_conn_position = gaussian_filter(p_conn_position, sigmas, mode='constant')
+        p_reflect = np.concatenate([p_conn_position[:, ::-1, :], p_conn_position], axis=1) # Mirror along radial axis at dr==0, to avoid edge effect
+        p_reflect = gaussian_filter(p_reflect, sigmas, mode='constant')
+        p_conn_position = p_reflect[:, p_conn_position.shape[1]:, :] # Cut original part of the data
 
     model_inputs = ['z', 'dr', 'dz'] # Must be the same for all interpolation types!
-    if model_specs.get('name') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
+    if model_specs.get('type') == 'LinearInterpolation': # Linear interpolation model => Removing dimensions with only single value from interpolation
 
-        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("name")}" model!')
+        log.log_assert(len(model_specs.get('kwargs', {})) == 0, f'ERROR: No parameters expected for "{model_specs.get("type")}" model!')
 
         # Create model
         index = pd.MultiIndex.from_product([z_pos, dr_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=['p'])
         model = model_types.ConnProb5thOrderLinInterpnReducedModel(p_conn_table=df)
 
-    elif model_specs.get('name') == 'RandomForestRegressor': # Random Forest Regressor model
+    elif model_specs.get('type') == 'RandomForestRegressor': # Random Forest Regressor model
         log.log_assert(False, 'ERROR: No model class implemented for RandomForestRegressor!')
 
     else:
-        log.log_assert(False, f'ERROR: Model type "{model_specs.get("name")}" unknown!')
+        log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
     log.info('Model description:\n' + model.get_model_str())
 
@@ -1552,7 +1554,7 @@ def plot_5th_order_reduced(out_dir, p_conn_position, z_bins, dr_bins, dz_bins, s
         plt.ylabel('$\\Delta$z [$\\mu$m]')
         plt.colorbar(label='Conn. prob.')
         if zidx == 0:
-            plt.title(f'Model: {model_specs.get("name")}')
+            plt.title(f'Model: {model_specs.get("type")}')
 
     plt.suptitle(f'Reduced position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>')
     plt.tight_layout()
