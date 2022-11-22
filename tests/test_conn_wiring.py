@@ -16,6 +16,8 @@ def test_apply():
     c = Circuit(os.path.join(TEST_DATA_DIR, 'circuit_sonata.json'))
     edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]
+    src_mtypes = nodes[0].property_values('mtype')
+    tgt_mtypes = nodes[1].property_values('mtype')
     src_ids = nodes[0].ids()
     tgt_ids = nodes[1].ids()
     edges_table = edges.afferent_edges(tgt_ids, properties=edges.property_names)
@@ -30,23 +32,40 @@ def test_apply():
     aux_dict = {'split_ids': tgt_ids}
     n_syn_conn = 2
     nsynconn_model_file = os.path.join(TEST_DATA_DIR, f'model_config__NSynPerConn{n_syn_conn}.json') # Model with exactly <n_syn_conn> syn/conn (constant) fo all pathways
+    nsynconn_model = model_types.AbstractModel.model_from_file(nsynconn_model_file)
     delay_model_file = os.path.join(TEST_DATA_DIR, f'model_config__DistDepDelay.json') # Deterministic delay model w/o variation
     delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
     pct = 100.0
-    print(edges_table_empty.columns)
+
     # Case 1: Check connectivity with conn. prob. p=0.0 (no connectivity)
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p0.json')
+    prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
     res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
     assert res.equals(edges_table_empty), 'ERROR: Existing edges table changed!' # Check if unchanged
-
+    
     ## (b) Edges already existing
     res = test_module.apply(edges_table, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
     assert res.equals(edges_table), 'ERROR: Existing edges table changed!' # Check if unchanged
 
+    ## (c) Standalone wiring per pathway
+    pathway_nodes = nodes[0]
+    assert nodes[0] is nodes[1]
+    pathway_models = []
+    for pre_mt in src_mtypes:
+        for post_mt in tgt_mtypes:
+            pathway_models.append({'pre': pre_mt, 'post': post_mt,
+                                   'prob_model': prob_model,
+                                   'nsynconn_model': nsynconn_model,
+                                   'delay_model': None})
+    res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0)
+    assert res.size == 0, 'ERROR: Connectome should be empty!'
+    assert np.all(np.isin(required_properties, res.columns)), 'ERROR: Synapse properties missing!'
+
     # Case 2: Check connectivity with conn. prob. p=1.0 (full connectivity, w/o autapses)
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb1p0.json')
+    prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
     res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
@@ -83,6 +102,19 @@ def test_apply():
     assert np.all([np.sum(np.all(edges_table.iloc[i][syn_props] == res[syn_props], 1)) == 1 for i in range(edges_table.shape[0])]), 'ERROR: Existing synapses changed!' # Check if all existing synapses still exist exactly once
     assert np.all(np.isin(required_properties, syn_props)), 'ERROR: Synapse properties missing!'
 
+    ## (c) Standalone wiring per pathway
+    pathway_models = []
+    for pre_mt in src_mtypes:
+        for post_mt in tgt_mtypes:
+            pathway_models.append({'pre': pre_mt, 'post': post_mt,
+                                   'prob_model': prob_model,
+                                   'nsynconn_model': nsynconn_model,
+                                   'delay_model': None})
+    res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0, morph_ext='swc')
+    assert res.shape[0] == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
+    assert np.all(np.isin(required_properties, res.columns)), 'ERROR: Synapse properties missing!'
+    assert np.all(np.unique(res[['@source_node', '@target_node']], axis=0, return_counts=True)[1] == n_syn_conn), 'ERROR: Wrong #syn/conn!' #Check #synapses/connection
+
     # Case 3: Check pct
     for pct in np.linspace(0, 100, 6):
         res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct.tolist(), prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
@@ -90,13 +122,38 @@ def test_apply():
 
     # Case 4: Check src/tgt_sel
     pct = 100.0
+    
+    ## (a) Per synapse class
     for src_class in ['EXC', 'INH']:
         for tgt_class in ['EXC', 'INH']:
             sel_src = {'synapse_class': src_class}
             sel_dest = {'synapse_class': tgt_class}
             res = test_module.apply(edges_table_empty, nodes, aux_dict, sel_src=sel_src, sel_dest=sel_dest, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
             assert np.all(np.isin(res['@source_node'], nodes[0].ids(sel_src))), 'ERROR: Source selection error!'
-            assert np.all(np.isin(res['@target_node'], nodes[0].ids(sel_dest))), 'ERROR: Target selection error!'
+            assert np.all(np.isin(res['@target_node'], nodes[1].ids(sel_dest))), 'ERROR: Target selection error!'
+            assert res.shape[0] == (len(nodes[0].ids(sel_src)) * len(nodes[1].ids(sel_dest)) - len(np.intersect1d(nodes[0].ids(sel_src), nodes[1].ids(sel_dest)))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
+
+    ## (b) Per mtype
+    for src_mt in src_mtypes:
+        for tgt_mt in tgt_mtypes:
+            sel_src = {'mtype': src_mt}
+            sel_dest = {'mtype': tgt_mt}
+
+            ### Integrated wiring
+            res = test_module.apply(edges_table_empty, nodes, aux_dict, sel_src=sel_src, sel_dest=sel_dest, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
+            assert np.all(np.isin(res['@source_node'], nodes[0].ids(sel_src))), 'ERROR: Source selection error!'
+            assert np.all(np.isin(res['@target_node'], nodes[1].ids(sel_dest))), 'ERROR: Target selection error!'
+            assert res.shape[0] == (len(nodes[0].ids(sel_src)) * len(nodes[1].ids(sel_dest)) - len(np.intersect1d(nodes[0].ids(sel_src), nodes[1].ids(sel_dest)))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
+
+            ### Standalone wiring per pathway
+            pathway_models = [{'pre': src_mt, 'post': tgt_mt,
+                               'prob_model': prob_model,
+                               'nsynconn_model': nsynconn_model,
+                               'delay_model': None}]
+            res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0, morph_ext='swc')
+            assert np.all(np.isin(res['@source_node'], nodes[0].ids(sel_src))), 'ERROR: Source selection error!'
+            assert np.all(np.isin(res['@target_node'], nodes[1].ids(sel_dest))), 'ERROR: Target selection error!'
+            assert res.shape[0] == (len(nodes[0].ids(sel_src)) * len(nodes[1].ids(sel_dest)) - len(np.intersect1d(nodes[0].ids(sel_src), nodes[1].ids(sel_dest)))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
 
     # Case 5: Check block-based processing
     split_ids_list = [tgt_ids[:len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1:]]
@@ -108,20 +165,54 @@ def test_apply():
     assert res.shape[0] == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn, 'ERROR: Wrong number of synapses!' # Check #synapses
 
     # Case 6: Check delays (from PRE neuron (soma) to POST synapse position)
+    def check_delay(nodes, delay_model, res):
+        for i in range(res.shape[0]):
+            delay_offset, delay_scale = delay_model.get_param_dict()['delay_mean_coefs']
+            src_pos = nodes[0].positions(res.iloc[i]['@source_node']).to_numpy()
+            syn_pos = res.iloc[i][['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy()
+            dist = np.sqrt(np.sum((src_pos - syn_pos)**2))
+            delay = delay_scale * dist + delay_offset
+            assert np.isclose(res.iloc[i]['delay'], delay), 'ERROR: Delay mismatch!'
+
+    ## (a) Integrated wiring
     res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file, delay_model_file=delay_model_file)
-    for i in range(res.shape[0]):
-        delay_offset, delay_scale = delay_model.get_param_dict()['delay_mean_coefs']
-        src_pos = nodes[0].positions(res.iloc[i]['@source_node']).to_numpy()
-        syn_pos = res.iloc[i][['afferent_center_x', 'afferent_center_y', 'afferent_center_z']].to_numpy()
-        dist = np.sqrt(np.sum((src_pos - syn_pos)**2))
-        delay = delay_scale * dist + delay_offset
-        assert np.isclose(res.iloc[i]['delay'], delay), 'ERROR: Delay mismatch!'
+    check_delay(nodes, delay_model, res)
+
+    ## (b) Standalone wiring per pathway
+    pathway_models = []
+    for pre_mt in src_mtypes:
+        for post_mt in tgt_mtypes:
+            pathway_models.append({'pre': pre_mt, 'post': post_mt,
+                                   'prob_model': prob_model,
+                                   'nsynconn_model': nsynconn_model,
+                                   'delay_model': delay_model})
+    res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0, morph_ext='swc')
+    check_delay([pathway_nodes, pathway_nodes], delay_model, res)
 
     # Case 7: Check connectivity with conn. prob. p=0.1
     prob_model_file = os.path.join(TEST_DATA_DIR, 'model_config__ConnProb0p1.json')
+    prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
+
+    ## (a) Integrated wiring
     np.random.seed(0)
     syn_counts = []
     for rep in range(20): # Estimate synapse counts over N repetitions => May be increased if variation still to large
         res = test_module.apply(edges_table_empty, nodes, aux_dict, amount_pct=pct, prob_model_file=prob_model_file, nsynconn_model_file=nsynconn_model_file)
         syn_counts.append(res.shape[0])
+    assert np.std(syn_counts) > 0, 'ERROR: No variability over repetitions!'
     assert np.isclose(np.mean(syn_counts), (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * 0.1 * n_syn_conn, atol=1.0), 'ERROR: Wrong number of synapses!' # Accept tolerance of +/-1
+
+    ## (b) Standalone wiring per pathway [larger variability expected, since wiring per pathway]
+    pathway_models = []
+    for pre_mt in src_mtypes:
+        for post_mt in tgt_mtypes:
+            pathway_models.append({'pre': pre_mt, 'post': post_mt,
+                                   'prob_model': prob_model,
+                                   'nsynconn_model': nsynconn_model,
+                                   'delay_model': None})
+    syn_counts = []
+    for rep in range(40): # Estimate synapse counts over N repetitions => May be increased if variation still to large
+        res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=rep, morph_ext='swc')
+        syn_counts.append(res.shape[0])
+    assert np.std(syn_counts) > 0, 'ERROR: No variability over repetitions!'
+    assert np.isclose(np.mean(syn_counts), (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * 0.1 * n_syn_conn, atol=1.0), f'ERROR: Wrong number of synapses!' # Accept tolerance of +/-1

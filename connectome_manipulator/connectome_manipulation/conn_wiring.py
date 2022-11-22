@@ -132,15 +132,17 @@ def init_edges_table(with_delay=True, from_table=None):
     """ Initializes empty edges table. """
     if with_delay:
         required_properties = SYNAPSE_PROPERTIES
+        property_types = PROPERTY_TYPES
     else:
         required_properties = list(filter(lambda x: x != 'delay', SYNAPSE_PROPERTIES))
+        property_types = {k: v for k, v in PROPERTY_TYPES.items() if k != 'delay'}
 
     if from_table is None: # Create empty table
-        all_new_edges = pd.DataFrame([], columns=required_properties).astype(PROPERTY_TYPES)
+        all_new_edges = pd.DataFrame([], columns=required_properties).astype(property_types)
     else: # Init from existing table
         all_new_edges = from_table.loc[[]].copy()
         log.log_assert(np.all(np.isin(required_properties, all_new_edges.columns)), 'Required synapse properties missing!')
-        if not np.all([PROPERTY_TYPES[k] == v for k, v in all_new_edges[required_properties].dtypes.items()]):
+        if not np.all([property_types[k] == v for k, v in all_new_edges[required_properties].dtypes.items()]):
             log.warning('Unexpected property data types!')
 
     return all_new_edges
@@ -213,7 +215,7 @@ def connectome_wiring_wrapper(src_node_ids, src_positions, src_mtypes, src_class
     return all_new_edges
 
 
-def connectome_wiring_per_pathway(nodes, pathway_models, seed=0):
+def connectome_wiring_per_pathway(nodes, pathway_models, seed=0, morph_ext='h5'):
     """ Stand-alone connectome wiring per pathway, i.e., wiring pathways using pathway-specific probability/nsynconn/delay models. """
 
     # Init random seed for connectome building and sampling from parameter distributions
@@ -222,7 +224,7 @@ def connectome_wiring_per_pathway(nodes, pathway_models, seed=0):
     # Prepare to load target (dendritic) morphologies
     morph_dir = nodes.config['morphologies_dir']
     tgt_morph = MorphHelper(morph_dir, nodes, {'h5v1': os.path.join(morph_dir, 'h5v1'), 'neurolucida-asc': os.path.join(morph_dir, 'ascii')})
-    tgt_morph_access = lambda node_id: tgt_morph.get(node_id, transform=True, extension='h5') # Access function to retrieve morphology for given ID (incl. transformation!), using specified format (swc/h5/...)
+    tgt_morph_access = lambda node_id: tgt_morph.get(node_id, transform=True, extension=morph_ext) # Access function to retrieve morphology for given ID (incl. transformation!), using specified format (swc/h5/...)
 
     # Loop over pathways
     new_edges_per_pathway = []
