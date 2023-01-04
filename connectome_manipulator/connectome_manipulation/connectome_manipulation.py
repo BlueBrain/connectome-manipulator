@@ -348,7 +348,7 @@ def resource_profiling(enabled=False, description='', reset=False, csv_file=None
         resource_profiling.perf_table.to_csv(csv_file)
 
 
-def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):  # pragma: no cover
+def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=False, overwrite_edges=False):  # pragma: no cover
     """Main entry point for circuit wiring for circuits w/o connectome.
       [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
        into N disjoint parts of target neurons (OPTIONAL)]."""
@@ -383,12 +383,12 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
     rel_edges_path = 'sonata/networks/edges/functional/All'
     edges_fn = f'edges_{manip_config["manip"]["name"]}.h5'
     edges_file = os.path.join(output_path, rel_edges_path, edges_fn)
-    if manip_config.get('overwrite_edges_file', False):
+    if overwrite_edges:
         if os.path.exists(edges_file):
             os.remove(edges_file)
             log.info(f'Edges file "{edges_file}" already exists - Overwriting!')
     else:
-        log.log_assert(not os.path.exists(edges_file), f'Edges file "{edges_file}" already exists! Use "overwrite_edges_file" to overwrite!')
+        log.log_assert(not os.path.exists(edges_file), f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!')
     parquet_path = os.path.join(output_path, rel_edges_path, 'parquet')
     if not os.path.exists(parquet_path):
         os.makedirs(parquet_path)
@@ -633,9 +633,18 @@ def main_wrapper():
     else:
         wiring_from_scratch = False
 
+    # Read overwrite_edges flag (wiring only)
+    if len(args) > 5:
+        if not wiring_from_scratch:
+            print('ERROR: "overwrite_edges" flag only supported in "wiring_from_scratch" mode!')
+            sys.exit(2)
+        overwrite_edges = bool(int(args[5]))
+    else:
+        overwrite_edges = False
+
     # Call main function
     if wiring_from_scratch:
-        main_wiring(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
+        main_wiring(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet, overwrite_edges=overwrite_edges)
     else:
         main(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
 
