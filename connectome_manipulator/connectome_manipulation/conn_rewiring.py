@@ -115,8 +115,17 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     syn_del_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all unused synapses to be deleted
     syn_rewire_idx = np.full(edges_table.shape[0], False) # Global synapse indices to keep track of all rewired synapses [for data logging]
     all_new_edges = edges_table.loc[[]].copy() # New edges table to collect all generated synapses
-    stats_dict['target_nrn_count'] = num_tgt # (Neurons)
+    stats_dict['source_nrn_count_all'] = len(src_node_ids) # All source neurons (corresponding to chosen sel_src and syn_class)
+    stats_dict['target_nrn_count_all'] = len(tgt_node_ids) # All target neurons in current split (corresponding to chosen sel_dest)
+    stats_dict['target_nrn_count_sel'] = num_tgt # Selected target neurons in current split (based on amount_pct)
     stats_dict['unable_to_rewire_nrn_count'] = 0 # (Neurons)
+    stats_dict['input_conn_count_sel'] = [] # Number of input connections within src/tgt node selection
+    stats_dict['output_conn_count_sel'] = [] # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
+    stats_dict['output_conn_count_sel_avg'] = [] # Average number of output connections within src/tgt node selection (based on prob. model)
+    estimation_run = False ### [TESTING] ###
+    p_scale = 1.0 #1.0561152470269748 ### [TESTING] ###
+    if estimation_run:
+        log.log_assert(keep_indegree == False, 'Connectivity estimation not supported with "keep_indegree" option!')
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
@@ -132,13 +141,14 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
 
         # Determine conn. prob. of all source nodes to be connected with target node
         tgt_pos = conn_prob.get_neuron_positions(nodes[1].positions if pos_acc is None else pos_acc, [[tgt]])[0] # Get neuron positions (incl. position mapping, if provided)
-        p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten()
+        p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten() * p_scale
         p_src[np.isnan(p_src)] = 0.0 # Exclude invalid values
         p_src[src_node_ids == tgt] = 0.0 # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
 
         # Currently existing sources for given target node
         src, src_syn_idx = np.unique(edges_table.loc[syn_sel_idx, '@source_node'], return_inverse=True)
         num_src = len(src)
+        stats_dict['input_conn_count_sel'] = stats_dict['input_conn_count_sel'] + [num_src]
 
         # Sample new presynaptic neurons from list of source nodes according to conn. prob.
         if keep_indegree: # Keep the same number of ingoing connections
@@ -146,8 +156,28 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             log.log_assert(np.sum(p_src) > 0.0, f'Keeping indegree not possible since connection probability zero!')
             src_new = np.random.choice(src_node_ids, size=num_src, replace=False, p=p_src / np.sum(p_src)) # New source node IDs per connection
         else: # Number of ingoing connections NOT kept the same
+
+            stats_dict['output_conn_count_sel_avg'] = stats_dict['output_conn_count_sel_avg'] + [np.round(np.mean(p_src) * len(p_src)).astype(int)]
+            if estimation_run:
+                continue
+
+#             ##### TESTING: OPTIMIZING #CONNECTIONS [Repeat random generation N times and keep the one with #connestions closest to average] #####
+#             num_opt = 10
+#             num_conns_expected = np.round(np.mean(p_src) * len(p_src)).astype(int) # Expected number of connections (=target count)
+#             new_conn_count = -np.inf
+#             for n_opt in range(num_opt):
+#                 src_new_sel_tmp = np.random.rand(len(src_node_ids)) < p_src
+#                 if np.abs(np.sum(src_new_sel_tmp) - num_conns_expected) < np.abs(new_conn_count - num_conns_expected): # Keep closest value among all tries
+#                     src_new_sel = src_new_sel_tmp
+#                     new_conn_count = np.sum(src_new_sel)
+#                 if new_conn_count == num_conns_expected:
+#                     break # Optimum found
+#             ##### ###### ##### ###### ##### ###### #####
+
             src_new_sel = np.random.rand(len(src_node_ids)) < p_src
             src_new = src_node_ids[src_new_sel] # New source node IDs per connection
+            stats_dict['output_conn_count_sel'] = stats_dict['output_conn_count_sel'] + [np.sum(src_new_sel)]
+
         num_new = len(src_new)
 
         # Re-use (up to) num_src existing connections (incl. #synapses/connection) for rewiring of (up to) num_new new connections (optional)
@@ -197,6 +227,14 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
 
         # Assign new distance-dependent delays (in-place), based on (generative) delay model
         assign_delays_from_model(delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx)
+
+    # Estimate resulting number of connections for computing a global probability scaling factor [returns empty edges table!!]
+    if estimation_run:
+        stat_sel = ['input_syn_count', 'input_conn_count', 'input_syn_per_conn', 'source_nrn_count_all', 'target_nrn_count_all', 'target_nrn_count_sel', 'unable_to_rewire_nrn_count', 'input_conn_count_sel', 'output_conn_count_sel_avg']
+        stat_str = [f'      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}' if isinstance(v, list) and len(v) > 0 else f'      {k}: {v}' for k, v in stats_dict.items() if k in stat_sel]
+        log.info('CONNECTIVITY ESTIMATION:\n%s', '\n'.join(stat_str))
+        log.data(f'EstimationStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}', **{k: v for k, v in stats_dict.items() if k in stat_sel})
+        return edges_table.iloc[[]].copy()
 
     # Update statistics
     stats_dict['num_syn_unchanged'] = stats_dict['input_syn_count'] - np.sum(stats_dict['num_syn_removed']) - np.sum(stats_dict['num_syn_rewired'])
