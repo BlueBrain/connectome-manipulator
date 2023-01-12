@@ -2,15 +2,22 @@
 Manipulation name: conn_removal
 Description: Remove percentage of randomly selected connections (i.e., all synapses per connection)
              according to certain cell and syn/conn selection criteria.
+
+             Optionally, a connection mask can be provided, in which case only connections within
+             that mask will be considered for removal (in addition to the other selecion criteria).
+             Such connection mask (.npz file) must be given as sparse adjacency matrix in CSC format,
+             exactly matching the size of the selected src/dest neurons and indexed in increasing order.
 """
 
 import numpy as np
+import os
+import scipy.sparse as sps
 
 from connectome_manipulator import log
 from connectome_manipulator.access_functions import get_node_ids
 
 
-def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct=100.0, min_syn_per_conn=None, max_syn_per_conn=None):
+def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct=100.0, min_syn_per_conn=None, max_syn_per_conn=None, conn_mask_file=None):
     """Remove percentage of randomly selected connections (i.e., all synapses per connection) according to certain cell and syn/conn selection criteria."""
     log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
 
@@ -20,6 +27,22 @@ def apply(edges_table, nodes, _aux_dict, sel_src=None, sel_dest=None, amount_pct
     syn_sel_idx = np.logical_and(np.isin(edges_table['@source_node'], gids_src), np.isin(edges_table['@target_node'], gids_dest)) # All potential synapses to be removed
     conns, syn_conn_idx, num_syn_per_conn = np.unique(edges_table[syn_sel_idx][['@source_node', '@target_node']], axis=0, return_inverse=True, return_counts=True)
     conn_sel = np.ones(conns.shape[0]).astype(bool)
+
+    # Connection mask (optional)
+    if conn_mask_file is not None:
+        log.log_assert(os.path.splitext(conn_mask_file)[-1].lower() == '.npz', f'Connection mask file "{conn_mask_file}" not in .npz format!')
+        log.log_assert(os.path.exists(conn_mask_file), f'Connection mask file "{conn_mask_file}" not found!')
+        conn_mask = sps.load_npz(conn_mask_file)
+        log.log_assert(conn_mask.shape[0] == len(gids_src) and conn_mask.shape[1] == len(gids_dest), f'Size of connection mask does not match selected number of pre/post neurons (must be <{len(gids_src)}x{len(gids_dest)}>)!')
+        log.info(f'Loaded <{conn_mask.shape[0]}x{conn_mask.shape[1]}> connection mask with {conn_mask.count_nonzero()} entries')
+
+        # Create index table for converting neuron IDs to matrix indices
+        src_conv = sps.csr_matrix((np.arange(len(gids_src), dtype=int), (np.zeros(len(gids_src), dtype=int), gids_src)))
+        dest_conv = sps.csr_matrix((np.arange(len(gids_dest), dtype=int), (np.zeros(len(gids_dest), dtype=int), gids_dest)))
+        conns_reindex = np.array([src_conv[0, conns[:, 0]].toarray().flatten(), dest_conv[0, conns[:, 1]].toarray().flatten()]).T
+
+        # Apply mask
+        conn_sel = np.logical_and(conn_sel, np.array(conn_mask[conns_reindex[:, 0], conns_reindex[:, 1]]).flatten())
 
     # Apply syn/conn filters (optional)
     if min_syn_per_conn is not None:
