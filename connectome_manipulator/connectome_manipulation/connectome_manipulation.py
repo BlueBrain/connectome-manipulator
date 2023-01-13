@@ -584,7 +584,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
             if os.path.exists(manip_config['workflow_template']):
                 create_workflow_config(manip_config['circuit_path'], blue_config_manip, manip_config['manip']['name'], output_path, manip_config['workflow_template'])
             else:
-                log.log_error(f'Unable to create workflow config! Workflow template file "{manip_config["workflow_template"]}" not found!')
+                log.warning(f'Unable to create workflow config! Workflow template file "{manip_config["workflow_template"]}" not found!')
 
     resource_profiling(do_profiling, 'final', csv_file=csv_file)
 
