@@ -597,12 +597,13 @@ def main_wrapper():
          do_resume (optional): Disable (0; default) or enable (1) resume option in case .parquet file(s) already exist
          keep_parquet (optional): Disable (0; default) or enable (1) keeping temporary .parquet file(s) after completion
          wiring_from_scratch: Disable (0: default) or enable (1) to run connectome wiring from scratch for circuits w/o connectome (rather than manipulations of existing connectomes)
+         overwrite_edges: Disable (0: default) or enable (1) overwriting an existing edges file; Supported in "wiring_from_scratch" mode only!
     """
 
     # Parse inputs
     args = sys.argv[1:]
     if len(args) < 1:
-        print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet] [wiring_from_scratch]')
+        print(f'Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet] [wiring_from_scratch] [overwrite_edges]')
         sys.exit(2)
 
     # Load config dict
