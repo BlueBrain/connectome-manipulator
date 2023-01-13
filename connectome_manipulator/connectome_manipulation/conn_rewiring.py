@@ -1,6 +1,7 @@
 """
 Manipulation name: conn_rewiring
-Description: Rewiring of existing connectome, based on a given model of connection probability.
+Description: Rewiring of existing connectome, based on a given model of connection probability (which can
+             optionally be scaled by a global probability scaling factor p_scale; p_scale=1.0 by default)
              Optionally, number of ingoing connections (and #synapses/connection) can be kept the same
              by re-using existing connections/synapses. Otherwise, existing synapses may be deleted or new ones
              created, based on the selected generation method ("duplicate_sample" and "duplicate_randomize"
@@ -9,6 +10,11 @@ Description: Rewiring of existing connectome, based on a given model of connecti
              Connection/synapse generation methods (gen_method):
                  "duplicate_sample" ... Duplicate existing synapse position & sample (non-morphology-related; w/o delay) property values independently from existing synapses
                  "duplicate_randomize" ... Duplicate existing synapse position & randomize (non-morphology-related; w/o delay) property values based on pathway-specific model distributions
+
+             Estimation run (optional): By setting estimation_run=True (False by default), an early stopping
+                 criterion is applied to just estimate the resulting number of connections (on average, i.e.,
+                 independent on random seed) based on the given connection probability model (and scaling).
+                 No actual connectome will be generated and such a run will not produce any output file.
 
              NOTE: Input edges_table assumed to be sorted by @target_node.
                    Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
@@ -25,11 +31,16 @@ from connectome_manipulator.model_building import model_types, conn_prob
 from connectome_manipulator.access_functions import get_node_ids
 
 
-def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None):
+def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None, estimation_run=False, p_scale=1.0):
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
     log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'Edges table must be ordered by @target_node!')
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
-    log.log_assert(0.0 <= amount_pct <= 100.0, 'amount_pct out of range!')
+    log.log_assert(0.0 <= amount_pct <= 100.0, '"amount_pct" out of range!')
+    log.log_assert(p_scale >= 0.0, '"p_scale" cannot be negative!')
+
+    if estimation_run:
+        log.log_assert(keep_indegree == False, 'Connectivity estimation not supported with "keep_indegree" option!')
+        log.info('*** Estimation run enabled ***')
 
     if keep_indegree and reuse_conns:
         log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
@@ -45,6 +56,8 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     p_model = model_types.AbstractModel.model_from_file(prob_model_file)
     log.log_assert(p_model.input_names == ['src_pos', 'tgt_pos'], 'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!')
     log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
+    if p_scale != 1.0:
+        log.info(f'Using probability scaling factor p_scale={p_scale}')
 
     # Load delay model
     log.log_assert(os.path.exists(delay_model_file), 'Delay model file not found!')
@@ -122,10 +135,6 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     stats_dict['input_conn_count_sel'] = [] # Number of input connections within src/tgt node selection
     stats_dict['output_conn_count_sel'] = [] # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
     stats_dict['output_conn_count_sel_avg'] = [] # Average number of output connections within src/tgt node selection (based on prob. model)
-    estimation_run = False ### [TESTING] ###
-    p_scale = 1.0 #1.0561152470269748 ### [TESTING] ###
-    if estimation_run:
-        log.log_assert(keep_indegree == False, 'Connectivity estimation not supported with "keep_indegree" option!')
     progress_pct = np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int)
     for tidx, tgt in enumerate(tgt_node_ids):
         if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
