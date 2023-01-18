@@ -304,7 +304,8 @@ class ConnPropsModel(AbstractModel):
                                'normal': ['mean', 'std'],
                                'truncnorm': ['mean', 'std', 'min', 'max'],
                                'gamma': ['mean', 'std'],
-                               'poisson': ['mean']}
+                               'poisson': ['mean'],
+                               'discrete': ['val', 'p']}
 
     def __init__(self, **kwargs):
         """Model initialization."""
@@ -332,6 +333,9 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(np.all([[np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys()))) for p in self.prop_names] for src in self.src_types]), 'ERROR: Target type statistics missing!')
         log.log_assert(np.all([[['type' in self.prop_stats[p][src][tgt].keys() for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution type missing!')
         log.log_assert(np.all([[[np.all(np.isin(self.DISTRIBUTION_ATTRIBUTES[self.prop_stats[p][src][tgt]['type']], list(self.prop_stats[p][src][tgt].keys()))) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attributes missing (required: {self.DISTRIBUTION_ATTRIBUTES})!')
+        log.log_assert(np.all([[[np.all([len(self.prop_stats[p][src][tgt][a]) > 0 for a in self.DISTRIBUTION_ATTRIBUTES[self.prop_stats[p][src][tgt]['type']] if hasattr(self.prop_stats[p][src][tgt][a], '__iter__')]) for p in self.prop_names] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Distribution attribute(s) empty (required: {self.DISTRIBUTION_ATTRIBUTES})!')
+        log.log_assert(np.all([[[np.isclose(np.sum(self.prop_stats[p][src][tgt]['p']), 1.0) for p in self.prop_names if 'p' in self.prop_stats[p][src][tgt].keys()] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Probability attribute "p" does not sum to 1.0!')
+        log.log_assert(np.all([[[len(self.prop_stats[p][src][tgt]['p']) == len(self.prop_stats[p][src][tgt]['val']) for p in self.prop_names if np.all(np.isin(['p', 'val'], list(self.prop_stats[p][src][tgt].keys())))] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Probability attribute "p" does not match length of corresponding "val"!')
         log.log_assert(np.all([[[self.prop_stats[p][src][tgt]['lower_bound'] <= self.prop_stats[p][src][tgt]['upper_bound'] for p in self.prop_names
                                  if 'lower_bound' in self.prop_stats[p][src][tgt].keys() and 'upper_bound' in self.prop_stats[p][src][tgt].keys()] for src in self.src_types] for tgt in self.tgt_types]), f'ERROR: Data bounds error!')
 
@@ -352,7 +356,7 @@ class ConnPropsModel(AbstractModel):
         return self.prop_stats[prop_name][src_type][tgt_type]
 
     @staticmethod
-    def draw_from_distribution(distr_type, distr_mean, distr_std=None, distr_min=None, distr_max=None, size=1):
+    def draw_from_distribution(distr_type, distr_mean=None, distr_std=None, distr_min=None, distr_max=None, distr_val=None, distr_p=None, size=1):
         """Draw value(s) from given distribution"""
         if distr_type == 'constant':
             drawn_values = np.full(size, distr_mean)
@@ -380,6 +384,8 @@ class ConnPropsModel(AbstractModel):
             log.log_assert(distr_mean is not None, 'ERROR: Distribution parameter missing (required: mean)!')
             log.log_assert(distr_mean >= 0.0, 'ERROR: Range error (poisson)!')
             drawn_values = np.random.poisson(lam=distr_mean, size=size)
+        elif distr_type == 'discrete':
+            drawn_values = np.random.choice(distr_val, size=size, p=distr_p)
         else:
             log.log_assert(False, f'ERROR: Distribution type "{distr_type}" not supported!')
         return drawn_values
@@ -390,18 +396,20 @@ class ConnPropsModel(AbstractModel):
         stats_dict = self.prop_stats.get(prop_name)
 
         distr_type = stats_dict[src_type][tgt_type].get('type')
-        mean_val = stats_dict[src_type][tgt_type]['mean']
+        mean_val = stats_dict[src_type][tgt_type].get('mean', np.nan)
         std_val = stats_dict[src_type][tgt_type].get('std', 0.0)
         std_within = stats_dict[src_type][tgt_type].get('std-within', 0.0)
         min_val = stats_dict[src_type][tgt_type].get('min', -np.inf)
         max_val = stats_dict[src_type][tgt_type].get('max', np.inf)
+        distr_val = stats_dict[src_type][tgt_type].get('val', [])
+        distr_p = stats_dict[src_type][tgt_type].get('p', [])
 
         if prop_name == N_SYN_PER_CONN_NAME: # Draw <size> N_SYN_PER_CONN_NAME value(s)
-            drawn_values = np.maximum(np.round(self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, size)).astype(int), 1) # At least one synapse/connection, otherwise no connection!!
+            drawn_values = np.maximum(np.round(self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, distr_val, distr_p, size)).astype(int), 1) # At least one synapse/connection, otherwise no connection!!
         else:
-            conn_mean = self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, 1) # Draw connection mean
+            conn_mean = self.draw_from_distribution(distr_type, mean_val, std_val, min_val, max_val, distr_val, distr_p, 1) # Draw connection mean
             if std_within > 0.0 and size > 0:
-                drawn_values = self.draw_from_distribution(distr_type, conn_mean, std_within, min_val, max_val, size) # Draw property values for synapses within connection
+                drawn_values = self.draw_from_distribution(distr_type, conn_mean, std_within, min_val, max_val, distr_val, distr_p, size) # Draw property values for synapses within connection
             else:
                 drawn_values = np.full(size, conn_mean) # No within-connection variability
 

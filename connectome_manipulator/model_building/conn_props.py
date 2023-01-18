@@ -15,8 +15,9 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
+MAX_UNIQUE_COUNT = 100 # To be used in discrete distributions
+
 # Ideas for improvement:
-#   *Discrete distributions
 #   *Detect actual distributions of synaptic properties (incl. data type!)
 #   *Capture cross-correlations between synaptic properties
 
@@ -55,7 +56,10 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
                           'std': np.full((len(m_types[0]), len(m_types[1])), np.nan),
                           'min': np.full((len(m_types[0]), len(m_types[1])), np.nan),
                           'max': np.full((len(m_types[0]), len(m_types[1])), np.nan),
-                          'hist': [[[] for j in range(len(m_types[1]))] for i in range(len(m_types[0]))]}
+                          'hist': np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object),
+                          'val': np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object), # Unique values (for discrete distribution)
+                          'cnt': np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object), # Unique value counts (for discrete distribution)
+                          'p': np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object)} # Unique value probabilities (for discrete distribution)
 
     # Statistics for synapse/connection properties
     conn_prop_data = {'mean': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value means across connections
@@ -63,7 +67,10 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
                       'std-within': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value stds across synapses within connections
                       'min': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value overall min
                       'max': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan), # Property value overall max
-                      'hist': [[[[] for k in range(len(syn_props))] for j in range(len(m_types[1]))] for i in range(len(m_types[0]))]} # Histogram of distribution
+                      'hist': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object), # Histogram of distribution
+                      'val': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object), # Unique values (for discrete distribution)
+                      'cnt': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object), # Unique value counts (for discrete distribution)
+                      'p': np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object)} # Unique value probabilities (for discrete distribution)
 
     # Extract statistics
     conn_counts = {'min': np.inf, 'max': -np.inf, 'sel': 0} # Count connections for reporting
@@ -90,7 +97,17 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             syns_per_conn_data['std'][sidx, tidx] = np.std(num_syn_per_conn[conn_sel])
             syns_per_conn_data['min'][sidx, tidx] = np.min(num_syn_per_conn[conn_sel])
             syns_per_conn_data['max'][sidx, tidx] = np.max(num_syn_per_conn[conn_sel])
-            syns_per_conn_data['hist'][sidx][tidx] = np.histogram(num_syn_per_conn[conn_sel], bins=hist_bins)
+            syns_per_conn_data['hist'][sidx, tidx] = np.histogram(num_syn_per_conn[conn_sel], bins=hist_bins)
+            v, c = np.unique(num_syn_per_conn[conn_sel], return_counts=True)
+            if len(v) == 1 or (len(v) < len(num_syn_per_conn[conn_sel]) and len(v) <= MAX_UNIQUE_COUNT): # Store discrete values only if not too many [otherwise, it is probably not a discrete distribution]
+                syns_per_conn_data['val'][sidx, tidx] = v
+                syns_per_conn_data['cnt'][sidx, tidx] = c
+                syns_per_conn_data['p'][sidx, tidx] = c / np.sum(c)
+            else:
+                syns_per_conn_data['val'][sidx, tidx] = []
+                syns_per_conn_data['cnt'][sidx, tidx] = []
+                syns_per_conn_data['p'][sidx, tidx] = []
+                # log.warning(f'Discrete #synapses/connection values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(num_syn_per_conn[conn_sel])} unique values)!')
 
             means_within = np.full((len(conn_sel), len(syn_props)), np.nan)
             stds_within = np.full((len(conn_sel), len(syn_props)), np.nan)
@@ -108,7 +125,17 @@ def extract(circuit, min_sample_size_per_group=None, max_sample_size_per_group=N
             conn_prop_data['min'][sidx, tidx, :] = np.min(mins_within, 0)
             conn_prop_data['max'][sidx, tidx, :] = np.max(maxs_within, 0)
             for pidx in range(len(syn_props)):
-                conn_prop_data['hist'][sidx][tidx][pidx] = np.histogram(means_within[:, pidx], bins=hist_bins)
+                conn_prop_data['hist'][sidx, tidx, pidx] = np.histogram(means_within[:, pidx], bins=hist_bins)
+                v, c = np.unique(means_within[:, pidx], return_counts=True)
+                if len(v) == 1 or (len(v) < len(means_within[:, pidx]) and len(v) <= MAX_UNIQUE_COUNT): # Store discrete values only if not too many [otherwise, it is probably not a discrete distribution]
+                    conn_prop_data['val'][sidx, tidx, pidx] = v
+                    conn_prop_data['cnt'][sidx, tidx, pidx] = c
+                    conn_prop_data['p'][sidx, tidx, pidx] = c / np.sum(c)
+                else:
+                    conn_prop_data['val'][sidx, tidx, pidx] = []
+                    conn_prop_data['cnt'][sidx, tidx, pidx] = []
+                    conn_prop_data['p'][sidx, tidx, pidx] = []
+                    # log.warning(f'Discrete {syn_props[pidx]} values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(means_within[:, pidx])} unique values)!')
 
     log.info(f'Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.')
 
@@ -126,34 +153,65 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
         # Select level of granularity
         for level in range(5):
             if level == 0: # Use source m-type/target layer/synapse class value, if existent
-                src_sel = [sidx]
-                tgt_sel = np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][tidx], np.array(m_type_class[1]) == m_type_class[1][tidx])
+                src_sel = np.array([sidx])
+                tgt_sel = np.where(np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][tidx], np.array(m_type_class[1]) == m_type_class[1][tidx]))[0]
             elif level == 1: # Use source m-type/target synapse class value, if existent
-                src_sel = [sidx]
-                tgt_sel = np.array(m_type_class[1]) == m_type_class[1][tidx]
+                src_sel = np.array([sidx])
+                tgt_sel = np.where(np.array(m_type_class[1]) == m_type_class[1][tidx])[0]
             elif level == 2: # Use per layer/synapse class value, if existent
-                src_sel = np.logical_and(np.array(m_type_layer[0]) == m_type_layer[0][sidx], np.array(m_type_class[0]) == m_type_class[0][sidx])
-                tgt_sel = np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][tidx], np.array(m_type_class[1]) == m_type_class[1][tidx])
+                src_sel = np.where(np.logical_and(np.array(m_type_layer[0]) == m_type_layer[0][sidx], np.array(m_type_class[0]) == m_type_class[0][sidx]))[0]
+                tgt_sel = np.where(np.logical_and(np.array(m_type_layer[1]) == m_type_layer[1][tidx], np.array(m_type_class[1]) == m_type_class[1][tidx]))[0]
             elif level == 3: # Use per synapse class value, if existent
-                src_sel = np.array(m_type_class[0]) == m_type_class[0][sidx]
-                tgt_sel = np.array(m_type_class[1]) == m_type_class[1][tidx]
+                src_sel = np.where(np.array(m_type_class[0]) == m_type_class[0][sidx])[0]
+                tgt_sel = np.where(np.array(m_type_class[1]) == m_type_class[1][tidx])[0]
             else: # Otherwise: Use overall value
-                src_sel = range(len(m_types[0]))
-                tgt_sel = range(len(m_types[1]))
+                src_sel = np.array(list(range(len(m_types[0]))))
+                tgt_sel = np.array(list(range(len(m_types[1]))))
             if np.any(np.isfinite(syns_per_conn_data['mean'][src_sel, :][:, tgt_sel])):
                 level_counts[f'Level{level}'] = level_counts.get(f'Level{level}', 0) + 1
                 break
+
+        def merge_uniq(vals, cnts):
+            """ Helper function to merge unique values/counts """
+            vals = list(filter(lambda x: len(x) > 0 if hasattr(x, '__iter__') else np.isfinite(x), vals)) # [Remove NaNs/empty lists, so not to mess up data type]
+            cnts = list(filter(lambda x: len(x) > 0 if hasattr(x, '__iter__') else np.isfinite(x), cnts)) # [Remove NaNs/empty lists, so not to mess up data type]
+            if len(vals) > 0:
+                vc_dict = {} # Value/count dict
+                for v, c in zip(np.hstack(vals), np.hstack(cnts)):
+                    if v in vc_dict: # Add to existing count
+                        vc_dict[v] += c
+                    else: # Init count
+                        vc_dict[v] = c
+                vals = np.array(list(vc_dict.keys()))
+                cnts = np.array([vc_dict[v] for v in vals])
+            return vals, cnts
 
         # Interpolate missing values
         syns_per_conn_model['mean'][sidx, tidx] = np.nanmean(syns_per_conn_data['mean'][src_sel, :][:, tgt_sel])
         syns_per_conn_model['std'][sidx, tidx] = np.nanmean(syns_per_conn_data['std'][src_sel, :][:, tgt_sel])
         syns_per_conn_model['min'][sidx, tidx] = np.nanmin(syns_per_conn_data['min'][src_sel, :][:, tgt_sel])
         syns_per_conn_model['max'][sidx, tidx] = np.nanmax(syns_per_conn_data['max'][src_sel, :][:, tgt_sel])
+
+        uvals = syns_per_conn_data['val'][src_sel, :][:, tgt_sel].flatten()
+        ucnts = syns_per_conn_data['cnt'][src_sel, :][:, tgt_sel].flatten()
+        v, c = merge_uniq(uvals, ucnts)
+        syns_per_conn_model['val'][sidx, tidx] = v
+        syns_per_conn_model['cnt'][sidx, tidx] = c
+        syns_per_conn_model['p'][sidx, tidx] = c / np.sum(c)
+
         conn_prop_model['mean'][sidx, tidx, :] = [np.nanmean(conn_prop_data['mean'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
         conn_prop_model['std'][sidx, tidx, :] = [np.nanmean(conn_prop_data['std'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
         conn_prop_model['std-within'][sidx, tidx, :] = [np.nanmean(conn_prop_data['std-within'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
         conn_prop_model['min'][sidx, tidx, :] = [np.nanmin(conn_prop_data['min'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
         conn_prop_model['max'][sidx, tidx, :] = [np.nanmax(conn_prop_data['max'][src_sel, :, p][:, tgt_sel]) for p in range(len(syn_props))]
+
+        for pidx in range(len(syn_props)):
+            uvals = [conn_prop_model['val'][s][t][pidx] for s in src_sel for t in tgt_sel]
+            ucnts = [conn_prop_model['cnt'][s][t][pidx] for s in src_sel for t in tgt_sel]
+            v, c = merge_uniq(uvals, ucnts)
+            conn_prop_model['val'][sidx, tidx, pidx] = v
+            conn_prop_model['cnt'][sidx, tidx, pidx] = c
+            conn_prop_model['p'][sidx, tidx, pidx] = c / np.sum(c)
 
     log.info(f'Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }')
 
@@ -173,10 +231,12 @@ def build(syns_per_conn_data, conn_prop_data, m_types, m_type_class, m_type_laye
                 attr_dict = {'type': distr_type}
                 distr_attr = model_types.ConnPropsModel.DISTRIBUTION_ATTRIBUTES[distr_type]
                 if prop == model_types.N_SYN_PER_CONN_NAME:
+                    log.log_assert(np.all([attr in syns_per_conn_model for attr in distr_attr]), f'ERROR: Required attribute(s) {distr_attr} for distribution "{distr_type}" not found!')
                     attr_dict.update({attr: syns_per_conn_model[attr][sidx, tidx] for attr in distr_attr})
                 else:
                     if np.any(conn_prop_model['std-within'][sidx, tidx, pidx] > 0.0):
                         distr_attr = distr_attr + ['std-within']
+                    log.log_assert(np.all([attr in conn_prop_model for attr in distr_attr]), f'ERROR: Required attribute(s) {distr_attr} for distribution "{distr_type}" not found!')
                     attr_dict.update({attr: conn_prop_model[attr][sidx, tidx, pidx] for attr in distr_attr})
                 if dtype is not None:
                     attr_dict.update({'dtype': dtype})
@@ -220,16 +280,16 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
 
     # Plot data vs. model: Distribution histogram examples (generative model)
     N = 1000 # Number of samples
-    conn_counts = [[np.sum(syns_per_conn_data['hist'][sidx][tidx][0]) if len(syns_per_conn_data['hist'][sidx][tidx]) > 0 else 0 for sidx in range(len(m_types[0]))] for tidx in range(len(m_types[1]))]
+    conn_counts = [[np.sum(syns_per_conn_data['hist'][sidx, tidx][0]) if (hasattr(syns_per_conn_data['hist'][sidx, tidx], '__iter__') and len(syns_per_conn_data['hist'][sidx, tidx]) > 0) else 0 for sidx in range(len(m_types[0]))] for tidx in range(len(m_types[1]))]
     max_pathways = np.where(np.array(conn_counts) == np.max(conn_counts)) # Select pathway(s) with maximum number of connections (i.e., most robust statistics)
     sidx, tidx = [max_pathways[i][0] for i in range(len(max_pathways))] # Select first of these pathways for plotting
     src, tgt = [m_types[0][sidx], m_types[1][tidx]]
     for pidx, p in enumerate(prop_names):
         plt.figure(figsize=(5, 3), dpi=300)
         if pidx < len(syn_props):
-            data_hist = conn_prop_data['hist'][sidx][tidx][pidx]
+            data_hist = conn_prop_data['hist'][sidx, tidx, pidx]
         else:
-            data_hist = syns_per_conn_data['hist'][sidx][tidx]
+            data_hist = syns_per_conn_data['hist'][sidx, tidx]
         plt.bar(data_hist[1][:-1], data_hist[0] / np.sum(data_hist[0]), align='edge', width=np.min(np.diff(data_hist[1])), label=f'Data (N={np.max(conn_counts)})')
         model_data = np.hstack([model.draw(prop_name=p, src_type=src, tgt_type=tgt) for n in range(N)])
         hist_bins = data_hist[1] # Use same model distribution binning as for data
