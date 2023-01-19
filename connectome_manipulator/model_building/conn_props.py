@@ -260,11 +260,36 @@ def plot(out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model,
     prop_names = model.get_prop_names()
 
     # Plot data vs. model: property maps
+    def get_model_stat(stat, m_params):
+        """ Get distribution statistic (if existing) or derive from other model paramters, if possible. """
+        val = np.nan
+        if stat in m_params: # Return existing stat. parameter
+            val = m_params[stat]
+        else:
+            if stat == 'mean' and 'val' in m_params and 'p' in m_params: # Derive mean from discrete values/probabilities
+                val = np.sum(np.array(m_params['p'] * np.array(m_params['val'])))
+            elif stat == 'std' and 'val' in m_params and 'p' in m_params: # Derive std from discrete values/probabilities
+                m = np.sum(np.array(m_params['p'] * np.array(m_params['val'])))
+                val = np.sqrt(np.sum(np.array(m_params['p']) * (np.array(m_params['val']) - m)**2))
+            elif stat == 'min' and 'val' in m_params and 'p' in m_params: # Derive min from discrete values/probabilities
+                val = np.min(np.array(m_params['val'])[np.array(m_params['p']) > 0.0])
+            elif stat == 'max' and 'val' in m_params and 'p' in m_params: # Derive max from discrete values/probabilities
+                val = np.max(np.array(m_params['val'])[np.array(m_params['p']) > 0.0])
+        return val
+
     title_str = ['Data', 'Model']
     for stat_sel in ['mean', 'std']:
         for pidx, p in enumerate(prop_names):
             plt.figure(figsize=(8, 3), dpi=300)
-            for didx, data in enumerate([conn_prop_data[stat_sel][:, :, pidx] if pidx < conn_prop_data[stat_sel].shape[2] else syns_per_conn_data[stat_sel], np.array([[model_params['prop_stats'][p][s][t][stat_sel] if stat_sel in model_params['prop_stats'][p][s][t] else np.nan for t in m_types[1]] for s in m_types[0]])]):
+            if pidx < conn_prop_data[stat_sel].shape[2]:
+                data_stat_sel = conn_prop_data[stat_sel][:, :, pidx]
+            else:
+                data_stat_sel = syns_per_conn_data[stat_sel]
+            model_stat_sel = np.full((len(m_types[0]), len(m_types[1])), np.nan)
+            for sidx, s in enumerate(m_types[0]):
+                for tidx, t in enumerate(m_types[1]):
+                    model_stat_sel[sidx, tidx] = get_model_stat(stat_sel, model_params['prop_stats'][p][s][t])
+            for didx, data in enumerate([data_stat_sel, model_stat_sel]):
                 plt.subplot(1, 2, didx + 1)
                 plt.imshow(data, interpolation='nearest', cmap='jet')
                 plt.xticks(range(len(m_types[1])), m_types[1], rotation=90, fontsize=3)
