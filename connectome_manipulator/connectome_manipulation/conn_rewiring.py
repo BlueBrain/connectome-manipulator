@@ -16,6 +16,11 @@ Description: Rewiring of existing connectome, based on a given model of connecti
                  independent on random seed) based on the given connection probability model (and scaling).
                  No actual connectome will be generated and such a run will not produce any output file.
 
+             Optimizing #connections: By setting opt_nconn=True (False by default), the number of ingoing connections
+                 for each post-neuron will be optimized to match its expected number of connections on average. This
+                 is done by repeating the random generation up to OPT_NCONN_MAX_ITER times and keeping the instance
+                 which has #connestions exactly matching or closest to the average.
+
              NOTE: Input edges_table assumed to be sorted by @target_node.
                    Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
 """
@@ -30,8 +35,10 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types, conn_prob
 from connectome_manipulator.access_functions import get_node_ids
 
+OPT_NCONN_MAX_ITER = 1000
 
-def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None, estimation_run=False, p_scale=1.0):
+
+def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_file, sel_src=None, sel_dest=None, pos_map_file=None, keep_indegree=True, reuse_conns=True, gen_method=None, amount_pct=100.0, props_model_file=None, estimation_run=False, p_scale=1.0, opt_nconn=False):
     """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
     log.log_assert(np.all(np.diff(edges_table['@target_node']) >= 0), 'Edges table must be ordered by @target_node!')
     log.log_assert(syn_class in ['EXC', 'INH'], f'Synapse class "{syn_class}" not supported (must be "EXC" or "INH")!')
@@ -41,6 +48,11 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
     if estimation_run:
         log.log_assert(keep_indegree == False, 'Connectivity estimation not supported with "keep_indegree" option!')
         log.info('*** Estimation run enabled ***')
+
+    if opt_nconn:
+        log.log_assert(keep_indegree == False, '#Connections optimization not supported with "keep_indegree" option!')
+        log.log_assert(estimation_run == False, '#Connections optimization not supported with "estimation_run" option!')
+        log.info(f'Enabled optimization of #connections to match expected number on average (max. {OPT_NCONN_MAX_ITER} iterations)')
 
     if keep_indegree and reuse_conns:
         log.log_assert(gen_method is None, f'No generation method required for "keep_indegree" and "reuse_conns" options!')
@@ -166,26 +178,25 @@ def apply(edges_table, nodes, aux_dict, syn_class, prob_model_file, delay_model_
             src_new = np.random.choice(src_node_ids, size=num_src, replace=False, p=p_src / np.sum(p_src)) # New source node IDs per connection
         else: # Number of ingoing connections NOT kept the same
 
-            stats_dict['output_conn_count_sel_avg'] = stats_dict['output_conn_count_sel_avg'] + [np.round(np.mean(p_src) * len(p_src)).astype(int)]
+            stats_dict['output_conn_count_sel_avg'].append(np.round(np.sum(p_src)).astype(int))
             if estimation_run:
                 continue
 
-#             ##### TESTING: OPTIMIZING #CONNECTIONS [Repeat random generation N times and keep the one with #connestions closest to average] #####
-#             num_opt = 10
-#             num_conns_expected = np.round(np.mean(p_src) * len(p_src)).astype(int) # Expected number of connections (=target count)
-#             new_conn_count = -np.inf
-#             for n_opt in range(num_opt):
-#                 src_new_sel_tmp = np.random.rand(len(src_node_ids)) < p_src
-#                 if np.abs(np.sum(src_new_sel_tmp) - num_conns_expected) < np.abs(new_conn_count - num_conns_expected): # Keep closest value among all tries
-#                     src_new_sel = src_new_sel_tmp
-#                     new_conn_count = np.sum(src_new_sel)
-#                 if new_conn_count == num_conns_expected:
-#                     break # Optimum found
-#             ##### ###### ##### ###### ##### ###### #####
+            if opt_nconn: # Optimizing #connections [Repeat random generation up to OPT_NCONN_MAX_ITER times and keep the one with #connestions closest to average]
+                num_conns_avg = np.round(np.sum(p_src)).astype(int) # Number of connections on average (=target count)
+                new_conn_count = -np.inf
+                for n_opt in range(OPT_NCONN_MAX_ITER):
+                    src_new_sel_tmp = np.random.rand(len(src_node_ids)) < p_src
+                    if np.abs(np.sum(src_new_sel_tmp) - num_conns_avg) < np.abs(new_conn_count - num_conns_avg): # Keep closest value among all tries
+                        src_new_sel = src_new_sel_tmp
+                        new_conn_count = np.sum(src_new_sel)
+                    if new_conn_count == num_conns_avg:
+                        break # Optimum found
+            else: # Just draw once (w/o optimization)
+                src_new_sel = np.random.rand(len(src_node_ids)) < p_src
 
-            src_new_sel = np.random.rand(len(src_node_ids)) < p_src
             src_new = src_node_ids[src_new_sel] # New source node IDs per connection
-            stats_dict['output_conn_count_sel'] = stats_dict['output_conn_count_sel'] + [np.sum(src_new_sel)]
+            stats_dict['output_conn_count_sel'].append(np.sum(src_new_sel))
 
         num_new = len(src_new)
 
