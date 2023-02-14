@@ -15,11 +15,13 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from glob import glob
 
 import numpy as np
 import pyarrow.parquet as pq
 from bluepysnap.circuit import Circuit
 
+import connectome_manipulator
 from connectome_manipulator import log
 from connectome_manipulator.access_functions import get_nodes_population, get_edges_population
 
@@ -76,7 +78,8 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     for m_step in range(len(manip_config['manip']['fcts'])):
         manip_source = manip_config['manip']['fcts'][m_step]['source']
         manip_kwargs = manip_config['manip']['fcts'][m_step]['kwargs']
-        log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
+        #log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
+        log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}')
 
         manip_module = importlib.import_module('connectome_manipulator.connectome_manipulation.' + manip_source)
         log.log_assert(hasattr(manip_module, 'apply'), f'Manipulation module "{manip_source}" requires apply() function!')
@@ -85,94 +88,70 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     return edges_table
 
 
-### CODE for parquet-converters/0.5.7 from archive/2021-07 ###
+### CODE for parquet-converters/0.8.0 ###
 def edges_to_parquet(edges_table, output_file):
-    """Write edge properties table to parquet file."""
-    edges_table = edges_table.rename(columns={'@target_node': 'connected_neurons_post', '@source_node': 'connected_neurons_pre'}) # Convert column names
-    edges_table['synapse_type_id'] = 0 # Add type ID, required for SONATA
-    edges_table.to_parquet(output_file, index=False)
+    """Write edge properties table to parquet file (if non-empty!)."""
+    if edges_table.size == 0:
+        log.info(f'Edges table empty - SKIPPING {os.path.split(output_file)[-1]}')
+    else:
+        edges_table = edges_table.rename(columns={'@target_node': 'target_node_id', '@source_node':
+                                                  'source_node_id'}) # Convert column names
+        edges_table['edge_type_id'] = 0 # Add type ID, required for SONATA
+        edges_table.to_parquet(output_file, index=False)
 
 
-def parquet_to_sonata(input_file_list, output_file, nodes, nodes_files, keep_parquet=False):
-    """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!).
+### CODE for parquet-converters/0.8.0 ###
+def create_parquet_metadata(parquet_path, nodes):
+    """Adding metadata file required for parquet conversion using parquet-converters/0.8.0
+       [Modified from: https://bbpgitlab.epfl.ch/hpc/circuit-building/spykfunc/-/blob/main/src/spykfunc/functionalizer.py#L328-354]
+    """
+    schema = pq.ParquetDataset(parquet_path, use_legacy_dataset=False).schema
+    metadata = {k.decode(): v.decode() for k, v in schema.metadata.items()}
+    metadata.update({"source_population_name": nodes[0].name,
+                     "source_population_size": str(nodes[0].size),
+                     "target_population_name": nodes[1].name,
+                     "target_population_size": str(nodes[1].size),
+                     "version": connectome_manipulator.__version__}) # [Will be reflected as "version" attribute under edges/<population_name> in the resulting SONATA file]
+    new_schema = schema.with_metadata(metadata)
+    metadata_file = os.path.join(parquet_path, "_metadata")
+    pq.write_metadata(new_schema, metadata_file)
+
+    return metadata_file
+
+
+### CODE for parquet-converters/0.8.0 ###
+def parquet_to_sonata(input_path, output_file, nodes, done_file, population_name='default', keep_parquet=False):
+    """Convert all parquet file(s) from input path to SONATA format (using parquet-converters tool; recomputes indices!!).
        [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!!
                    Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
        [IMPORTANT: All .parquet files used for conversion must be non-empty!!
                    Otherwise, value errors (zeros) may occur in resulting SONATA file!!]
     """
-    total_num_files = len(input_file_list)
-    input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file may occur!!
-    log.info(f'Converting {len(input_file_list)} of {total_num_files} non-empty .parquet file(s) to SONATA')
-    log.log_assert(len(input_file_list) > 0, 'All .parquet files empty - nothing to convert!')
-    input_files = ' '.join(input_file_list)
 
+    # Check if .parquet files exist and are non-empty [Otherwise, value errors (zeros) may occur in resulting SONATA file]
+    input_file_list = glob(os.path.join(input_path, '*.parquet'))
+    log.log_assert(len(input_file_list) > 0, 'No .parquet files to convert!')
+    log.log_assert(np.all([pq.read_metadata(f).num_rows > 0 for f in input_file_list]), 'All .parquet files must be non-empty to be converted to SONATA!')
+    log.info(f'Converting {len(input_file_list)} (non-empty) .parquet file(s) to SONATA')
+
+    # Creating metadata file [Required by parquet-converters/0.8.0]
+    metadata_file = create_parquet_metadata(input_path, nodes)
+
+    # Running parquet conversion [Requires parquet-converters/0.8.0]
     if os.path.exists(output_file):
         os.remove(output_file)
-
-    # Running parquet conversion [Requires parquet-converters/0.5.7 from archive/2021-07 (which should be used by used JupyterLab kernel)]
-    proc = subprocess.Popen(f'module load parquet-converters/0.5.7;\
-                              parquet2hdf5 --format SONATA --from {nodes_files[0]} {nodes[0].name} --to {nodes_files[1]} {nodes[1].name} -o {output_file} {input_files}',
+    proc = subprocess.Popen(f'parquet2hdf5 {input_path} {output_file} {population_name}',
                             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     log.info(proc.communicate()[0].decode())
     log.log_assert(os.path.exists(output_file), 'Parquet conversion error - SONATA file not created successfully!')
 
     # Delete temporary parquet files (optional)
     if not keep_parquet:
-        log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s)')
+        log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s), "{os.path.split(metadata_file)[-1]}" file, and "{os.path.split(done_file)[-1]}"')
         for fn in input_file_list:
             os.remove(fn)
-### ### ### ### ### ### ### ### ### ### ### ###
-
-
-### CODE for parquet-converters/0.6.0 and higher => ERROR: No proper SONATA file [edges_manip.source => Unable to open the attribute "node_population": (Attribute) Object not found]
-# def edges_to_parquet(edges_table, output_file):
-#     """Write edge properties table to parquet file."""
-#     edges_table = edges_table.rename(columns={'@target_node': 'target_node_id', '@source_node': 'source_node_id'}) # Convert column names
-#     edges_table['synapse_type_id'] = 0 # Add type ID, required for SONATA
-#     edges_table.to_parquet(output_file, index=False)
-
-
-# def parquet_to_sonata(input_file_list, output_file, _nodes, _nodes_files, keep_parquet=False):
-#     """Convert parquet file(s) to SONATA format (using parquet-converters tool; recomputes indices!!).
-#        [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!!
-#                    Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
-#        [IMPORTANT: All .parquet files used for conversion must be non-empty!!
-#                    Otherwise, value errors (zeros) may occur in resulting SONATA file!!]
-#     """
-#     total_num_files = len(input_file_list)
-#     input_file_list = list(filter(lambda f: pq.read_metadata(f).num_rows > 0, input_file_list)) # Remove all empty .parquet files => Otherwise, value errors (zeros) in resulting SONATA file may occur!!
-#     log.info(f'Converting {len(input_file_list)} of {total_num_files} non-empty .parquet file(s) to SONATA')
-#     log.log_assert(len(input_file_list) > 0, 'All .parquet files empty - nothing to convert!')
-#     input_files = ' '.join(input_file_list)
-
-#     if os.path.exists(output_file):
-#         os.remove(output_file)
-
-#     # Creating temporary folder with symbolic links to .parquet files [parquet converter >= 0.6.0 works within a input directory]
-#     base_dir = os.path.split(input_file_list[0])[0]
-#     tmp_dir = os.path.join(base_dir, f'_tmp_{"".join([hex(x)[2:] for x in np.random.randint(16, size=16)])}_')
-#     assert not os.path.exists(tmp_dir), 'ERROR: Temp. directory already exists!'
-#     os.makedirs(tmp_dir)
-#     for file in input_file_list:
-#         fn = os.path.split(file)[1]
-#         os.symlink(os.path.join('..', fn), os.path.join(tmp_dir, fn))
-
-#     # Running parquet conversion [Requires parquet-converters/0.6.0 from archive/2021-07 or higher (which should be used by used JupyterLab kernel)]
-#     proc = subprocess.Popen(f'module load parquet-converters;\
-#                               parquet2hdf5 {tmp_dir} {output_file} default',
-#                             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-#     log.info(proc.communicate()[0].decode())
-#     log.log_assert(os.path.exists(output_file), 'Parquet conversion error - SONATA file not created successfully!')
-
-#     # Delete temporary folder
-#     shutil.rmtree(tmp_dir)
-
-#     # Delete temporary parquet files (optional)
-#     if not keep_parquet:
-#         log.info(f'Deleting {len(input_file_list)} temporary .parquet file(s)')
-#         for fn in input_file_list:
-#             os.remove(fn)
-### ### ### ### ### ### ### ### ### ### ### ###
+        os.remove(metadata_file)
+        os.remove(done_file)
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
@@ -348,6 +327,78 @@ def resource_profiling(enabled=False, description='', reset=False, csv_file=None
         resource_profiling.perf_table.to_csv(csv_file)
 
 
+def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
+    """Setup and check of output parquet directory and preparation of .parquet file list.
+       In addition, sets up a completed file list to resume from."""
+
+    if not os.path.exists(parquet_path):
+        os.makedirs(parquet_path)
+    done_file = os.path.join(parquet_path, 'parquet.DONE') # File to keep track of parquet files already completed (to resume from with do_resume option)
+
+    # Potential list of .parquet file names [NOTE: Empty files won't actually exist!!]
+    if N_split == 1:
+        split_ext = ['']
+    else:
+        ext_len = len(str(N_split))
+        split_ext = [f'.{N_split}-{i_split:0{ext_len}d}' for i_split in range(N_split)]
+    parquet_file_list = [os.path.join(parquet_path, os.path.splitext(edges_fn)[0]) + split_ext[i_split] + '.parquet' for i_split in range(N_split)]
+
+    # Check if parquet folder is clean
+    existing_parquet_files = glob(os.path.join(parquet_path, '*.parquet'))
+    if do_resume: # Resume from an existing run: Done file must be compatible with current run, and all existing .parquet files in the parquet folder must be from the list of expected (done) files (these files will be skipped over and merged later)
+        if not os.path.exists(done_file):
+            # Initialize empty list
+            done_list = []
+            with open(done_file, 'w') as f:
+                json.dump(done_list, f, indent=2)
+        else:
+            # Load completed files from existing list [can be in arbitrary order!!]
+            with open(done_file, 'r') as f:
+                done_list = json.load(f)
+            log.log_assert(all([os.path.join(parquet_path, f) + '.parquet' in parquet_file_list for f in done_list]), f'Unable to resume! "{os.path.split(done_file)[-1]}" contains unexpected entries!')
+        parquet_file_list_done = list(filter(lambda f: os.path.splitext(os.path.split(f)[-1])[0] in done_list, parquet_file_list))
+        log.log_assert(np.all([f in parquet_file_list_done for f in existing_parquet_files]), 'Unable to resume! Parquet output directory contains unexpected .parquet files, please clean your output dir!')
+        # [NOTE: Empty files don't exist but may be marked as done!]
+    else: # Running from scratch: Parquet folder must not contain any .parquet files (so not to mix up existing and new files!!)
+        log.log_assert(len(existing_parquet_files) == 0, 'Parquet output directory contains .parquet files, please clean your output dir or use "do_resume" to resume from an existing run!')
+        with open(done_file, 'w') as f: # Initialize (empty) done file
+            json.dump([], f, indent=2)
+
+    return parquet_file_list, done_file
+
+
+def mark_as_done(parquet_file, done_file):
+    """Marks the given parquet file as "done" in the done file
+       (i.e., adding the file name to the list of done files)."""
+
+    log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
+
+    # Load list of completed files [can be in arbitrary order!!]
+    with open(done_file, 'r') as f:
+        done_list = json.load(f)
+
+    # Update list and write back
+    done_list.append(os.path.splitext(os.path.split(parquet_file)[-1])[0])
+    with open(done_file, 'w') as f:
+        json.dump(done_list, f, indent=2)
+
+
+def check_if_done(parquet_file, done_file):
+    """Checks if given parquet file is done already
+       (i.e., file name existing in the list of done files)."""
+
+    log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
+
+    # Load list of completed files [can be in arbitrary order!!]
+    with open(done_file, 'r') as f:
+        done_list = json.load(f)
+
+    # Check if done
+    is_done = os.path.splitext(os.path.split(parquet_file)[-1])[0] in done_list
+
+    return is_done
+
+
 def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=False, overwrite_edges=False):  # pragma: no cover
     """Main entry point for circuit wiring for circuits w/o connectome.
       [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
@@ -390,21 +441,19 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
     else:
         log.log_assert(not os.path.exists(edges_file), f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!')
     parquet_path = os.path.join(output_path, rel_edges_path, 'parquet')
-    if not os.path.exists(parquet_path):
-        os.makedirs(parquet_path)
+    parquet_file_list, done_file = prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume)
 
     # Start processing
     np.random.seed(manip_config.get('seed', 123456))
 
-    parquet_file_list = []
     N_syn_in = []
     N_syn_out = []
     aux_dict = {} # Auxiliary dict to pass information from one split iteration to another
     for i_split, split_ids in enumerate(node_ids_split):
 
         # Resume option: Don't recompute, if .parquet file of current split already exists
-        parquet_file_manip = os.path.splitext(os.path.join(parquet_path, os.path.split(edges_file)[1]))[0] + f'_{manip_config["manip"]["name"]}' + (f'.{i_split:04d}' if N_split > 1 else '') + '.parquet'
-        if do_resume and os.path.exists(parquet_file_manip):
+        parquet_file_manip = parquet_file_list[i_split]
+        if do_resume and check_if_done(parquet_file_manip, done_file):
             log.info(f'Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})')
         else:
             # Apply connectome wiring
@@ -419,14 +468,14 @@ def main_wiring(manip_config, do_profiling=False, do_resume=False, keep_parquet=
 
             # Write back connectome to .parquet file
             edges_to_parquet(edges_table_manip, parquet_file_manip)
+            mark_as_done(parquet_file_manip, done_file)
             resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
-        parquet_file_list.append(parquet_file_manip)
 
     log.info(f'Total input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n')
 
     # Convert .parquet file(s) to SONATA file
     ### [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
-    parquet_to_sonata(parquet_file_list, edges_file, nodes, nodes_files, keep_parquet)
+    parquet_to_sonata(parquet_path, edges_file, nodes, done_file, keep_parquet=keep_parquet)
 
     # Create new SONATA config (.JSON) from original config file
     sonata_config_manip = os.path.join(output_path, os.path.splitext(manip_config['circuit_config'])[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(manip_config['circuit_config'])[1])
@@ -472,7 +521,7 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
 
     popul_name_spec = manip_config.get('population_name')
     nodes, nodes_files, node_ids_split, edges, edges_file, popul_name = load_circuit(sonata_config, N_split, popul_name_spec)
-    
+
     log.log_assert(edges is not None and edges_file is not None, 'Circuit without edges cannot be used for manipulations! Use "main_wiring" for connectome wiring instead!')
     log.log_assert(os.path.abspath(edges_file).find(os.path.abspath(manip_config['circuit_path'])) == 0, 'Edges file not within circuit path!')
     edges_fn = os.path.split(edges_file)[1]
@@ -480,21 +529,19 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
 
     # Prepare output parquet path
     parquet_path = os.path.join(output_path, rel_edges_path, 'parquet')
-    if not os.path.exists(parquet_path):
-        os.makedirs(parquet_path)
+    parquet_file_list, done_file = prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume)
 
     # Start processing
     np.random.seed(manip_config.get('seed', 123456))
 
-    parquet_file_list = []
     N_syn_in = []
     N_syn_out = []
     aux_dict = {} # Auxiliary dict to pass information from one split iteration to another
     for i_split, split_ids in enumerate(node_ids_split):
 
         # Resume option: Don't recompute, if .parquet file of current split already exists
-        parquet_file_manip = os.path.splitext(os.path.join(parquet_path, os.path.split(edges_file)[1]))[0] + f'_{manip_config["manip"]["name"]}' + (f'.{i_split:04d}' if N_split > 1 else '') + '.parquet'
-        if do_resume and os.path.exists(parquet_file_manip):
+        parquet_file_manip = parquet_file_list[i_split]
+        if do_resume and check_if_done(parquet_file_manip, done_file):
             log.info(f'Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})')
         else:
             # Load edge table containing all edge (=synapse) properties
@@ -516,14 +563,14 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
 
             # Write back connectome to .parquet file
             edges_to_parquet(edges_table_manip, parquet_file_manip)
+            mark_as_done(parquet_file_manip, done_file)
             resource_profiling(do_profiling, f'saved-{i_split + 1}/{N_split}', csv_file=csv_file)
-        parquet_file_list.append(parquet_file_manip)
 
     log.info(f'Total input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n')
 
     # Convert .parquet file(s) to SONATA file
     edges_file_manip = os.path.join(output_path, rel_edges_path, os.path.splitext(edges_fn)[0] + f'_{manip_config["manip"]["name"]}' + os.path.splitext(edges_file)[1])
-    parquet_to_sonata(parquet_file_list, edges_file_manip, nodes, nodes_files, keep_parquet)
+    parquet_to_sonata(parquet_path, edges_file_manip, nodes, done_file, keep_parquet=keep_parquet)
 
     # Create new SONATA config (.JSON) from original config file
     edges_fn_manip = os.path.split(edges_file_manip)[1]
