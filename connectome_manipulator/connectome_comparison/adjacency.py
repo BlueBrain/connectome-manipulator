@@ -1,5 +1,5 @@
-"""
-Connectome comparison name: adjacency
+"""Connectome comparison name: adjacency
+
 Description: Structural comparison of two connectomes in terms of adjacency matrices for selected pathways
              (including synapse counts per connection), as specified by the config. For each connectome,
              the underlying adjacency/count matrices are computed by the compute() function and will be saved
@@ -9,7 +9,6 @@ Description: Structural comparison of two connectomes in terms of adjacency matr
 
 import matplotlib.pyplot as plt
 import numpy as np
-import progressbar
 from scipy.sparse import csr_matrix
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
@@ -46,52 +45,76 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
     def tgt_gid_to_idx(gids):
         return tgt_plot_ids[gids - tgt_gid_offset]
 
-    print(f'INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (sel_src={sel_src}, sel_dest={sel_dest})', flush=True)
+    print(
+        f"INFO: Creating {len(src_node_ids)}x{len(tgt_node_ids)} adjacency matrix (sel_src={sel_src}, sel_dest={sel_dest})",
+        flush=True,
+    )
 
-#     pbar = progressbar.ProgressBar()
-#     for post_idx in pbar(range(len(tgt_node_ids))):
-#         post_gid = tgt_node_ids[post_idx]
-#         conns = np.array(list(edges.iter_connections(target=post_gid, return_edge_count=True)))
-#         if len(conns) > 0:
-#             idx = src_gid_to_idx(conns[:, 0])
-#             count_matrix[idx[idx >= 0], tgt_gid_to_idx(post_gid)] = conns[idx >= 0, 2]
+    #     pbar = progressbar.ProgressBar()
+    #     for post_idx in pbar(range(len(tgt_node_ids))):
+    #         post_gid = tgt_node_ids[post_idx]
+    #         conns = np.array(list(edges.iter_connections(target=post_gid, return_edge_count=True)))
+    #         if len(conns) > 0:
+    #             idx = src_gid_to_idx(conns[:, 0])
+    #             count_matrix[idx[idx >= 0], tgt_gid_to_idx(post_gid)] = conns[idx >= 0, 2]
 
-    conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)))
-    count_matrix = csr_matrix((conns[:, 2], (src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1]))))
+    conns = np.array(
+        list(
+            edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)
+        )
+    )
+    count_matrix = csr_matrix(
+        (conns[:, 2], (src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1])))
+    )
 
     adj_matrix = count_matrix > 0
 
-    return {'adj': {'data': adj_matrix, 'name': 'Adjacency', 'unit': None},
-            'adj_cnt': {'data': count_matrix, 'name': 'Adjacency count', 'unit': 'Synapse count'},
-            'common': {'src_gids': src_node_ids, 'tgt_gids': tgt_node_ids}}
+    return {
+        "adj": {"data": adj_matrix, "name": "Adjacency", "unit": None},
+        "adj_cnt": {"data": count_matrix, "name": "Adjacency count", "unit": "Synapse count"},
+        "common": {"src_gids": src_node_ids, "tgt_gids": tgt_node_ids},
+    }
 
 
-def plot(res_dict, _common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, **_):  # pragma:no cover
+def plot(
+    res_dict, _common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, **_
+):  # pragma:no cover
     """Plot adjacency matrix [NOT using imshow causing display errors]."""
-    if isdiff: # Difference plot
-        assert -vmin == vmax, 'ERROR: Symmetric plot range required!'
-        cmap = 'PiYG' # Symmetric (diverging) colormap
-    else: # Regular plot
-        assert vmin == 0, 'ERROR: Plot range including 0 required!'
-        cmap = 'hot_r' # Regular colormap [color at 0 should be white (not actually drawn), to match figure background!]
+    if isdiff:  # Difference plot
+        assert -1 * vmin == vmax, "ERROR: Symmetric plot range required!"
+        cmap = "PiYG"  # Symmetric (diverging) colormap
+    else:  # Regular plot
+        assert vmin == 0, "ERROR: Plot range including 0 required!"
+        cmap = "hot_r"  # Regular colormap [color at 0 should be white (not actually drawn), to match figure background!]
 
-    conns = np.array(res_dict['data'].nonzero()).T
-    col_idx = res_dict['data'].data
-    plt.scatter(conns[:, 1], conns[:, 0], marker=',', s=0.1, edgecolors='none', alpha=0.5, c=col_idx, cmap=cmap, vmin=vmin, vmax=vmax)
+    conns = np.array(res_dict["data"].nonzero()).T
+    col_idx = res_dict["data"].data
+    plt.scatter(
+        conns[:, 1],
+        conns[:, 0],
+        marker=",",
+        s=0.1,
+        edgecolors="none",
+        alpha=0.5,
+        c=col_idx,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+    )
 
-    if not res_dict['data'].dtype == bool:
+    if not res_dict["data"].dtype == bool:
         cb = plt.colorbar()
-        cb.set_label(res_dict['unit'])
+        cb.set_label(res_dict["unit"])
 
     if fig_title is None:
-        plt.title(res_dict['name'])
+        plt.title(res_dict["name"])
     else:
         plt.title(fig_title)
 
-    plt.xlabel('Postsynaptic neurons')
-    plt.ylabel('Presynaptic neurons')
+    plt.xlabel("Postsynaptic neurons")
+    plt.ylabel("Presynaptic neurons")
 
-    plt.axis('image')
-    plt.xlim((-0.5, res_dict['data'].shape[1] - 0.5))
-    plt.ylim((-0.5, res_dict['data'].shape[0] - 0.5))
+    plt.axis("image")
+    plt.xlim((-0.5, res_dict["data"].shape[1] - 0.5))
+    plt.ylim((-0.5, res_dict["data"].shape[0] - 0.5))
     plt.gca().invert_yaxis()

@@ -11,7 +11,8 @@
                 "populations": {
                     "nodeA": {
                         "type": "biophysical",
-                        "morphologies_dir": "."
+                        "morphologies_dir": ".",
+                        "biophysical_neuron_models_dir": "."
                     }
                 }
             }

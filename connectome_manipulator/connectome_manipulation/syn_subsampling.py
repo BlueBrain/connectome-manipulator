@@ -1,4 +1,4 @@
-'''TODO: improve description'''
+"""TODO: improve description"""
 # Connectome manipulation function
 #
 # Definition of apply(edges_table, nodes, ...):
@@ -14,12 +14,12 @@ from connectome_manipulator import log
 
 def apply(edges_table, _nodes, _aux_dict, keep_pct=100.0):
     """Random synapse subsampling, keeping a certain percentage of synapses."""
-    log.log_assert(0.0 <= keep_pct <= 100.0, 'keep_pct out of range!')
+    log.log_assert(0.0 <= keep_pct <= 100.0, "keep_pct out of range!")
 
     num_syn = edges_table.shape[0]
     num_keep = np.round(keep_pct * num_syn / 100).astype(int)
 
-    log.info(f'Synapse subsampling, keeping {num_keep} ({keep_pct}%) of {num_syn} synapses')
+    log.info(f"Synapse subsampling, keeping {num_keep} ({keep_pct}%) of {num_syn} synapses")
 
     syn_sel_idx = np.random.permutation([True] * num_keep + [False] * (num_syn - num_keep))
     edges_table_manip = edges_table[syn_sel_idx].copy()

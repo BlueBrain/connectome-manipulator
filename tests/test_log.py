@@ -11,8 +11,8 @@ import connectome_manipulator.log as test_module
 
 
 def test_log_assert():
-    msg = 'failing_assert_message'
-    with patch('logging.log') as patched:
+    msg = "failing_assert_message"
+    with patch("logging.log") as patched:
         with pytest.raises(AssertionError, match=msg):
             test_module.log_assert(False, msg)
 
@@ -24,9 +24,9 @@ def test_log_assert():
 
 
 def test_logging_init():
-    logname = 'chronicle'
+    logname = "chronicle"
     with setup_tempdir(__name__) as tempdir:
-        logdir = os.path.join(tempdir, 'logs')
+        logdir = os.path.join(tempdir, "logs")
         test_module.logging_init(logdir, logname)
 
         assert os.path.isdir(logdir)
@@ -36,8 +36,8 @@ def test_logging_init():
         assert len(dir_listing) == 1
 
         # check that the file matches the naming policy
-        assert re.match(rf'^{logname}.*\.log$', dir_listing[0])
+        assert re.match(rf"^{logname}.*\.log$", dir_listing[0])
 
         # check that PROFILING and ASSERTION log levels exist
-        assert test_module.logging.getLevelName(test_module.logging.INFO + 5) == 'PROFILING'
-        assert test_module.logging.getLevelName(test_module.logging.ERROR + 5) == 'ASSERTION'
+        assert test_module.logging.getLevelName(test_module.logging.INFO + 5) == "PROFILING"
+        assert test_module.logging.getLevelName(test_module.logging.ERROR + 5) == "ASSERTION"

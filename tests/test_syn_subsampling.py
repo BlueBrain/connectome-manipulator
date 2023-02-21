@@ -18,4 +18,6 @@ def test_apply():
     for pct in [10.1, 50.99999, 0.666, 99.9999]:
         res = test_module.apply(edges_table, None, None, keep_pct=pct)
         assert res.shape[0] == np.round(pct * datalen / 100)
-        assert np.all([np.any(np.all(res.iloc[i] == edges_table, 1)) for i in range(res.shape[0])]) # Check is all rows are contained
+        assert np.all(
+            [np.any(np.all(res.iloc[i] == edges_table, 1)) for i in range(res.shape[0])]
+        )  # Check is all rows are contained

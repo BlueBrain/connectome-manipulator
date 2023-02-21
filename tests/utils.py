@@ -11,7 +11,7 @@ TEST_DATA_DIR = os.path.join(TEST_DIR, "data")
 
 @contextmanager
 def setup_tempdir(prefix):
-    '''Create a temporary dir to be removed after use'''
+    """Create a temporary dir to be removed after use"""
     temp_dir = tempfile.mkdtemp(prefix=prefix)
     try:
         yield temp_dir
@@ -20,7 +20,7 @@ def setup_tempdir(prefix):
 
 
 def create_fake_module(module_name, code):
-    '''Used to test code that uses dynamically imported modules'''
+    """Used to test code that uses dynamically imported modules"""
     module = ModuleType(module_name)
     exec(code, module.__dict__)
     sys.modules[module_name] = module

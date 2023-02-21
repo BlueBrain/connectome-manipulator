@@ -28,29 +28,29 @@ import connectome_manipulator.model_building.model_building as test_module
 def test_create_model_config_per_pathway():
     with setup_tempdir(__name__) as tempdir:
         model_config = {
-                'model': {
-                    'name': 'TestCreateModelConfigPerPathway',
-                    'fct': {'source': 'test_model', 'kwargs': {}}
-                },
-                'working_dir': os.path.join(tempdir, 'working_dir'),
-                'out_dir': os.path.join(tempdir, 'out_dir'),
-                'circuit_config': os.path.join(TEST_DATA_DIR, 'circuit_sonata.json')
+            "model": {
+                "name": "TestCreateModelConfigPerPathway",
+                "fct": {"source": "test_model", "kwargs": {}},
+            },
+            "working_dir": os.path.join(tempdir, "working_dir"),
+            "out_dir": os.path.join(tempdir, "out_dir"),
+            "circuit_config": os.path.join(TEST_DATA_DIR, "circuit_sonata.json"),
         }
 
-        res = test_module.create_model_config_per_pathway(model_config, 'synapse_class')
+        res = test_module.create_model_config_per_pathway(model_config, "synapse_class")
 
         # Check for parameters that are same in each model
-        assert all([c['circuit_config'] == model_config['circuit_config'] for c in res])
+        assert all([c["circuit_config"] == model_config["circuit_config"] for c in res])
 
-        for key in ['out_dir', 'working_dir']:
+        for key in ["out_dir", "working_dir"]:
             assert len({c[key] for c in res}) == 1
 
-        assert len({c['model']['fct']['source'] for c in res}) == 1
+        assert len({c["model"]["fct"]["source"] for c in res}) == 1
 
         # Check that models have different name
-        assert len({c['model']['name'] for c in res}) == len(res)
+        assert len({c["model"]["name"] for c in res}) == len(res)
 
         # Check that kwargs are unique
         for i in range(len(res) - 1):
-            for j in range(i+1, len(res)):
-                assert res[i]['model']['fct'] != res[j]['model']['fct']
+            for j in range(i + 1, len(res)):
+                assert res[i]["model"]["fct"] != res[j]["model"]["fct"]
