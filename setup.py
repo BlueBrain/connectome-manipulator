@@ -1,21 +1,23 @@
 #!/usr/bin/env python
 
-import imp
-import sys
-
+import importlib.util
 from setuptools import setup, find_packages
-
-if sys.version_info < (3, 6):
-    sys.exit("Sorry, Python < 3.6 is not supported")
 
 # read the contents of the README file
 with open("README.rst", encoding="utf-8") as f:
     README = f.read()
 
-VERSION = imp.load_source("", "connectome_manipulator/version.py").__version__
+spec = importlib.util.spec_from_file_location(
+    "connectome_manipulator.version",
+    "connectome_manipulator/version.py",
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+VERSION = module.__version__
+
 
 setup(
-    name="connectome_manipulator",
+    name="connectome-manipulator",
     author="Christoph Pokorny",
     author_email="christoph.pokorny@epfl.ch",
     version=VERSION,
@@ -29,27 +31,30 @@ setup(
     },
     license="BBP-internal-confidential",
     install_requires=[
-        "bluepysnap==0.13.2",
-        "jsonpickle",
+        "bluepysnap<1.0.0",
         "numpy",
         "progressbar",
         "pyarrow",
         "scipy",
         "scikit-learn",
         "voxcell",
+        "pyarrow",
+        "jsonpickle",
+        "scikit-learn",
     ],
     packages=find_packages(),
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     extras_require={"docs": ["sphinx", "sphinx-bluebrain-theme"]},
+    entry_points={"console_scripts": ["connectome-manipulator=connectome_manipulator.cli:app"]},
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
 )

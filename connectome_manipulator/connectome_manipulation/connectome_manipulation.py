@@ -12,7 +12,6 @@ import json
 import os
 import resource
 import subprocess
-import sys
 import time
 
 from bluepysnap.circuit import Circuit
@@ -23,6 +22,7 @@ import pyarrow.parquet as pq
 
 import connectome_manipulator
 from connectome_manipulator import log
+from connectome_manipulator import utils
 from connectome_manipulator.access_functions import get_nodes_population, get_edges_population
 
 
@@ -561,7 +561,12 @@ def check_if_done(parquet_file, done_file):
 
 
 def main_wiring(
-    manip_config, do_profiling=False, do_resume=False, keep_parquet=False, overwrite_edges=False
+    manip_config,
+    output_dir,
+    do_profiling=False,
+    do_resume=False,
+    keep_parquet=False,
+    overwrite_edges=False,
 ):  # pragma: no cover
     """Main entry point for circuit wiring for circuits w/o connectome.
 
@@ -569,14 +574,7 @@ def main_wiring(
     into N disjoint parts of target neurons (OPTIONAL)].
     """
     # Set output path
-    if manip_config.get("output_path") is None:
-        output_path = manip_config[
-            "circuit_path"
-        ]  # If no path provided, use circuit path for output
-    else:
-        output_path = manip_config["output_path"]
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+    output_path = utils.create_dir(output_dir)
 
     # Initialize logger
     log_file = log.logging_init(os.path.join(output_path, "logs"), name="connectome_manipulation")
@@ -705,21 +703,15 @@ def main_wiring(
     resource_profiling(do_profiling, "final", csv_file=csv_file)
 
 
-def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):  # pragma: no cover
+def main(
+    manip_config, output_dir, do_profiling=False, do_resume=False, keep_parquet=False
+):  # pragma: no cover
     """Main entry point for circuit manipulations.
 
     [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
-    into N disjoint parts of target neurons (OPTIONAL)].
+     into N disjoint parts of target neurons (OPTIONAL)].
     """
-    # Set output path
-    if manip_config.get("output_path") is None:
-        output_path = manip_config[
-            "circuit_path"
-        ]  # If no path provided, use circuit path for output
-    else:
-        output_path = manip_config["output_path"]
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+    output_path = utils.create_dir(output_dir)
 
     # Initialize logger
     log_file = log.logging_init(os.path.join(output_path, "logs"), name="connectome_manipulation")
@@ -958,76 +950,3 @@ def main(manip_config, do_profiling=False, do_resume=False, keep_parquet=False):
                 )
 
     resource_profiling(do_profiling, "final", csv_file=csv_file)
-
-
-def main_wrapper():
-    """Main function wrapper when called from command line.
-
-    Command line arguments:
-      manip_config: Config file (.json), specifying the manipulation settings
-      do_profiling (optional): Disable (0; default) or enable (1) resource profiling
-      do_resume (optional): Disable (0; default) or enable (1) resume option in case .parquet file(s) already exist
-      keep_parquet (optional): Disable (0; default) or enable (1) keeping temporary .parquet file(s) after completion
-      wiring_from_scratch: Disable (0: default) or enable (1) to run connectome wiring from scratch for circuits w/o connectome (rather than manipulations of existing connectomes)
-      overwrite_edges: Disable (0: default) or enable (1) overwriting an existing edges file; Supported in "wiring_from_scratch" mode only!
-    """
-    # Parse inputs
-    args = sys.argv[1:]
-    if len(args) < 1:
-        print(
-            f"Usage: {__file__} <manip_config.json> [do_profiling] [do_resume] [keep_parquet] [wiring_from_scratch] [overwrite_edges]"
-        )
-        sys.exit(2)
-
-    # Load config dict
-    with open(args[0], "r") as f:
-        config_dict = json.load(f)
-
-    # Read do_profiling flag
-    if len(args) > 1:
-        do_profiling = bool(int(args[1]))
-    else:
-        do_profiling = False
-
-    # Read do_resume flag
-    if len(args) > 2:
-        do_resume = bool(int(args[2]))
-    else:
-        do_resume = False
-
-    # Read keep_parquet flag
-    if len(args) > 3:
-        keep_parquet = bool(int(args[3]))
-    else:
-        keep_parquet = False
-
-    # Read wiring_from_scratch flag
-    if len(args) > 4:
-        wiring_from_scratch = bool(int(args[4]))
-    else:
-        wiring_from_scratch = False
-
-    # Read overwrite_edges flag (wiring only)
-    if len(args) > 5:
-        if not wiring_from_scratch:
-            print('ERROR: "overwrite_edges" flag only supported in "wiring_from_scratch" mode!')
-            sys.exit(2)
-        overwrite_edges = bool(int(args[5]))
-    else:
-        overwrite_edges = False
-
-    # Call main function
-    if wiring_from_scratch:
-        main_wiring(
-            config_dict,
-            do_profiling=do_profiling,
-            do_resume=do_resume,
-            keep_parquet=keep_parquet,
-            overwrite_edges=overwrite_edges,
-        )
-    else:
-        main(config_dict, do_profiling=do_profiling, do_resume=do_resume, keep_parquet=keep_parquet)
-
-
-if __name__ == "__main__":
-    main_wrapper()

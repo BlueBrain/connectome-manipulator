@@ -15,3 +15,11 @@ include:
 variables:
   EXTRA_MODULES:
     unstable:parquet-converters
+
+functional:
+  extends: .tox-template
+  variables:
+    TOXENV:
+      functional
+    EXTRA_MODULES:
+      unstable:parquet-converters
