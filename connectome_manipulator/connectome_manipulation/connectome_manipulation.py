@@ -4,11 +4,11 @@
 - Applies manipulation(s) to the connectome, as specified by the manipulation config dict
 - Writes back the manipulated connectome to a SONATA edges file, together with a new circuit config
 """
-
+import copy
+from pathlib import Path
 from datetime import datetime
 import glob
 import importlib
-import json
 import os
 import resource
 import subprocess
@@ -82,7 +82,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
         tgt_node_ids, np.cumsum([np.ceil(len(tgt_node_ids) / N_split).astype(int)] * (N_split - 1))
     )
 
-    return nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
+    return c.config, nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
 
 
 def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
@@ -213,79 +213,24 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
         file.write(content)
 
 
-def create_sonata_config(
-    new_config_file,
-    new_edges_fn,
-    orig_config_file,
-    orig_edges_fn,
-    orig_base_dir=None,
-    popul_name=None,
-    rel_edges_path=None,
-):
+def create_sonata_config(existing_config, out_config_path, out_edges_path, population_name):
     """Create new SONATA config (.JSON) from original, incl. modifications."""
-    log.info(f"Creating SONATA config {new_config_file}")
+    log.info(f"Creating SONATA config {out_config_path}")
 
-    def fct_update(d):
-        if orig_base_dir is not None:
-            d = {
-                k: v.replace("$BASE_DIR", "$ORIG_BASE_DIR") if isinstance(v, str) else v
-                for k, v in d.items()
-            }
+    config = copy.deepcopy(existing_config)
 
-        if "edges_file" in d.keys():
-            if (
-                popul_name is None
-                or "populations" not in d.keys()
-                or ("populations" in d.keys() and popul_name in d["populations"])
-            ):
-                if orig_base_dir is not None:
-                    if "$NETWORK_EDGES_DIR" in d["edges_file"]:
-                        d["edges_file"] = d["edges_file"].replace(
-                            "$NETWORK_EDGES_DIR", "$MANIP_NETWORK_EDGES_DIR"
-                        )
-                    else:
-                        d["edges_file"] = d["edges_file"].replace("$ORIG_BASE_DIR", "$BASE_DIR")
-                d["edges_file"] = d["edges_file"].replace(orig_edges_fn, new_edges_fn)
-        return d
+    # Ensure there are no multiple edge populations from the original config
+    edge_list = config["networks"].get("edges", [])
+    if edge_list:
+        log.log_assert(len(edge_list) == 1, "Multiple edge populations are not supported.")
 
-    with open(orig_config_file, "r") as file:
-        config = json.load(file, object_hook=fct_update)
+    config["networks"]["edges"] = [
+        {"edges_file": str(out_edges_path), "populations": {population_name: {"type": "chemical"}}}
+    ]
 
-    if orig_base_dir is not None:
-        config["manifest"] = {
-            "$ORIG_BASE_DIR": orig_base_dir,
-            **config["manifest"],
-            "$BASE_DIR": ".",
-        }
-        if "$NETWORK_EDGES_DIR" in config["manifest"]:
-            config["manifest"]["$MANIP_NETWORK_EDGES_DIR"] = config["manifest"][
-                "$NETWORK_EDGES_DIR"
-            ].replace("$ORIG_BASE_DIR", "$BASE_DIR")
+    config = utils.reduce_config_paths(config, config_dir=Path(out_config_path).parent)
 
-    if "edges" not in config["networks"]:  # Circuit w/o edges section
-        config["networks"]["edges"] = []
-    if len(config["networks"]["edges"]) == 0:  # Circuit w/o edges populations
-        log.log_assert(
-            "$NETWORK_EDGES_DIR" not in config["manifest"],
-            '"$NETWORK_EDGES_DIR" already defined in circuit w/o connectome!',
-        )
-        log.log_assert(
-            rel_edges_path is not None, '"rel_edges_path" required for circuits w/o connectome!'
-        )
-        config["networks"]["edges"].append(
-            {
-                "edges_file": os.path.join(
-                    "$NETWORK_EDGES_DIR", os.path.split(rel_edges_path)[-1], new_edges_fn
-                ),
-                "edge_types_file": None,
-            }
-        )
-        config["manifest"]["$NETWORK_EDGES_DIR"] = os.path.join(
-            "$BASE_DIR", os.path.split(rel_edges_path)[0]
-        )
-
-    with open(new_config_file, "w") as f:
-        json.dump(config, f, indent=2)
+    utils.write_json(data=config, filepath=out_config_path)
 
 
 def create_workflow_config(circuit_path, blue_config, manip_name, output_path, template_file):
@@ -467,11 +412,10 @@ def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
 
     In addition, sets up a completed file list to resume from.
     """
-    if not os.path.exists(parquet_path):
-        os.makedirs(parquet_path)
-    done_file = os.path.join(
-        parquet_path, "parquet.DONE"
-    )  # File to keep track of parquet files already completed (to resume from with do_resume option)
+    parquet_path = utils.create_dir(parquet_path)
+
+    # File to keep track of parquet files already completed (to resume from with do_resume option)
+    done_file = os.path.join(parquet_path, "parquet.DONE")
 
     # Potential list of .parquet file names [NOTE: Empty files won't actually exist!!]
     if N_split == 1:
@@ -492,12 +436,10 @@ def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
         if not os.path.exists(done_file):
             # Initialize empty list
             done_list = []
-            with open(done_file, "w") as f:
-                json.dump(done_list, f, indent=2)
+            utils.write_json(data=done_list, filepath=done_file)
         else:
             # Load completed files from existing list [can be in arbitrary order!!]
-            with open(done_file, "r") as f:
-                done_list = json.load(f)
+            utils.load_json(done_file)
             log.log_assert(
                 all(
                     os.path.join(parquet_path, f) + ".parquet" in parquet_file_list
@@ -520,8 +462,7 @@ def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
             len(existing_parquet_files) == 0,
             'Parquet output directory contains .parquet files, please clean your output dir or use "do_resume" to resume from an existing run!',
         )
-        with open(done_file, "w") as f:  # Initialize (empty) done file
-            json.dump([], f, indent=2)
+        utils.write_json(data=[], filepath=done_file)
 
     return parquet_file_list, done_file
 
@@ -534,13 +475,12 @@ def mark_as_done(parquet_file, done_file):
     log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
 
     # Load list of completed files [can be in arbitrary order!!]
-    with open(done_file, "r") as f:
-        done_list = json.load(f)
+    done_list = utils.load_json(done_file)
 
     # Update list and write back
     done_list.append(os.path.splitext(os.path.split(parquet_file)[-1])[0])
-    with open(done_file, "w") as f:
-        json.dump(done_list, f, indent=2)
+
+    utils.write_json(data=done_list, filepath=done_file)
 
 
 def check_if_done(parquet_file, done_file):
@@ -551,8 +491,7 @@ def check_if_done(parquet_file, done_file):
     log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
 
     # Load list of completed files [can be in arbitrary order!!]
-    with open(done_file, "r") as f:
-        done_list = json.load(f)
+    done_list = utils.load_json(done_file)
 
     # Check if done
     is_done = os.path.splitext(os.path.split(parquet_file)[-1])[0] in done_list
@@ -560,105 +499,88 @@ def check_if_done(parquet_file, done_file):
     return is_done
 
 
-def main_wiring(
-    manip_config,
+def main(
+    config,
     output_dir,
     do_profiling=False,
     do_resume=False,
     keep_parquet=False,
     overwrite_edges=False,
-):  # pragma: no cover
-    """Main entry point for circuit wiring for circuits w/o connectome.
-
-    [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
-    into N disjoint parts of target neurons (OPTIONAL)].
-    """
-    # Set output path
-    output_path = utils.create_dir(output_dir)
+):
+    """Build local connectome."""
+    log.log_assert(output_dir != Path("circuit_path"), "Input directory == Output directory")
 
     # Initialize logger
-    log_file = log.logging_init(os.path.join(output_path, "logs"), name="connectome_manipulation")
+    log_file = log.logging_init(os.path.join(output_dir, "logs"), name="connectome_manipulation")
 
     # Initialize profiler
     csv_file = os.path.splitext(log_file)[0] + ".csv"
     resource_profiling(do_profiling, "initial", reset=True, csv_file=csv_file)
 
     # Load circuit (nodes only)
-    log.log_assert(
-        os.path.splitext(manip_config["circuit_config"])[-1] == ".json",
-        "SONATA (.json) config required!",
-    )
-    sonata_config = os.path.join(manip_config["circuit_path"], manip_config["circuit_config"])
-    with open(sonata_config, "r") as file:
-        cfg_dict = json.load(file)
-        log.log_assert(
-            os.path.normpath(cfg_dict["manifest"]["$BASE_DIR"]) == "."
-            or os.path.normpath(cfg_dict["manifest"]["$BASE_DIR"])
-            == os.path.normpath(
-                os.path.join(
-                    manip_config["circuit_path"], os.path.split(manip_config["circuit_config"])[0]
-                )
-            ),
-            "Base dir in SONATA config must point to root directory of config file!",
-        )  # Otherwise, manipulated folder structure may not be consistent any more
-    N_split = max(manip_config.get("N_split_nodes", 1), 1)
+    sonata_config_file = config["circuit_config"]
 
-    nodes, _, node_ids_split, edges, _, _ = load_circuit(sonata_config, N_split)
+    if "circuit_path" in config:
+        sonata_config_file = os.path.join(config["circuit_path"], sonata_config_file)
+
+    N_split = max(config.get("N_split_nodes", 1), 1)
+
+    sonata_config, nodes, _, node_ids_split, edges, _, _ = load_circuit(sonata_config_file, N_split)
+
+    edges_file = output_dir / "edges.h5"
     log.log_assert(
-        edges is None,
-        'Circuit w/o edges required for connectome wiring! Use "main" for running connectome manipulations instead!',
+        overwrite_edges or not edges_file.exists(),
+        f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!',
     )
 
-    # Prepare output edges & parquet path
-    rel_edges_path = "sonata/networks/edges/functional/All"
-    edges_fn = f'edges_{manip_config["manip"]["name"]}.h5'
-    edges_file = os.path.join(output_path, rel_edges_path, edges_fn)
-    if overwrite_edges:
-        if os.path.exists(edges_file):
-            os.remove(edges_file)
-            log.info(f'Edges file "{edges_file}" already exists - Overwriting!')
-    else:
-        log.log_assert(
-            not os.path.exists(edges_file),
-            f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!',
-        )
-    parquet_path = os.path.join(output_path, rel_edges_path, "parquet")
-    parquet_file_list, done_file = prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume)
+    parquet_dir = os.path.join(output_dir, "parquet")
+    parquet_file_list, done_file = prepare_parquet_dir(
+        parquet_dir, edges_file.name, N_split, do_resume
+    )
 
     # Start processing
-    np.random.seed(manip_config.get("seed", 123456))
+    np.random.seed(config.get("seed", 123456))
+
+    # Follow SONATA convention for edge population naming
+    edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
 
     N_syn_in = []
     N_syn_out = []
-    aux_dict = {}  # Auxiliary dict to pass information from one split iteration to another
     for i_split, split_ids in enumerate(node_ids_split):
         # Resume option: Don't recompute, if .parquet file of current split already exists
-        parquet_file_manip = parquet_file_list[i_split]
-        if do_resume and check_if_done(parquet_file_manip, done_file):
+        parquet_output_file = parquet_file_list[i_split]
+        if do_resume and check_if_done(parquet_output_file, done_file):
             log.info(
                 f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})"
             )
         else:
-            # Apply connectome wiring
-            edges_table = None
-            N_syn_in.append(0)
+            # Apply connectome wiring/manipulation
             log.info(
                 f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
             )
-            aux_dict.update({"N_split": N_split, "i_split": i_split, "split_ids": split_ids})
-            edges_table_manip = apply_manipulation(
-                edges_table, nodes, manip_config, aux_dict
-            )  # Apply manipulation
-            log.log_assert(
-                edges_table_manip["@target_node"].is_monotonic_increasing,
-                "Target nodes not monotonically increasing!",
-            )  # [TESTING/DEBUGGING]
-            N_syn_out.append(edges_table_manip.shape[0])
-            resource_profiling(do_profiling, f"wired-{i_split + 1}/{N_split}", csv_file=csv_file)
+
+            edges_table = _get_afferent_edges_table(split_ids, edges)
+            resource_profiling(do_profiling, f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
+
+            new_edges_table = _generate_partition_edges(
+                nodes=nodes,
+                edges_table=edges_table,
+                manip_config=config,
+                aux_dict={"N_split": N_split, "i_split": i_split, "split_ids": split_ids},
+            )
+
+            # [TESTING/DEBUGGING]
+            N_syn_in.append(len(edges_table) if edges_table is not None else 0)
+            N_syn_out.append(len(new_edges_table))
+            resource_profiling(
+                do_profiling,
+                f"{'manipulated' if edges else 'wired'}-{i_split + 1}/{N_split}",
+                csv_file=csv_file,
+            )
 
             # Write back connectome to .parquet file
-            edges_to_parquet(edges_table_manip, parquet_file_manip)
-            mark_as_done(parquet_file_manip, done_file)
+            edges_to_parquet(new_edges_table, parquet_output_file)
+            mark_as_done(parquet_output_file, done_file)
             resource_profiling(do_profiling, f"saved-{i_split + 1}/{N_split}", csv_file=csv_file)
 
     log.info(
@@ -667,191 +589,54 @@ def main_wiring(
 
     # Convert .parquet file(s) to SONATA file
     # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
-    parquet_to_sonata(parquet_path, edges_file, nodes, done_file, keep_parquet=keep_parquet)
+    parquet_to_sonata(
+        parquet_dir,
+        edges_file,
+        nodes,
+        done_file,
+        population_name=edge_population_name,
+        keep_parquet=keep_parquet,
+    )
 
     # Create new SONATA config (.JSON) from original config file
-    sonata_config_manip = os.path.join(
-        output_path,
-        os.path.splitext(manip_config["circuit_config"])[0]
-        + f'_{manip_config["manip"]["name"]}'
-        + os.path.splitext(manip_config["circuit_config"])[1],
-    )
-    rel_edges_path_cfg = os.path.relpath(
-        rel_edges_path, os.path.split(manip_config["circuit_config"])[0]
-    )  # Path rel. to config location
+    out_config_path = Path(output_dir, "circuit_config.json")
     create_sonata_config(
-        sonata_config_manip,
-        edges_fn,
-        sonata_config,
-        orig_edges_fn=None,
-        orig_base_dir=os.path.join(
-            manip_config["circuit_path"], os.path.split(manip_config["circuit_config"])[0]
-        )
-        if manip_config["circuit_path"] != output_path
-        else None,
-        rel_edges_path=rel_edges_path_cfg,
+        existing_config=sonata_config,
+        out_config_path=out_config_path,
+        out_edges_path=edges_file,
+        population_name=edge_population_name,
     )
-
-    # Write manipulation config to JSON file
-    json_file = os.path.join(
-        os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json'
-    )
-    with open(json_file, "w") as f:
-        json.dump(manip_config, f, indent=2)
-    log.info(f"Creating file {json_file}")
 
     resource_profiling(do_profiling, "final", csv_file=csv_file)
 
 
-def main(
-    manip_config, output_dir, do_profiling=False, do_resume=False, keep_parquet=False
-):  # pragma: no cover
-    """Main entry point for circuit manipulations.
+def _get_afferent_edges_table(node_ids, edges):
+    if edges is None:
+        return None
+    return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
 
-    [OPTIMIZATION FOR HUGE CONNECTOMES: Split post-synaptically
-     into N disjoint parts of target neurons (OPTIONAL)].
-    """
-    output_path = utils.create_dir(output_dir)
 
-    # Initialize logger
-    log_file = log.logging_init(os.path.join(output_path, "logs"), name="connectome_manipulation")
+def _generate_partition_edges(nodes, edges_table, manip_config, aux_dict):
+    if edges_table is None:
+        new_edges_table = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
+    else:
+        column_types = {col: edges_table[col].dtype for col in edges_table.columns}
 
-    # Initialize profiler
-    csv_file = os.path.splitext(log_file)[0] + ".csv"
-    resource_profiling(do_profiling, "initial", reset=True, csv_file=csv_file)
+        new_edges_table = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
 
-    # Load circuit
-    log.log_assert(
-        os.path.splitext(manip_config["circuit_config"])[-1] == ".json",
-        "SONATA (.json) config required!",
-    )
-    sonata_config = os.path.join(manip_config["circuit_path"], manip_config["circuit_config"])
-    with open(sonata_config, "r") as file:
-        cfg_dict = json.load(file)
-        log.log_assert(
-            os.path.normpath(cfg_dict["manifest"]["$BASE_DIR"]) == "."
-            or os.path.normpath(cfg_dict["manifest"]["$BASE_DIR"])
-            == os.path.normpath(
-                os.path.join(
-                    manip_config["circuit_path"], os.path.split(manip_config["circuit_config"])[0]
-                )
-            ),
-            "Base dir in SONATA config must point to root directory of config file!",
-        )  # Otherwise, manipulated folder structure may not be consistent any more
-    N_split = max(manip_config.get("N_split_nodes", 1), 1)
-
-    popul_name_spec = manip_config.get("population_name")
-    nodes, _, node_ids_split, edges, edges_file, popul_name = load_circuit(
-        sonata_config, N_split, popul_name_spec
-    )
+        # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
+        column_types = {col: column_types[col] for col in new_edges_table.columns}
+        new_edges_table = new_edges_table.astype(column_types)
 
     log.log_assert(
-        edges is not None and edges_file is not None,
-        'Circuit without edges cannot be used for manipulations! Use "main_wiring" for connectome wiring instead!',
-    )
-    log.log_assert(
-        os.path.abspath(edges_file).find(os.path.abspath(manip_config["circuit_path"])) == 0,
-        "Edges file not within circuit path!",
-    )
-    edges_fn = os.path.split(edges_file)[1]
-    rel_edges_path = os.path.relpath(os.path.split(edges_file)[0], manip_config["circuit_path"])
-
-    # Prepare output parquet path
-    parquet_path = os.path.join(output_path, rel_edges_path, "parquet")
-    parquet_file_list, done_file = prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume)
-
-    # Start processing
-    np.random.seed(manip_config.get("seed", 123456))
-
-    N_syn_in = []
-    N_syn_out = []
-    aux_dict = {}  # Auxiliary dict to pass information from one split iteration to another
-    for i_split, split_ids in enumerate(node_ids_split):
-        # Resume option: Don't recompute, if .parquet file of current split already exists
-        parquet_file_manip = parquet_file_list[i_split]
-        if do_resume and check_if_done(parquet_file_manip, done_file):
-            log.info(
-                f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})"
-            )
-        else:
-            # Load edge table containing all edge (=synapse) properties
-            edges_table = edges.afferent_edges(split_ids, properties=sorted(edges.property_names))
-            column_types = {col: edges_table[col].dtype for col in edges_table.columns}
-            log.info(
-                f"Split {i_split + 1}/{N_split}: Loaded {edges_table.shape[0]} synapses with {edges_table.shape[1]} properties targeting {len(split_ids)} neurons"
-            )
-            N_syn_in.append(edges_table.shape[0])
-            resource_profiling(do_profiling, f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
-
-            # Apply connectome manipulation
-            aux_dict.update({"N_split": N_split, "i_split": i_split, "split_ids": split_ids})
-            edges_table_manip = apply_manipulation(
-                edges_table, nodes, manip_config, aux_dict
-            )  # Apply manipulation
-            column_types = {
-                col: column_types[col] for col in edges_table_manip.columns
-            }  # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
-            edges_table_manip = edges_table_manip.astype(
-                column_types
-            )  # Restore original column data types
-            # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
-            log.log_assert(
-                edges_table_manip["@target_node"].is_monotonic_increasing,
-                "Target nodes not monotonically increasing!",
-            )  # [TESTING/DEBUGGING]
-            N_syn_out.append(edges_table_manip.shape[0])
-            resource_profiling(
-                do_profiling, f"manipulated-{i_split + 1}/{N_split}", csv_file=csv_file
-            )
-
-            # Write back connectome to .parquet file
-            edges_to_parquet(edges_table_manip, parquet_file_manip)
-            mark_as_done(parquet_file_manip, done_file)
-            resource_profiling(do_profiling, f"saved-{i_split + 1}/{N_split}", csv_file=csv_file)
-
-    log.info(
-        f"Total input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n"
+        new_edges_table["@target_node"].is_monotonic_increasing,
+        "Target nodes not monotonically increasing!",
     )
 
-    # Convert .parquet file(s) to SONATA file
-    edges_file_manip = os.path.join(
-        output_path,
-        rel_edges_path,
-        os.path.splitext(edges_fn)[0]
-        + f'_{manip_config["manip"]["name"]}'
-        + os.path.splitext(edges_file)[1],
-    )
-    parquet_to_sonata(parquet_path, edges_file_manip, nodes, done_file, keep_parquet=keep_parquet)
+    return new_edges_table
 
-    # Create new SONATA config (.JSON) from original config file
-    edges_fn_manip = os.path.split(edges_file_manip)[1]
-    sonata_config_manip = os.path.join(
-        output_path,
-        os.path.splitext(manip_config["circuit_config"])[0]
-        + f'_{manip_config["manip"]["name"]}'
-        + os.path.splitext(manip_config["circuit_config"])[1],
-    )
-    create_sonata_config(
-        sonata_config_manip,
-        edges_fn_manip,
-        sonata_config,
-        edges_fn,
-        orig_base_dir=os.path.join(
-            manip_config["circuit_path"], os.path.split(manip_config["circuit_config"])[0]
-        )
-        if manip_config["circuit_path"] != output_path
-        else None,
-        popul_name=popul_name,
-    )
 
-    # Write manipulation config to JSON file
-    json_file = os.path.join(
-        os.path.split(sonata_config_manip)[0], f'manip_config_{manip_config["manip"]["name"]}.json'
-    )
-    with open(json_file, "w") as f:
-        json.dump(manip_config, f, indent=2)
-    log.info(f"Creating file {json_file}")
-
+def _write_blue_config(manip_config, output_path, edges_fn_manip, edges_file_manip):
     # Create new symlinks and circuit config
     if not manip_config.get("blue_config_to_update") is None:
         blue_config = os.path.join(
@@ -948,5 +733,3 @@ def main(
                 log.warning(
                     f'Unable to create workflow config! Workflow template file "{manip_config["workflow_template"]}" not found!'
                 )
-
-    resource_profiling(do_profiling, "final", csv_file=csv_file)

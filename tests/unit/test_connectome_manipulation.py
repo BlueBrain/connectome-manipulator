@@ -2,6 +2,7 @@ import os
 import json
 
 import pytest
+from pathlib import Path
 from mock import patch, Mock
 
 from bluepysnap import Circuit
@@ -28,7 +29,7 @@ def test_load_circuit():
         # expected_error = 'No edge population found!'
         # with pytest.raises(AssertionError, match=expected_error):
         #     test_module.load_circuit('fake_config')
-        res = test_module.load_circuit(config_path)
+        _, *res = test_module.load_circuit(config_path)
 
         # Check that there are 2 instances of NodePopulation in first item
         assert len(res[0]) == 2
@@ -54,23 +55,33 @@ def test_load_circuit():
     n_split = 2
     res = test_module.load_circuit(config_path, N_split=n_split)
 
+    # Check valid config
+    config = res[0]
+    nodes = config["networks"]["nodes"][0]
+    nodes_file = nodes["nodes_file"]
+    assert nodes_file == str(Path(TEST_DATA_DIR, "nodes.h5"))
+
+    edges = config["networks"]["edges"][0]
+    edges_file = edges["edges_file"]
+    assert edges_file == str(Path(TEST_DATA_DIR, "edges.h5"))
+
     # Check that there are 2 instances of NodePopulation in first item
-    assert len(res[0]) == 2
-    assert all(isinstance(r, NodePopulation) for r in res[0])
+    assert len(res[1]) == 2
+    assert all(isinstance(r, NodePopulation) for r in res[1])
 
     # Check that two paths are returned and they're correct
-    assert len(res[1]) == 2
-    assert all(r == os.path.join(TEST_DATA_DIR, "nodes.h5") for r in res[1])
+    assert len(res[2]) == 2
+    assert all(r == os.path.join(TEST_DATA_DIR, "nodes.h5") for r in res[2])
 
     # Check that number of splits is correct
     # Just a thought, but maybe N_split should be restricted with min(N_split, len(tgt_node_ids))
-    assert len(res[2]) == n_split
+    assert len(res[3]) == n_split
 
     # Check that last edge population is returned
-    assert isinstance(res[3], EdgePopulation)
+    assert isinstance(res[4], EdgePopulation)
 
     # Check that a correct edge path is returned
-    assert res[4] == os.path.join(TEST_DATA_DIR, "edges.h5")
+    assert res[5] == os.path.join(TEST_DATA_DIR, "edges.h5")
 
 
 def test_apply_manipulation():
@@ -216,43 +227,24 @@ def test_create_sonata_config():
             return json.load(fd)
 
     config_path = os.path.join(TEST_DATA_DIR, "circuit_sonata.json")
+    config = Circuit(config_path).config
+
     orig_edges = "edges.h5"
-    new_edges = "edges-test.h5"
+    new_edges_name = "edges-test.h5"
+    population_name = "my_edges"
 
     with setup_tempdir(__name__) as tempdir:
         new_config_path = os.path.join(tempdir, "circuit_sonata.json")
+        new_edges_path = os.path.join(tempdir, new_edges_name)
 
-        test_module.create_sonata_config(new_config_path, new_edges, config_path, orig_edges)
+        test_module.create_sonata_config(config, new_config_path, new_edges_path, population_name)
         res = json_read(new_config_path)
 
-        assert os.path.basename(res["networks"]["edges"][0]["edges_file"]) == new_edges
+        assert os.path.basename(res["networks"]["edges"][0]["edges_file"]) == new_edges_name
 
-        test_module.create_sonata_config(
-            new_config_path,
-            new_edges,
-            config_path,
-            orig_edges,
-            orig_base_dir=os.path.split(config_path)[0],
-        )
-        res = json_read(new_config_path)
-        config = json_read(config_path)
-
-        # NOTE by herttuai on 06/10/2021:
-        # To me it seems that the $BASE_DIR and $ORIG_BASE_DIR should be the other way around in manifest.
-        # i.e., res['manifest']['$ORIG_BASE_DIR'] should equal to config['manifest']['$BASE_DIR']
-        # Or maybe I misunderstood something
-        # NOTE by chr-pok on 10/02/2022:
-        # Yes indeed, there was some confusion. "rebase_dir" was meant to contain the original dir from which
-        # to re-base the config. It has been renamed to "orig_base_dir" to avoid confusion.
-        assert res["manifest"]["$BASE_DIR"] == "."
-        if os.path.isabs(config["manifest"]["$BASE_DIR"]):
-            assert res["manifest"]["$ORIG_BASE_DIR"] == config["manifest"]["$BASE_DIR"]
-        else:
-            assert res["manifest"]["$ORIG_BASE_DIR"] == os.path.normpath(
-                os.path.join(os.path.split(config_path)[0], config["manifest"]["$BASE_DIR"])
-            )
-        assert os.path.dirname(res["networks"]["nodes"][0]["nodes_file"]) == "$ORIG_BASE_DIR"
-        assert os.path.dirname(res["networks"]["edges"][0]["edges_file"]) == "$BASE_DIR"
+        assert res["manifest"] == {"$BASE_DIR": "."}
+        assert res["networks"]["nodes"][0]["nodes_file"] == os.path.join(TEST_DATA_DIR, "nodes.h5")
+        assert res["networks"]["edges"][0]["edges_file"] == "$BASE_DIR/edges-test.h5"
 
 
 def test_create_workflow_config():

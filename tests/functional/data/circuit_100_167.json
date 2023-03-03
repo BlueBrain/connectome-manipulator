@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "manifest": {
+    "$BASE_DIR": ".",
+    "$NETWORK_NODES_DIR": "."
+  },
+  "networks": {
+    "nodes": [
+      {
+        "nodes_file": "$NETWORK_NODES_DIR/nodes_100.h5",
+        "populations": {
+          "All": {
+            "type": "biophysical",
+            "morphologies_dir": "$BASE_DIR/morphologies",
+            "biophysical_neuron_models_dir": "$BASE_DIR/hoc_files"
+          }
+        }
+      }
+    ],
+    "edges": [
+        {
+            "edges_file": "$BASE_DIR/edges_167.h5",
+            "populations": {
+                "All__All__chemical": {
+                    "type": "chemical"
+                }
+            }
+        }
+    ]
+  }
+}
