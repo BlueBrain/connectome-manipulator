@@ -55,6 +55,7 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
 
     reducer = {
         "nodes_file": _reduce_path,
+        "node_types_file": _reduce_path,
         "edges_file": _reduce_path,
         "edge_types_file": _reduce_path,
         "populations": _reduce_populations,
@@ -62,7 +63,10 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
 
     reduced_config["networks"] = {
         network_type: [
-            {key: reducer[key](value, config_dir) for key, value in net_dict.items()}
+            {
+                key: (reducer[key](value, config_dir) if key in reducer else value)
+                for key, value in net_dict.items()
+            }
             for net_dict in network_list
         ]
         for network_type, network_list in config["networks"].items()
@@ -71,7 +75,7 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
 
 
 def _reduce_path(path: str, base_dir: os.PathLike) -> str:
-    if path.startswith("$") or path == "":
+    if not path or path.startswith("$"):
         return path
 
     path = Path(path)
