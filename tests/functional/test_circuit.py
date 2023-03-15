@@ -82,6 +82,7 @@ def local_connectome__empty_edges(tmpdir_factory):
             "--output-dir",
             str(obj.output_dir),
             "--overwrite-edges",
+            "--convert-to-sonata",
         ],
     )
     return obj
@@ -142,6 +143,7 @@ def local_connectome__existing_edges(tmpdir_factory):
             "--output-dir",
             str(obj.output_dir),
             "--overwrite-edges",
+            "--convert-to-sonata",
         ],
     )
     return obj

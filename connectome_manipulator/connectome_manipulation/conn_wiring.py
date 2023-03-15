@@ -39,6 +39,7 @@ def apply(
     pos_map_file=None,
     amount_pct=100.0,
     morph_ext="swc",
+    tgt_morph_cache={},
 ):
     """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
 
@@ -135,7 +136,6 @@ def apply(
     log.info(
         f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
     )
-
     # Prepare to load target (dendritic) morphologies
     # tgt_morph = nodes[1].morph ### ERROR with path/file format!
     # get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True) # Access function
@@ -164,6 +164,7 @@ def apply(
         nsynconn_model,
         delay_model,
         edges_table_init=edges_table,
+        tgt_morph_cache=tgt_morph_cache,
     )
 
     # Drop empty (NaN) columns [OTHERWISE: Problem converting to SONATA]
@@ -231,7 +232,9 @@ def init_edges_table(with_delay=True, from_table=None):
     if from_table is None:  # Create empty table
         all_new_edges = pd.DataFrame([], columns=required_properties).astype(property_types)
     else:  # Init from existing table
-        all_new_edges = from_table.loc[[]].copy()
+        all_new_edges = pd.DataFrame(
+            {cname: pd.Series([], dtype=from_table[cname].dtype) for cname in from_table.columns}
+        )
         log.log_assert(
             np.all(np.isin(required_properties, all_new_edges.columns)),
             "Required synapse properties missing!",
@@ -258,6 +261,7 @@ def connectome_wiring_wrapper(
     nsynconn_model,
     delay_model,
     edges_table_init=None,
+    tgt_morph_cache={},
 ):
     """Stand-alone wrapper for connectome wiring."""
     # Create new edges table to collect all generated synapses
@@ -314,7 +318,12 @@ def connectome_wiring_wrapper(
 
         # Place synapses randomly on soma/dendrite sections
         # [TODO: Add model for synapse placement??]
-        morph = _get_tgt_morph(tgt_morph, morph_ext, tgt)
+        if tgt in tgt_morph_cache:
+            morph = tgt_morph_cache[tgt]
+        else:
+            morph = _get_tgt_morph(tgt_morph, morph_ext, tgt)
+            tgt_morph_cache[tgt] = morph
+
         sec_ind = np.hstack(
             [
                 [-1],

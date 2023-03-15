@@ -18,7 +18,7 @@ from bluepysnap.circuit import Circuit
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
-
+import submitit
 
 import connectome_manipulator
 from connectome_manipulator import log
@@ -88,6 +88,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
 def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
+    tgt_morph_cache = {}
     for m_step in range(len(manip_config["manip"]["fcts"])):
         manip_source = manip_config["manip"]["fcts"][m_step]["source"]
         manip_kwargs = manip_config["manip"]["fcts"][m_step]["kwargs"]
@@ -103,6 +104,8 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
             hasattr(manip_module, "apply"),
             f'Manipulation module "{manip_source}" requires apply() function!',
         )
+        if manip_source == "conn_wiring":
+            manip_kwargs["tgt_morph_cache"] = tgt_morph_cache
         edges_table = manip_module.apply(edges_table, nodes, aux_dict, **manip_kwargs)
 
     return edges_table
@@ -499,20 +502,65 @@ def check_if_done(parquet_file, done_file):
     return is_done
 
 
+def manip_wrapper(
+    nodes, edges, N_split, i_split, split_ids, config, parquet_file_manip, csv_file, in_job
+):
+    """Wrapper function that can be optionally executed by a submitit Slurm job"""
+    if in_job:
+        job_env = submitit.JobEnvironment()
+        log_file = log.logging_init(
+            config["logging_dir"], name="connectome_manipulation." + str(job_env.job_id)
+        )
+        csv_file = os.path.splitext(log_file)[0] + ".csv"
+    np.random.seed(config.get("seed", 123456) * (i_split + 1))
+    # Apply connectome wiring
+    edges_table = _get_afferent_edges_table(split_ids, edges)
+    resource_profiling(config["profile"], f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
+    aux_dict = {"N_split": N_split, "i_split": i_split, "split_ids": split_ids}
+    new_edges_table = _generate_partition_edges(
+        nodes=nodes,
+        edges_table=edges_table,
+        manip_config=config,
+        aux_dict=aux_dict,
+    )
+    # [TESTING/DEBUGGING]
+    N_syn_in = len(edges_table) if edges_table is not None else 0
+    N_syn_out = len(new_edges_table)
+    resource_profiling(
+        config["profile"],
+        f"{'manipulated' if edges else 'wired'}-{i_split + 1}/{N_split}",
+        csv_file=csv_file,
+    )
+
+    # Write back connectome to .parquet file
+    edges_to_parquet(new_edges_table, parquet_file_manip)
+    resource_profiling(
+        config["profile"],
+        f"saved-{aux_dict['i_split'] + 1}/{aux_dict['N_split']}",
+        csv_file=csv_file,
+    )
+    return N_syn_in, N_syn_out
+
+
 def main(
     config,
     output_dir,
     do_profiling=False,
     do_resume=False,
     keep_parquet=False,
+    convert_to_sonata=False,
     overwrite_edges=False,
+    parallel=False,
+    slurm_args=[],
 ):
     """Build local connectome."""
     log.log_assert(output_dir != Path("circuit_path"), "Input directory == Output directory")
 
     # Initialize logger
-    log_file = log.logging_init(os.path.join(output_dir, "logs"), name="connectome_manipulation")
-
+    logging_path = os.path.join(output_dir, "logs")
+    log_file = log.logging_init(logging_path, name="connectome_manipulation")
+    config["logging_dir"] = str(logging_path)
+    config["profile"] = do_profiling
     # Initialize profiler
     csv_file = os.path.splitext(log_file)[0] + ".csv"
     resource_profiling(do_profiling, "initial", reset=True, csv_file=csv_file)
@@ -538,74 +586,119 @@ def main(
         parquet_dir, edges_file.name, N_split, do_resume
     )
 
-    # Start processing
-    np.random.seed(config.get("seed", 123456))
-
     # Follow SONATA convention for edge population naming
     edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
 
     N_syn_in = []
     N_syn_out = []
-    for i_split, split_ids in enumerate(node_ids_split):
-        # Resume option: Don't recompute, if .parquet file of current split already exists
-        parquet_output_file = parquet_file_list[i_split]
-        if do_resume and check_if_done(parquet_output_file, done_file):
-            log.info(
-                f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})"
-            )
-        else:
-            # Apply connectome wiring/manipulation
-            log.info(
-                f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
-            )
+    jobs = []
+    # submitit executor
+    if parallel:
+        # parallel processing of jobs if requested
+        job_logs = str(logging_path) + "/%j"
+        executor = submitit.AutoExecutor(folder=job_logs)
+        executor.update_parameters(
+            slurm_partition="prod", name="connectome_manipulator", timeout_min=120
+        )
+        extra_args = {"slurm_" + k: v for k, v in map(lambda x: x.split("="), slurm_args)}
+        executor.update_parameters(**extra_args)
 
-            edges_table = _get_afferent_edges_table(split_ids, edges)
-            resource_profiling(do_profiling, f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
-
-            new_edges_table = _generate_partition_edges(
-                nodes=nodes,
-                edges_table=edges_table,
-                manip_config=config,
-                aux_dict={"N_split": N_split, "i_split": i_split, "split_ids": split_ids},
-            )
-
-            # [TESTING/DEBUGGING]
-            N_syn_in.append(len(edges_table) if edges_table is not None else 0)
-            N_syn_out.append(len(new_edges_table))
-            resource_profiling(
-                do_profiling,
-                f"{'manipulated' if edges else 'wired'}-{i_split + 1}/{N_split}",
-                csv_file=csv_file,
-            )
-
-            # Write back connectome to .parquet file
-            edges_to_parquet(new_edges_table, parquet_output_file)
-            mark_as_done(parquet_output_file, done_file)
-            resource_profiling(do_profiling, f"saved-{i_split + 1}/{N_split}", csv_file=csv_file)
+        log.info(f"Setting up {N_split} processing batch jobs...")
+        resource_profiling(do_profiling, "start_processing", csv_file=csv_file)
+        # FIXME: There is a known corner-case when 1 split is chosen and parallelization is enabled.
+        # This should be addressed.
+        with executor.batch():
+            # Start processing
+            for i_split, split_ids in enumerate(node_ids_split):
+                # Resume option: Don't recompute, if .parquet file of current split already exists
+                output_parquet_file = parquet_file_list[i_split]
+                if do_resume and check_if_done(output_parquet_file, done_file):
+                    log.info(
+                        f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})"
+                    )
+                else:
+                    log.info(
+                        f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
+                    )
+                    job = executor.submit(
+                        manip_wrapper,
+                        nodes,
+                        edges,
+                        N_split,
+                        i_split,
+                        split_ids,
+                        config,
+                        output_parquet_file,
+                        csv_file,
+                        True,
+                    )
+                    jobs.append((job, output_parquet_file))
+        # Wait for jobs to return
+        for idx, (j, output_parquet_file) in enumerate(jobs):
+            nsyn_in, nsyn_out = j.result()
+            log.info(f"Job {idx} (SLURM job id: {j.job_id}) has completed")
+            N_syn_in.append(nsyn_in)
+            N_syn_out.append(nsyn_out)
+            mark_as_done(output_parquet_file, done_file)
+        resource_profiling(do_profiling, "end_processing", csv_file=csv_file)
+    else:
+        # Start processing (serially)
+        for i_split, split_ids in enumerate(node_ids_split):
+            # Resume option: Don't recompute, if .parquet file of current split already exists
+            output_parquet_file = parquet_file_list[i_split]
+            if do_resume and check_if_done(output_parquet_file, done_file):
+                log.info(
+                    f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={do_resume})"
+                )
+            else:
+                N_syn_in.append(0)
+                log.info(
+                    f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
+                )
+                nsyn_in, nsyn_out = manip_wrapper(
+                    nodes,
+                    edges,
+                    N_split,
+                    i_split,
+                    split_ids,
+                    config,
+                    output_parquet_file,
+                    csv_file,
+                    False,
+                )
+                N_syn_in.append(nsyn_in)
+                N_syn_out.append(nsyn_out)
+                mark_as_done(output_parquet_file, done_file)
 
     log.info(
-        f"Total input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n"
+        f"Done processing.\nTotal input/output synapse counts: {np.sum(N_syn_in, dtype=int)}/{np.sum(N_syn_out, dtype=int)} (Diff: {np.sum(N_syn_out, dtype=int) - np.sum(N_syn_in, dtype=int)})\n"
     )
 
-    # Convert .parquet file(s) to SONATA file
-    # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
-    parquet_to_sonata(
-        parquet_dir,
-        edges_file,
-        nodes,
-        done_file,
-        population_name=edge_population_name,
-        keep_parquet=keep_parquet,
-    )
+    if convert_to_sonata:
+        # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
+        parquet_to_sonata(
+            parquet_dir,
+            edges_file,
+            nodes,
+            done_file,
+            population_name=edge_population_name,
+            keep_parquet=keep_parquet,
+        )
 
-    # Create new SONATA config (.JSON) from original config file
-    out_config_path = Path(output_dir, "circuit_config.json")
-    create_sonata_config(
-        existing_config=sonata_config,
-        out_config_path=out_config_path,
-        out_edges_path=edges_file,
-        population_name=edge_population_name,
-    )
+        # Create new SONATA config (.JSON) from original config file
+        out_config_path = Path(output_dir, "circuit_config.json")
+        create_sonata_config(
+            existing_config=sonata_config,
+            out_config_path=out_config_path,
+            out_edges_path=edges_file,
+            population_name=edge_population_name,
+        )
+    else:
+        if not keep_parquet:
+            log.warning(
+                "--keep-parquet and --convert-to-sonata are set to false. I will keep the parquet files anyway"
+            )
+        create_parquet_metadata(parquet_dir, nodes)
 
     resource_profiling(do_profiling, "final", csv_file=csv_file)
 

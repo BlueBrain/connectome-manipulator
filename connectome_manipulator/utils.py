@@ -46,7 +46,7 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
         )
 
     reduced_config = {
-        "version": config["version"],
+        "version": config.get("version", "1"),
         "manifest": {"$BASE_DIR": "."},
     }
 

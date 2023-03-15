@@ -37,6 +37,7 @@ setup(
         "pyarrow",
         "scipy",
         "scikit-learn",
+        "submitit",
         "voxcell",
         "pyarrow",
         "jsonpickle",
