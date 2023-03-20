@@ -2,8 +2,9 @@
 import json
 import os
 from pathlib import Path
-
 from typing import Any, Dict
+
+from cached_property import cached_property
 
 
 def create_dir(path: os.PathLike) -> Path:
@@ -103,3 +104,12 @@ def _reduce_populations(populations_dict: dict, base_dir: os.PathLike) -> dict:
         pop_name: {key: reduce_entry(key, value) for key, value in pop_dict.items()}
         for pop_name, pop_dict in populations_dict.items()
     }
+
+
+def invalidate_cached_properties(class_instance):
+    """Clear cached properties in object."""
+    class_vars = vars(type(class_instance))
+    instance_vars = vars(class_instance)
+    for method_name, method_instance in class_vars.items():
+        if isinstance(method_instance, cached_property) and method_name in instance_vars:
+            del instance_vars[method_name]

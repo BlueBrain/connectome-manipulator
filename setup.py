@@ -32,6 +32,7 @@ setup(
     license="BBP-internal-confidential",
     install_requires=[
         "bluepysnap<1.0.0",
+        "cached_property",
         "numpy",
         "progressbar",
         "pyarrow",

@@ -592,6 +592,7 @@ def main(
     N_syn_in = []
     N_syn_out = []
     jobs = []
+
     # submitit executor
     if parallel:
         # parallel processing of jobs if requested
@@ -620,6 +621,12 @@ def main(
                     log.info(
                         f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
                     )
+                    for pop in nodes:
+                        utils.invalidate_cached_properties(pop)
+
+                    if edges is not None:
+                        utils.invalidate_cached_properties(edges)
+
                     job = executor.submit(
                         manip_wrapper,
                         nodes,
