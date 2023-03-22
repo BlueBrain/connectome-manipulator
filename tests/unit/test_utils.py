@@ -70,28 +70,3 @@ def test_reduce_config_paths():
             },
         ],
     }
-
-
-def test_invalidate_cached_properties():
-    class A:
-        def a(self):
-            return 1
-
-        @property
-        def b(self):
-            return 2
-
-        @cached_property
-        def c(self):
-            return 3
-
-        @cached_property
-        def d(self):
-            return 4
-
-    obj = A()
-    obj.d
-    assert "d" in vars(obj)
-
-    test_module.invalidate_cached_properties(obj)
-    assert "d" not in vars(obj)

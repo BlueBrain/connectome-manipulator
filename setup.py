@@ -31,8 +31,7 @@ setup(
     },
     license="BBP-internal-confidential",
     install_requires=[
-        "bluepysnap<1.0.0",
-        "cached_property",
+        "bluepysnap>=1.0.5",  # 1.0.5 does not pickle cached properties
         "numpy",
         "progressbar",
         "pyarrow",
