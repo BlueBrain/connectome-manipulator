@@ -10,7 +10,6 @@ include:
       - /ci/jobs/docs.yml
       - /ci/jobs/build-package.yml
       - /ci/jobs/publish-package.yml
-      - /ci/jobs/publish-docs.yml
       - /ci/jobs/tag.yml
 variables:
   EXTRA_MODULES:
