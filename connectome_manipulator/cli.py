@@ -61,6 +61,14 @@ def app(verbose):
     help="Run using SLURM job array",
 )
 @click.option(
+    "--max-parallel-jobs",
+    "-n",
+    required=False,
+    default=256,
+    type=int,
+    help="Maximum number of parallel jobs to run in array",
+)
+@click.option(
     "--sbatch-arg",
     "-s",
     required=False,
@@ -78,6 +86,7 @@ def manipulate_connectome(
     overwrite_edges,
     splits,
     parallel,
+    max_parallel_jobs,
     sbatch_arg,
 ):
     """Manipulate or build a circuit's connectome."""
@@ -91,6 +100,7 @@ def manipulate_connectome(
         overwrite_edges,
         splits,
         parallel,
+        max_parallel_jobs,
         sbatch_arg,
     )
 
@@ -105,6 +115,7 @@ def _manipulate_connectome(
     overwrite_edges,
     splits,
     parallel,
+    max_parallel_jobs,
     sbatch_arg,
 ):
     config_dict = utils.load_json(config)
@@ -127,6 +138,7 @@ def _manipulate_connectome(
         convert_to_sonata=convert_to_sonata,
         overwrite_edges=overwrite_edges,
         parallel=parallel,
+        max_parallel_jobs=max_parallel_jobs,
         slurm_args=sbatch_arg,
     )
 

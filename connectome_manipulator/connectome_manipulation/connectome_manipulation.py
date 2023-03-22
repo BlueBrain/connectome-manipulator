@@ -551,6 +551,7 @@ def main(
     convert_to_sonata=False,
     overwrite_edges=False,
     parallel=False,
+    max_parallel_jobs=256,
     slurm_args=[],
 ):
     """Build local connectome."""
@@ -599,7 +600,10 @@ def main(
         job_logs = str(logging_path) + "/%j"
         executor = submitit.AutoExecutor(folder=job_logs)
         executor.update_parameters(
-            slurm_partition="prod", name="connectome_manipulator", timeout_min=120
+            array_parallelism=max_parallel_jobs,
+            slurm_partition="prod",
+            name="connectome_manipulator",
+            timeout_min=120,
         )
         extra_args = {"slurm_" + k: v for k, v in map(lambda x: x.split("="), slurm_args)}
         executor.update_parameters(**extra_args)
