@@ -172,10 +172,10 @@ def parquet_to_sonata(
     if os.path.exists(output_file):
         os.remove(output_file)
     with subprocess.Popen(
-        f"parquet2hdf5 {input_path} {output_file} {population_name}",
-        shell=True,
+        ["parquet2hdf5", str(input_path), str(output_file), population_name],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        env={"PATH": os.getenv("PATH", "")},
     ) as proc:
         log.info(proc.communicate()[0].decode())
     log.log_assert(
