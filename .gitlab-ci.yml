@@ -2,6 +2,7 @@ include:
   - project: nse/ci
     file:
       - /ci/lib/tox-bb5.yml
+      - /ci/jobs/check-version.yml
       - /ci/jobs/check-packaging.yml
       - /ci/jobs/lint.yml
       - /ci/jobs/py39.yml
