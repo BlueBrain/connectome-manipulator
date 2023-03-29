@@ -8,11 +8,17 @@ from bluepysnap import Circuit
 import pytest
 import re
 from utils import TEST_DATA_DIR
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 from connectome_manipulator.model_building import model_types
-import connectome_manipulator.connectome_manipulation.conn_rewiring as test_module
 
 
-def test_apply():
+@pytest.fixture
+def manipulation():
+    m = Manipulation.get("conn_rewiring")
+    return m()
+
+
+def test_apply(manipulation):
     c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]
@@ -37,7 +43,7 @@ def test_apply():
     with pytest.raises(
         AssertionError, match=re.escape("Edges table must be ordered by @target_node!")
     ):
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -163,7 +169,7 @@ def test_apply():
         prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__ConnProb1p0.json")
         pct = 0.0
 
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -190,7 +196,7 @@ def test_apply():
             AssertionError,
             match=re.escape("Keeping indegree not possible since connection probability zero!"),
         ):
-            res = test_module.apply(
+            res = manipulation.apply(
                 edges_table.copy(),
                 nodes,
                 aux_dict,
@@ -208,7 +214,7 @@ def test_apply():
             )
 
         ## (b) Not keeping indegree => All selected (EXC or INH) connections should be removed
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -237,7 +243,7 @@ def test_apply():
         pct = 100.0
 
         ## (a) Keeping indegree & reusing connections
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -265,7 +271,7 @@ def test_apply():
         )  # Check that non-selected connections unchanged
 
         ## (b) Keeping indegree & w/o reusing connections
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -290,7 +296,7 @@ def test_apply():
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
 
         ## (c) W/o keeping indegree & w/o reusing connections ("duplicate_sample" method)
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -328,7 +334,7 @@ def test_apply():
             }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                test_module.apply(
+                manipulation.apply(
                     edges_table_split,
                     nodes,
                     aux_dict_split,
@@ -358,7 +364,7 @@ def test_apply():
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
 
         ## (e) W/o keeping indegree & w/o reusing connections ("duplicate_randomize" method)
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table.copy(),
             nodes,
             aux_dict,
@@ -396,7 +402,7 @@ def test_apply():
             }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                test_module.apply(
+                manipulation.apply(
                     edges_table_split,
                     nodes,
                     aux_dict_split,

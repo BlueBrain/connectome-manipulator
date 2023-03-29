@@ -8,7 +8,6 @@ import copy
 from pathlib import Path
 from datetime import datetime
 import glob
-import importlib
 import os
 import resource
 import subprocess
@@ -23,6 +22,7 @@ import submitit
 import connectome_manipulator
 from connectome_manipulator import log
 from connectome_manipulator import utils
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 from connectome_manipulator.access_functions import get_nodes_population, get_edges_population
 
 
@@ -88,7 +88,6 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
 def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
-    tgt_morph_cache = {}
     for m_step in range(len(manip_config["manip"]["fcts"])):
         manip_source = manip_config["manip"]["fcts"][m_step]["source"]
         manip_kwargs = manip_config["manip"]["fcts"][m_step]["kwargs"]
@@ -96,17 +95,8 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
         log.info(
             f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}'
         )
-
-        manip_module = importlib.import_module(
-            "connectome_manipulator.connectome_manipulation." + manip_source
-        )
-        log.log_assert(
-            hasattr(manip_module, "apply"),
-            f'Manipulation module "{manip_source}" requires apply() function!',
-        )
-        if manip_source == "conn_wiring":
-            manip_kwargs["tgt_morph_cache"] = tgt_morph_cache
-        edges_table = manip_module.apply(edges_table, nodes, aux_dict, **manip_kwargs)
+        m = Manipulation.get(manip_source)()
+        edges_table = m.apply(edges_table, nodes, aux_dict, **manip_kwargs)
 
     return edges_table
 

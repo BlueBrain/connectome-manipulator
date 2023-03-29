@@ -2,17 +2,24 @@ import os
 
 import numpy as np
 import pandas as pd
+import pytest
 
+from bluepysnap.morph import MorphHelper
 from bluepysnap import Circuit
+import neurom as nm
 
 from utils import TEST_DATA_DIR
 from connectome_manipulator.model_building import model_types
-import connectome_manipulator.connectome_manipulation.conn_wiring as test_module
-import neurom as nm
-from bluepysnap.morph import MorphHelper
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
 
-def test_apply():
+@pytest.fixture
+def manipulation():
+    m = Manipulation.get("conn_wiring")
+    return m()
+
+
+def test_apply(manipulation):
     c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]
@@ -65,7 +72,7 @@ def test_apply():
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = test_module.apply(
+    res = manipulation.apply(
         edges_table_empty,
         nodes,
         aux_dict,
@@ -78,7 +85,7 @@ def test_apply():
     ), "ERROR: Existing edges table changed!"  # Check if unchanged
 
     ## (b) Edges already existing
-    res = test_module.apply(
+    res = manipulation.apply(
         edges_table,
         nodes,
         aux_dict,
@@ -103,7 +110,7 @@ def test_apply():
                     "delay_model": None,
                 }
             )
-    res = test_module.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0)
+    res = manipulation.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0)
     assert res.size == 0, "ERROR: Connectome should be empty!"
     assert np.all(np.isin(required_properties, res.columns)), "ERROR: Synapse properties missing!"
 
@@ -112,7 +119,7 @@ def test_apply():
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = test_module.apply(
+    res = manipulation.apply(
         edges_table_empty,
         nodes,
         aux_dict,
@@ -165,7 +172,7 @@ def test_apply():
             ), "ERROR: Section position error!"
 
     ## (b) Edges already existing
-    res = test_module.apply(
+    res = manipulation.apply(
         edges_table,
         nodes,
         aux_dict,
@@ -200,7 +207,7 @@ def test_apply():
                     "delay_model": None,
                 }
             )
-    res = test_module.connectome_wiring_per_pathway(
+    res = manipulation.connectome_wiring_per_pathway(
         pathway_nodes, pathway_models, seed=0, morph_ext="swc"
     )
     assert (
@@ -215,7 +222,7 @@ def test_apply():
 
     # Case 3: Check pct
     for pct in np.linspace(0, 100, 6):
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table_empty,
             nodes,
             aux_dict,
@@ -240,7 +247,7 @@ def test_apply():
         for tgt_class in ["EXC", "INH"]:
             sel_src = {"synapse_class": src_class}
             sel_dest = {"synapse_class": tgt_class}
-            res = test_module.apply(
+            res = manipulation.apply(
                 edges_table_empty,
                 nodes,
                 aux_dict,
@@ -272,7 +279,7 @@ def test_apply():
             sel_dest = {"mtype": tgt_mt}
 
             ### Integrated wiring
-            res = test_module.apply(
+            res = manipulation.apply(
                 edges_table_empty,
                 nodes,
                 aux_dict,
@@ -307,7 +314,7 @@ def test_apply():
                     "delay_model": None,
                 }
             ]
-            res = test_module.connectome_wiring_per_pathway(
+            res = manipulation.connectome_wiring_per_pathway(
                 pathway_nodes, pathway_models, seed=0, morph_ext="swc"
             )
             assert np.all(
@@ -335,7 +342,7 @@ def test_apply():
             "split_ids": split_ids,
         }
         res_list.append(
-            test_module.apply(
+            manipulation.apply(
                 edges_table_empty,
                 nodes,
                 aux_dict_split,
@@ -363,7 +370,7 @@ def test_apply():
             assert np.isclose(res.iloc[i]["delay"], delay), "ERROR: Delay mismatch!"
 
     ## (a) Integrated wiring
-    res = test_module.apply(
+    res = manipulation.apply(
         edges_table_empty,
         nodes,
         aux_dict,
@@ -387,7 +394,7 @@ def test_apply():
                     "delay_model": delay_model,
                 }
             )
-    res = test_module.connectome_wiring_per_pathway(
+    res = manipulation.connectome_wiring_per_pathway(
         pathway_nodes, pathway_models, seed=0, morph_ext="swc"
     )
     check_delay([pathway_nodes, pathway_nodes], delay_model, res)
@@ -402,7 +409,7 @@ def test_apply():
     for rep in range(
         20
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table_empty,
             nodes,
             aux_dict,
@@ -435,7 +442,7 @@ def test_apply():
     for rep in range(
         40
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
-        res = test_module.connectome_wiring_per_pathway(
+        res = manipulation.connectome_wiring_per_pathway(
             pathway_nodes, pathway_models, seed=rep, morph_ext="swc"
         )
         syn_counts.append(res.shape[0])

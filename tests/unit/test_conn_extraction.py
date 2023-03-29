@@ -2,13 +2,20 @@ import json
 import numpy as np
 import os
 
+import pytest
 from bluepysnap import Circuit
 
 from utils import TEST_DATA_DIR
-import connectome_manipulator.connectome_manipulation.conn_extraction as test_module
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
 
-def test_apply():
+@pytest.fixture
+def manipulation():
+    m = Manipulation.get("conn_extraction")
+    return m()
+
+
+def test_apply(manipulation):
     circuit = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = circuit.edges[circuit.edges.population_names[0]]
     nodes = [edges.source, edges.target]
@@ -17,7 +24,9 @@ def test_apply():
 
     # Test that given intrinsic cell target is extracted (no extra node sets file given)
     for tgt_name in ["LayerA", "RegionB"]:
-        res = test_module.apply(edges_table, nodes, None, target_name=tgt_name, node_sets_file=None)
+        res = manipulation.apply(
+            edges_table, nodes, None, target_name=tgt_name, node_sets_file=None
+        )
 
         src_ids = nodes[0].ids(tgt_name)
         tgt_ids = nodes[1].ids(tgt_name)
@@ -39,7 +48,7 @@ def test_apply():
     with open(node_sets_file, "r") as f:
         node_sets = json.load(f)
     for tgt_name in ["NSet1", "NSet1"]:
-        res = test_module.apply(
+        res = manipulation.apply(
             edges_table, nodes, None, target_name=tgt_name, node_sets_file=node_sets_file
         )
 
@@ -59,6 +68,6 @@ def test_apply():
         )
 
     # Test special case when no cell target specified (should return empty connectome)
-    res = test_module.apply(edges_table, nodes, None, target_name=None, node_sets_file=None)
+    res = manipulation.apply(edges_table, nodes, None, target_name=None, node_sets_file=None)
     assert res.empty
     assert np.all(res.columns == edges_table.columns)

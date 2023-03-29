@@ -33,10 +33,9 @@ def test_extract():
     xymap = Atlas.open(TEST_DATA_DIR).load_data(xy_file)
 
     res = test_module.extract(circuit, flatmap_path, xy_file, z_file, xy_scale=None, z_scale=None)
-    res_scale = [np.unique(res["flat_pos"][:, i])[0] for i in range(res["flat_pos"].shape[1])]
-    assert res_scale[0] == xymap.voxel_dimensions[0]  # Default x/y scaling based on voxel size
-    assert res_scale[1] == xymap.voxel_dimensions[1]  # Default x/y scaling based on voxel size
-    assert res_scale[2] == 1.0  # Default z scaling 1.0 (depth map assumed to be in um already)
+    np.testing.assert_allclose(res["flat_pos"][:, 0], xymap.voxel_dimensions[0])
+    np.testing.assert_allclose(res["flat_pos"][:, 1], xymap.voxel_dimensions[1])
+    np.testing.assert_allclose(res["flat_pos"][:, 2], 1.0)
 
     # Check interpolation (along z-axis only)
     xy_file = "xy_map_ones"

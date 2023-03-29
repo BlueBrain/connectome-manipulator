@@ -1,17 +1,20 @@
-import os
+import glob
 import json
+import os
 
-import pytest
-from pathlib import Path
 from mock import patch, Mock
+import pandas as pd
+from pathlib import Path
+import pytest
 
 from bluepysnap import Circuit
 from bluepysnap.nodes import NodePopulation, Nodes
 from bluepysnap.edges import EdgePopulation
 
-from utils import create_fake_module, setup_tempdir, TEST_DATA_DIR
+from utils import setup_tempdir, TEST_DATA_DIR
 
 import connectome_manipulator.connectome_manipulation.connectome_manipulation as test_module
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
 
 def test_load_circuit():
@@ -84,23 +87,23 @@ def test_load_circuit():
     assert res[5] == os.path.join(TEST_DATA_DIR, "edges.h5")
 
 
-def test_apply_manipulation():
-    module_name = "fake_apply"
+def test_manipulation_registration():
+    manip_mods = glob.glob("connectome_manipulator/connectome_manipulation/manipulation/*.py")
+    manip_mods = [os.path.splitext(os.path.basename(m))[0] for m in manip_mods]
+    print(manip_mods)
+    for mod_name in manip_mods:
+        if mod_name not in ["base", "__init__"]:
+            m = Manipulation.get(mod_name)()
+
+
+def test_null_manipulation():
+    module_name = "null_manipulation"
     manip_config = {"manip": {"name": "test", "fcts": [{"source": module_name, "kwargs": {}}]}}
-    full_module_name = f"connectome_manipulator.connectome_manipulation.{module_name}"
 
-    # Create fake module in which apply is an instance of Mock()
-    fake_module = create_fake_module(full_module_name, "from mock import Mock; apply=Mock()")
+    m = Manipulation.get(module_name)()
+    out_edges_table = m.apply(None, None, None, **manip_config)
 
-    # check that the apply function gets called
-    test_module.apply_manipulation(None, None, manip_config, None)
-    fake_module.apply.assert_called()
-
-    with patch("importlib.import_module", Mock(return_value=object)):
-        with pytest.raises(
-            AssertionError, match=r"Manipulation module .* requires apply\(\) function"
-        ):
-            test_module.apply_manipulation(None, None, manip_config, None)
+    assert out_edges_table is None
 
 
 def test_edges_to_parquet():

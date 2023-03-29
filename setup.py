@@ -33,6 +33,7 @@ setup(
     install_requires=[
         "bluepysnap>=1.0.5",  # 1.0.5 does not pickle cached properties
         "numpy",
+        "pandas",
         "progressbar",
         "pyarrow",
         "scipy",
@@ -42,6 +43,7 @@ setup(
         "pyarrow",
         "jsonpickle",
         "scikit-learn",
+        "tables",
     ],
     packages=find_packages(),
     python_requires=">=3.7",
@@ -56,6 +58,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
 )

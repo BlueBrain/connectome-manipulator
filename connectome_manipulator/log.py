@@ -81,10 +81,11 @@ def logging_init(log_path, name):
     )
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 
     # Add custom log levels
     logging.addLevelName(PROFILING_LOG_LEVEL, "PROFILING")
     logging.addLevelName(ASSERTION_LOG_LEVEL, "ASSERTION")
+
+    logging.basicConfig(level=PROFILING_LOG_LEVEL, handlers=[file_handler, stream_handler])
 
     return log_file
