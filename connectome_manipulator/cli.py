@@ -120,6 +120,10 @@ def _manipulate_connectome(
 ):
     config_dict = utils.load_json(config)
 
+    if parallel:
+        if utils.clear_slurm_env():
+            log.info("Prepared environment for parallel run from within SLURM job.")
+
     if splits is not None:
         if "N_split_nodes" in config_dict:
             log.warning(

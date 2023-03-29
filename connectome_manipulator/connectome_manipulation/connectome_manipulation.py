@@ -600,7 +600,7 @@ def main(
         job_logs = str(logging_path) + "/%j"
         executor = submitit.AutoExecutor(folder=job_logs)
         executor.update_parameters(
-            array_parallelism=max_parallel_jobs,
+            slurm_array_parallelism=max_parallel_jobs,
             slurm_partition="prod",
             name="connectome_manipulator",
             timeout_min=120,

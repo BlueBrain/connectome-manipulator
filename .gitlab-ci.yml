@@ -22,3 +22,13 @@ functional:
       functional
     EXTRA_MODULES:
       unstable:parquet-converters
+
+integration:
+  extends: .tox-template
+  variables:
+    SLURM_ACCOUNT:
+      proj9998
+    TOXENV:
+      integration
+    EXTRA_MODULES:
+      unstable:parquet-converters
