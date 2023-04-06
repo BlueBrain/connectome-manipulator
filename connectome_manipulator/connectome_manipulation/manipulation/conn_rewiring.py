@@ -25,8 +25,6 @@ NOTE: Input edges_table assumed to be sorted by @target_node.
    Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
 """
 
-import os
-
 import numpy as np
 import pandas as pd
 
@@ -60,8 +58,8 @@ class ConnectomeRewiring(Manipulation):
         nodes,
         aux_dict,
         syn_class,
-        prob_model_file,
-        delay_model_file,
+        prob_model_spec,
+        delay_model_spec,
         sel_src=None,
         sel_dest=None,
         pos_map_file=None,
@@ -69,12 +67,15 @@ class ConnectomeRewiring(Manipulation):
         reuse_conns=True,
         gen_method=None,
         amount_pct=100.0,
-        props_model_file=None,
+        props_model_spec=None,
         estimation_run=False,
         p_scale=1.0,
         opt_nconn=False,
     ):
-        """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses)."""
+        """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
+
+        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
+        """
         # pylint: disable=arguments-differ
         log.log_assert(
             np.all(np.diff(edges_table["@target_node"]) >= 0),
@@ -124,9 +125,7 @@ class ConnectomeRewiring(Manipulation):
             )
 
         # Load connection probability model
-        log.log_assert(os.path.exists(prob_model_file), "Conn. prob. model file not found!")
-        log.info(f"Loading conn. prob. model from {prob_model_file}")
-        p_model = model_types.AbstractModel.model_from_file(prob_model_file)
+        p_model = model_types.AbstractModel.init_model(prob_model_spec)
         log.log_assert(
             p_model.input_names == ["src_pos", "tgt_pos"],
             'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!',
@@ -136,9 +135,7 @@ class ConnectomeRewiring(Manipulation):
             log.info(f"Using probability scaling factor p_scale={p_scale}")
 
         # Load delay model
-        log.log_assert(os.path.exists(delay_model_file), "Delay model file not found!")
-        log.info(f"Loading delay model from {delay_model_file}")
-        delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
+        delay_model = model_types.AbstractModel.init_model(delay_model_spec)
         log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
 
         # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
@@ -149,16 +146,14 @@ class ConnectomeRewiring(Manipulation):
         # Load connection/synapse properties model [required for "duplicate_randomize" method]
         if gen_method == "duplicate_randomize":
             log.log_assert(
-                props_model_file is not None,
+                props_model_spec is not None,
                 f'Properties model required for generation method "{gen_method}"!',
             )
-            log.log_assert(os.path.exists(props_model_file), "Properties model file not found!")
-            log.info(f"Loading properties model from {props_model_file}")
-            props_model = model_types.AbstractModel.model_from_file(props_model_file)
+            props_model = model_types.AbstractModel.init_model(props_model_spec)
             log.info(f'Loaded properties model of type "{props_model.__class__.__name__}"')
         else:
             log.log_assert(
-                props_model_file is None,
+                props_model_spec is None,
                 f'Properties model incompatible with generation method "{gen_method}"!',
             )
             props_model = None
@@ -238,9 +233,7 @@ class ConnectomeRewiring(Manipulation):
         syn_rewire_idx = np.full(
             edges_table.shape[0], False
         )  # Global synapse indices to keep track of all rewired synapses [for data logging]
-        all_new_edges = edges_table.loc[
-            []
-        ].copy()  # New edges table to collect all generated synapses
+        new_edges_list = []  # New edges list to collect all generated synapses
         stats_dict["source_nrn_count_all"] = len(
             src_node_ids
         )  # All source neurons (corresponding to chosen sel_src and syn_class)
@@ -405,7 +398,7 @@ class ConnectomeRewiring(Manipulation):
                     log.log_assert(False, f"Generation method {gen_method} unknown!")
 
                 # Add new_edges to global new edges table [ignoring duplicate indices]
-                all_new_edges = all_new_edges.append(new_edges)
+                new_edges_list.append(new_edges)
 
                 stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [
                     new_edges.shape[0]
@@ -474,7 +467,8 @@ class ConnectomeRewiring(Manipulation):
             log.info(f"Deleted {np.sum(syn_del_idx)} unused synapses")
 
         # Add new synapses to table, re-sort, and assign new index
-        if all_new_edges.size > 0:
+        if len(new_edges_list) > 0:
+            all_new_edges = pd.concat(new_edges_list)
             syn_new_dupl_idx = np.array(
                 all_new_edges.index
             )  # Index of duplicated synapses [for data logging]
@@ -482,7 +476,7 @@ class ConnectomeRewiring(Manipulation):
             all_new_edges.index = range(
                 max_idx + 1, max_idx + 1 + all_new_edges.shape[0]
             )  # Set index to new range, so as to keep track of new edges
-            edges_table = edges_table.append(all_new_edges)
+            edges_table = pd.concat([edges_table, all_new_edges])
             edges_table.sort_values(
                 "@target_node", kind="mergesort", inplace=True
             )  # Stable sorting, i.e., preserving order of input edges!!

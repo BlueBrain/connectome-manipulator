@@ -174,9 +174,7 @@ def test_build():
                 assert model_distr["max"] == prop_data["max"][sidx, tidx, pidx]
                 assert model_distr["std-within"] == prop_data["std-within"][sidx, tidx, pidx]
 
-    with pytest.raises(
-        AssertionError, match='ERROR: Distribution type "WRONG_TYPE" not supported!'
-    ):
+    with pytest.raises(AssertionError, match='Distribution type "WRONG_TYPE" not supported!'):
         test_module.build(
             nsyn_data,
             prop_data,
@@ -222,7 +220,7 @@ def test_build():
 
     # Check data bounds
     test_bound = 10.0
-    with pytest.raises(AssertionError, match="ERROR: Data bounds error!"):
+    with pytest.raises(AssertionError, match="Data bounds error!"):
         test_module.build(
             nsyn_data,
             prop_data,

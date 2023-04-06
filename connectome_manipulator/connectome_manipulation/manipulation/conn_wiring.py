@@ -63,11 +63,11 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         edges_table,
         nodes,
         aux_dict,
-        prob_model_file,
-        nsynconn_model_file,
+        prob_model_spec={"model": "ConnProb1stOrderModel"},  # Default 1st-oder model
+        nsynconn_model_spec={"model": "NSynConnModel"},  # Default #syn/conn model
         sel_src=None,
         sel_dest=None,
-        delay_model_file=None,
+        delay_model_spec={"model": "LinDelayModel"},  # Default linear delay model
         pos_map_file=None,
         amount_pct=100.0,
         morph_ext="swc",
@@ -75,13 +75,13 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
 
         => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
-        => Model dict can be passed instead of files: prob_model_file, nsynconn_model_file, delay_model_file (NOT for pos_map_file)
+        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
         """
-        # pylint: disable=arguments-differ
+        # pylint: disable=arguments-differ, arguments-renamed
         log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
         if edges_table is None:
             edges_table = self._init_edges_table(
-                with_delay=delay_model_file is not None
+                with_delay=delay_model_spec is not None
             )  # Create empty edges table
         elif edges_table.shape[0] == 0:
             log.warning(
@@ -92,40 +92,21 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 f"Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses."
             )
 
-        # Load connection probability model (from file OR dict)
-        if isinstance(prob_model_file, dict):
-            p_model = model_types.AbstractModel.model_from_dict(prob_model_file)
-            log.info("Loading conn. prob. model from dict")
-        else:
-            log.log_assert(os.path.exists(prob_model_file), "Conn. prob. model file not found!")
-            log.info(f"Loading conn. prob. model from {prob_model_file}")
-            p_model = model_types.AbstractModel.model_from_file(prob_model_file)
+        # Load connection probability model
+        p_model = model_types.AbstractModel.init_model(prob_model_spec)
         log.log_assert(
             p_model.input_names == ["src_pos", "tgt_pos"],
             'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!',
         )
         log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
-        # Load #synapses/connection model (from file OR dict)
-        if isinstance(nsynconn_model_file, dict):
-            nsynconn_model = model_types.AbstractModel.model_from_dict(nsynconn_model_file)
-            log.info("Loading #synapses/connection model from dict")
-        else:
-            log.log_assert(
-                os.path.exists(nsynconn_model_file), "#synapses/connection model file not found!"
-            )
-            log.info(f"Loading #synapses/connection model from {nsynconn_model_file}")
-            nsynconn_model = model_types.AbstractModel.model_from_file(nsynconn_model_file)
+        # Load #synapses/connection model
+        nsynconn_model = model_types.AbstractModel.init_model(nsynconn_model_spec)
+        log.info(f'Loaded #synapses/connection model of type "{nsynconn_model.__class__.__name__}"')
 
         # Load delay model (optional)
-        if delay_model_file is not None:
-            if isinstance(delay_model_file, dict):
-                delay_model = model_types.AbstractModel.model_from_dict(delay_model_file)
-                log.info("Loading delay model from dict")
-            else:
-                log.log_assert(os.path.exists(delay_model_file), "Delay model file not found!")
-                log.info(f"Loading delay model from {delay_model_file}")
-                delay_model = model_types.AbstractModel.model_from_file(delay_model_file)
+        if delay_model_spec is not None:
+            delay_model = model_types.AbstractModel.init_model(delay_model_spec)
             log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
         else:
             delay_model = None
@@ -303,9 +284,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
             # Sample number of synapses per connection
             num_syn_per_conn = [
-                nsynconn_model.draw(
-                    model_types.N_SYN_PER_CONN_NAME, src_type=s, tgt_type=tgt_mtypes[tidx]
-                )[0]
+                nsynconn_model.apply(src_type=s, tgt_type=tgt_mtypes[tidx])
                 for s in src_mtypes[src_new_sel]
             ]
             syn_conn_idx = np.concatenate(

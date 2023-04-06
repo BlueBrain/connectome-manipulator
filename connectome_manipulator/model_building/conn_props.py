@@ -385,7 +385,7 @@ def build(
             log.warning(f'No distribution type for "{prop}" specified - Using "normal"!')
         distr_type = distr_types.get(prop, "normal")
         log.log_assert(
-            distr_type in model_types.ConnPropsModel.DISTRIBUTION_ATTRIBUTES,
+            distr_type in model_types.ConnPropsModel.distribution_attributes,
             f'ERROR: Distribution type "{distr_type}" not supported!',
         )
         dtype = data_types.get(prop)
@@ -394,7 +394,7 @@ def build(
             prop_model_dict[prop][src] = {}
             for tidx, tgt in enumerate(m_types[1]):
                 attr_dict = {"type": distr_type}
-                distr_attr = model_types.ConnPropsModel.DISTRIBUTION_ATTRIBUTES[distr_type]
+                distr_attr = model_types.ConnPropsModel.distribution_attributes[distr_type]
                 if prop == model_types.N_SYN_PER_CONN_NAME:
                     log.log_assert(
                         np.all([attr in syns_per_conn_model for attr in distr_attr]),
@@ -425,7 +425,7 @@ def build(
     model = model_types.ConnPropsModel(
         src_types=m_types[0], tgt_types=m_types[1], prop_stats=prop_model_dict
     )
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     return model
 

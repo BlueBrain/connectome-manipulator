@@ -101,7 +101,7 @@ def build(nrn_ids, coord_names, map_pos, model_coord_names=None, **_):
 
     # Create model
     model = model_types.PosMapModel(pos_table=map_pos_table)
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     return model
 

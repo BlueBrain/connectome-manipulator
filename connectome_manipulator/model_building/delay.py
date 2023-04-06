@@ -125,7 +125,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     model = model_types.LinDelayModel(
         delay_mean_coefs=delay_mean_coefs, delay_std=delay_std, delay_min=delay_min
     )
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     return model
 

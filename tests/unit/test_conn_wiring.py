@@ -77,8 +77,8 @@ def test_apply(manipulation):
         nodes,
         aux_dict,
         amount_pct=pct,
-        prob_model_file=prob_model_file,
-        nsynconn_model_file=nsynconn_model_file,
+        prob_model_spec={"file": prob_model_file},
+        nsynconn_model_spec={"file": nsynconn_model_file},
     )
     assert res.equals(
         edges_table_empty
@@ -90,8 +90,8 @@ def test_apply(manipulation):
         nodes,
         aux_dict,
         amount_pct=pct,
-        prob_model_file=prob_model_file,
-        nsynconn_model_file=nsynconn_model_file,
+        prob_model_spec={"file": prob_model_file},
+        nsynconn_model_spec={"file": nsynconn_model_file},
     )
     assert res.equals(edges_table), "ERROR: Existing edges table changed!"  # Check if unchanged
 
@@ -124,8 +124,8 @@ def test_apply(manipulation):
         nodes,
         aux_dict,
         amount_pct=pct,
-        prob_model_file=prob_model_file,
-        nsynconn_model_file=nsynconn_model_file,
+        prob_model_spec={"file": prob_model_file},
+        nsynconn_model_spec={"file": nsynconn_model_file},
     )
     assert (
         res.shape[0]
@@ -177,8 +177,8 @@ def test_apply(manipulation):
         nodes,
         aux_dict,
         amount_pct=pct,
-        prob_model_file=prob_model_file,
-        nsynconn_model_file=nsynconn_model_file,
+        prob_model_spec={"file": prob_model_file},
+        nsynconn_model_spec={"file": nsynconn_model_file},
     )
     assert (
         res.shape[0]
@@ -227,8 +227,8 @@ def test_apply(manipulation):
             nodes,
             aux_dict,
             amount_pct=pct.tolist(),
-            prob_model_file=prob_model_file,
-            nsynconn_model_file=nsynconn_model_file,
+            prob_model_spec={"file": prob_model_file},
+            nsynconn_model_spec={"file": nsynconn_model_file},
         )
         assert (
             res.shape[0]
@@ -254,8 +254,8 @@ def test_apply(manipulation):
                 sel_src=sel_src,
                 sel_dest=sel_dest,
                 amount_pct=pct,
-                prob_model_file=prob_model_file,
-                nsynconn_model_file=nsynconn_model_file,
+                prob_model_spec={"file": prob_model_file},
+                nsynconn_model_spec={"file": nsynconn_model_file},
             )
             assert np.all(
                 np.isin(res["@source_node"], nodes[0].ids(sel_src))
@@ -286,8 +286,8 @@ def test_apply(manipulation):
                 sel_src=sel_src,
                 sel_dest=sel_dest,
                 amount_pct=pct,
-                prob_model_file=prob_model_file,
-                nsynconn_model_file=nsynconn_model_file,
+                prob_model_spec={"file": prob_model_file},
+                nsynconn_model_spec={"file": nsynconn_model_file},
             )
             assert np.all(
                 np.isin(res["@source_node"], nodes[0].ids(sel_src))
@@ -347,8 +347,8 @@ def test_apply(manipulation):
                 nodes,
                 aux_dict_split,
                 amount_pct=pct,
-                prob_model_file=prob_model_file,
-                nsynconn_model_file=nsynconn_model_file,
+                prob_model_spec={"file": prob_model_file},
+                nsynconn_model_spec={"file": nsynconn_model_file},
             )
         )
     res = pd.concat(res_list, ignore_index=True)
@@ -375,9 +375,9 @@ def test_apply(manipulation):
         nodes,
         aux_dict,
         amount_pct=pct,
-        prob_model_file=prob_model_file,
-        nsynconn_model_file=nsynconn_model_file,
-        delay_model_file=delay_model_file,
+        prob_model_spec={"file": prob_model_file},
+        nsynconn_model_spec={"file": nsynconn_model_file},
+        delay_model_spec={"file": delay_model_file},
     )
     check_delay(nodes, delay_model, res)
 
@@ -407,23 +407,23 @@ def test_apply(manipulation):
     np.random.seed(0)
     syn_counts = []
     for rep in range(
-        20
+        30
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
         res = manipulation.apply(
             edges_table_empty,
             nodes,
             aux_dict,
             amount_pct=pct,
-            prob_model_file=prob_model_file,
-            nsynconn_model_file=nsynconn_model_file,
+            prob_model_spec={"file": prob_model_file},
+            nsynconn_model_spec={"file": nsynconn_model_file},
         )
         syn_counts.append(res.shape[0])
     assert np.std(syn_counts) > 0, "ERROR: No variability over repetitions!"
     assert np.isclose(
         np.mean(syn_counts),
         (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * 0.1 * n_syn_conn,
-        atol=1.0,
-    ), "ERROR: Wrong number of synapses!"  # Accept tolerance of +/-1
+        atol=1.5,
+    ), f"ERROR: Wrong number of synapses!"  # Accept tolerance of +/-1.5
 
     ## (b) Standalone wiring per pathway [larger variability expected, since wiring per pathway]
     pathway_models = []

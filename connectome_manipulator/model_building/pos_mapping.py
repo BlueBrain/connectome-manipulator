@@ -151,7 +151,7 @@ def build(nrn_ids, flat_pos, **_):
 
     # Create model
     model = model_types.PosMapModel(pos_table=flat_pos_table)
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     return model
 

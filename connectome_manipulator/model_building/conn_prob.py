@@ -377,7 +377,7 @@ def build_1st_order(p_conn, **_):
     """Build 1st order model (Erdos-Renyi, capturing average conn. prob.)."""
     # Create model
     model = model_types.ConnProb1stOrderModel(p_conn=p_conn)
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     return model
 
@@ -559,7 +559,7 @@ def build_2nd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist * count_all).astype(int)
@@ -588,7 +588,7 @@ def plot_2nd_order(
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
-    model_str = model.get_model_str().split("\n")[1].split("=")[-1].strip()
+    model_str = str(model).split("\n")[1].split("=")[-1].strip()
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -858,7 +858,7 @@ def build_3rd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist_bip * count_all).astype(int)
@@ -889,8 +889,8 @@ def plot_3rd_order(
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
-    model_strN = model.get_model_str().split("\n")[1].split("=")[-1].strip()
-    model_strP = model.get_model_str().split("\n")[2].split("=")[-1].strip()
+    model_strN = str(model).split("\n")[1].split("=")[-1].strip()
+    model_strP = str(model).split("\n")[2].split("=")[-1].strip()
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -1136,7 +1136,7 @@ def build_4th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1512,7 +1512,7 @@ def build_4th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1842,7 +1842,7 @@ def build_5th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
@@ -2343,7 +2343,7 @@ def build_5th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n" + model.get_model_str())
+    log.info("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
