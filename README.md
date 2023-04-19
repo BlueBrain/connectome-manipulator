@@ -81,3 +81,125 @@ As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are di
 | ![Edge table](doc/source/images/edge_table.png "Example of an edge table (Pandas dataframe) comprising all synapse properties.") |
 | :-: |
 | __Figure 3:__ Example of an edge table (Pandas dataframe), comprising a list of synapses together with all synapse properties. |
+
+
+## Developing in connectome-manipulator
+
+### Getting started
+
+Best is to setup a virtual environment to install all the dependencies and the package itself in
+place for easy testing.
+
+```
+module load unstable python-dev parquet-converters/0.8.0 git
+mkdir cm_dev && cd cm_dev
+git clone git@bbpgitlab.epfl.ch:conn/structural/connectome_manipulator.git
+python3 -m venv venv && source venv/bin/activate
+export PIP_INDEX_URL=https://bbpteam.epfl.ch/repository/devpi/simple
+cd connectome_manipulator
+pip install -e .
+pip install -U tox pytest libsonata
+```
+
+### Testing
+
+The project has a CI setup that will run unit, functional and integration tests in gitlab.
+Everything is driven by tox, so you can also easily run things locally to make sure your changes did
+not break anything before pushing any code.
+
+```
+tox -e lint # will run the code and doc linters
+tox -e 310 # will run pytest
+tox -e functional # will run more complete functional tests
+```
+
+### Running benchmarks
+
+If you really want to test bigger things, best is to look inside one of our benchmarking
+directories:
+
+```
+/gpfs/bbp.cscs.ch/data/scratch/proj134/home/pokorny/BBPP134-225
+```
+
+You'll find a number of configuration files of differnet sizes
+
+```
+wiring_config_v2__whole_brain__ER_100k.json
+wiring_config_v2__whole_brain__ER_10M.json
+wiring_config_v2__whole_brain__ER_1M.json
+wiring_config_v2__whole_brain__ER.json
+wiring_config_v3__whole_brain__ER_100.json
+wiring_config_v3__whole_brain__ER_100k.json
+wiring_config_v3__whole_brain__ER_10.json
+wiring_config_v3__whole_brain__ER_10k.json
+wiring_config_v3__whole_brain__ER_1.json
+wiring_config_v3__whole_brain__ER_1k.json
+wiring_config_v3__whole_brain__ER.json
+```
+
+v2 is for the current `main` branch, while v3 is for the new connectivity model that is the
+`pathway_reduction` branch. The number at the end indicates the number of pathways
+
+The same directory also shows you how to run connectome-manipulator:
+
+```
+Usage: connectome-manipulator manipulate-connectome [OPTIONS] CONFIG
+
+  Manipulate or build a circuit's connectome.
+
+Options:
+  --output-dir TEXT               Output directory.  [required]
+  --profile                       Enable profiling.  [default: False]
+  --resume                        Resume from exisiting .parquet files.
+                                  [default: False]
+  --keep-parquet                  Keep temporary parquet files.  [default:
+                                  False]
+  --convert-to-sonata             Convert parquet to sonata and generate
+                                  circuit config  [default: False]
+  --overwrite-edges               Overwrite existing edges file  [default:
+                                  False]
+  --splits INTEGER                Number of blocks, overwrites value in config
+                                  file
+  --parallel                      Run using SLURM job array  [default: False]
+  -n, --max-parallel-jobs INTEGER
+                                  Maximum number of parallel jobs to run in
+                                  array  [default: 256]
+  -s, --sbatch-arg TEXT           Overwrite sbatch arguments with key=value
+  --help                          Show this message and exit.  [default:
+                                  False]
+```
+
+Just running serially you can do something like this:
+
+```
+connectome-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
+    --output-dir ${OUTPATH} --profile --splits 1
+```
+
+Running in parallel (with submitit) you could do this:
+
+```
+connectome-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
+    --profile --parallel -n 800 --splits=5000 \
+    -s account=proj16 -s constraint=cpu -s mem=20G
+```
+
+### Profiling the code
+
+Unfortunately the latest version of arm map wth python 3.10 refuses to run on this code, that's why
+it's easiest to have a separate venv setup that uses python 3.9.7 and run the profiler like that
+
+```
+module purge
+module load archive/2023-02 python-dev parquet-converters/0.8.0 arm-forge/22.0.3-Linux-x86_64
+python3 -m venv venv_397 && source venv_397/bin/activate
+export PIP_INDEX_URL=https://bbpteam.epfl.ch/repository/devpi/simple
+cd connectome_manipulator
+pip install -e .
+pip install -U tox pytest libsonata
+cd ../run_directory
+map --verbose --profile --no-mpi --output $OUTPATH/profile_whole_brain_ER_1-6.map \
+  python -m connectome_manipulator.cli manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
+  --output-dir ${OUTPATH} --profile --splits 1
+```
