@@ -22,7 +22,7 @@ class ConnectomeExtraction(Manipulation):
     Note 2: If no cell target is given, an empty connectome is returned!
     """
 
-    def apply(self, edges_table, nodes, _aux_dict, target_name=None, node_sets_file=None):
+    def apply(self, edges_table, split_ids, _aux_dict, target_name=None, node_sets_file=None):
         """Extraction of a cell target as given by target_name
 
         Extraction keeping only connections within that target (empty connectome if no target_name provided).
@@ -35,10 +35,12 @@ class ConnectomeExtraction(Manipulation):
             return edges_table.loc[[]].copy()
 
         # Load cell targets
-        assert nodes[0] is nodes[1], "ERROR: Only one source/target node population supported!"
+        assert (
+            self.nodes[0] is self.nodes[1]
+        ), "ERROR: Only one source/target node population supported!"
         # pylint: disable=W0212
-        if target_name in nodes[0]._node_sets.content:
-            target_gids = nodes[0].ids(target_name)
+        if target_name in self.nodes[0]._node_sets.content:
+            target_gids = self.nodes[0].ids(target_name)
         else:
             log.log_assert(
                 node_sets_file is not None,

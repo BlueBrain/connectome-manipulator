@@ -33,7 +33,7 @@ class ConnectomeRemoval(Manipulation):
     def apply(
         self,
         edges_table,
-        nodes,
+        split_ids,
         _aux_dict,
         sel_src=None,
         sel_dest=None,
@@ -46,8 +46,8 @@ class ConnectomeRemoval(Manipulation):
         # pylint: disable=arguments-differ
         log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
 
-        gids_src = get_node_ids(nodes[0], sel_src)
-        gids_dest = get_node_ids(nodes[1], sel_dest)
+        gids_src = get_node_ids(self.nodes[0], sel_src)
+        gids_dest = get_node_ids(self.nodes[1], sel_dest)
 
         syn_sel_idx = np.logical_and(
             np.isin(edges_table["@source_node"], gids_src),

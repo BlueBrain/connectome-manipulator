@@ -6,6 +6,7 @@ import pytest
 
 from bluepysnap.morph import MorphHelper
 from bluepysnap import Circuit
+from libsonata import Selection
 import neurom as nm
 
 from utils import TEST_DATA_DIR
@@ -15,8 +16,9 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 @pytest.fixture
 def manipulation():
+    Manipulation.destroy_instances()
     m = Manipulation.get("conn_wiring")
-    return m()
+    return m
 
 
 def test_apply(manipulation):
@@ -55,7 +57,8 @@ def test_apply(manipulation):
         node_id, transform=True, extension="swc"
     )  # Access function (incl. transformation!), using specified format (swc/h5/...)
 
-    aux_dict = {"split_ids": tgt_ids}
+    id_selection = Selection(tgt_ids).ranges
+    aux_dict = {"split_ids": tgt_ids, "id_selection": id_selection}
     n_syn_conn = 2
     nsynconn_model_file = os.path.join(
         TEST_DATA_DIR, f"model_config__NSynPerConn{n_syn_conn}.json"
@@ -72,9 +75,9 @@ def test_apply(manipulation):
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = manipulation.apply(
+    res = manipulation(nodes).apply(
         edges_table_empty,
-        nodes,
+        tgt_ids,
         aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
@@ -85,9 +88,9 @@ def test_apply(manipulation):
     ), "ERROR: Existing edges table changed!"  # Check if unchanged
 
     ## (b) Edges already existing
-    res = manipulation.apply(
+    res = manipulation(nodes).apply(
         edges_table,
-        nodes,
+        tgt_ids,
         aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
@@ -119,9 +122,9 @@ def test_apply(manipulation):
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = manipulation.apply(
+    res = manipulation(nodes).apply(
         edges_table_empty,
-        nodes,
+        tgt_ids,
         aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
@@ -172,9 +175,9 @@ def test_apply(manipulation):
             ), "ERROR: Section position error!"
 
     ## (b) Edges already existing
-    res = manipulation.apply(
+    res = manipulation(nodes).apply(
         edges_table,
-        nodes,
+        tgt_ids,
         aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
@@ -222,9 +225,9 @@ def test_apply(manipulation):
 
     # Case 3: Check pct
     for pct in np.linspace(0, 100, 6):
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table_empty,
-            nodes,
+            tgt_ids,
             aux_dict,
             amount_pct=pct.tolist(),
             prob_model_spec={"file": prob_model_file},
@@ -237,7 +240,7 @@ def test_apply(manipulation):
                 - len(np.intersect1d(src_ids, tgt_ids)) * pct / 100
             )
             * n_syn_conn
-        ), "ERROR: Wrong number of synapses!"  # Check #synapses
+        ), f"ERROR: Wrong number of synapses! for pct ({pct})"  # Check #synapses
 
     # Case 4: Check src/tgt_sel
     pct = 100.0
@@ -247,9 +250,9 @@ def test_apply(manipulation):
         for tgt_class in ["EXC", "INH"]:
             sel_src = {"synapse_class": src_class}
             sel_dest = {"synapse_class": tgt_class}
-            res = manipulation.apply(
+            res = manipulation(nodes).apply(
                 edges_table_empty,
-                nodes,
+                tgt_ids,
                 aux_dict,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
@@ -279,9 +282,9 @@ def test_apply(manipulation):
             sel_dest = {"mtype": tgt_mt}
 
             ### Integrated wiring
-            res = manipulation.apply(
+            res = manipulation(nodes).apply(
                 edges_table_empty,
-                nodes,
+                tgt_ids,
                 aux_dict,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
@@ -336,15 +339,18 @@ def test_apply(manipulation):
     split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
     res_list = []
     for i_split, split_ids in enumerate(split_ids_list):
+        id_selection = Selection(split_ids).ranges
         aux_dict_split = {
             "N_split": len(split_ids_list),
             "i_split": i_split,
             "split_ids": split_ids,
+            "id_selection": id_selection,
         }
+        print(split_ids)
         res_list.append(
-            manipulation.apply(
+            manipulation(nodes).apply(
                 edges_table_empty,
-                nodes,
+                split_ids,
                 aux_dict_split,
                 amount_pct=pct,
                 prob_model_spec={"file": prob_model_file},
@@ -370,9 +376,9 @@ def test_apply(manipulation):
             assert np.isclose(res.iloc[i]["delay"], delay), "ERROR: Delay mismatch!"
 
     ## (a) Integrated wiring
-    res = manipulation.apply(
+    res = manipulation(nodes).apply(
         edges_table_empty,
-        nodes,
+        tgt_ids,
         aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
@@ -409,9 +415,9 @@ def test_apply(manipulation):
     for rep in range(
         30
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table_empty,
-            nodes,
+            tgt_ids,
             aux_dict,
             amount_pct=pct,
             prob_model_spec={"file": prob_model_file},

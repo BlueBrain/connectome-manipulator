@@ -75,6 +75,7 @@ def local_connectome__empty_edges(tmpdir_factory):
     config_file = _manipulation_config_path(output_dir, "circuit_100.json")
 
     obj = Helper(config_file, output_dir)
+
     obj.run(
         [
             "manipulate-connectome",
@@ -99,7 +100,7 @@ def test_number_of_edges__empty_edges(local_connectome__empty_edges):
     """Test the number of edges of the generated edge population."""
     _check_number_of_edges(
         local_connectome__empty_edges.output_edges_file,
-        expected_number=167,
+        expected_number=134,
     )
 
 
@@ -161,5 +162,5 @@ def test_number_of_edges__existing_edges(local_connectome__existing_edges):
     """Test the number of edges of the generated edge population."""
     _check_number_of_edges(
         local_connectome__existing_edges.output_edges_file,
-        expected_number=334,
+        expected_number=301,
     )

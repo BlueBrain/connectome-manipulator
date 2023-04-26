@@ -46,16 +46,17 @@ class ConnectomeRewiring(Manipulation):
     supported so far!).
     """
 
-    def __init__(self):
+    def __init__(self, nodes):
         """Construct ConnectomeRewiring Manipulation and declare state vars..."""
         self.duplicate_sample_synapses_per_mtype_dict = tuple({})
         self.props_sel = []
         self.syn_sel_idx_type = None
+        super().__init__(nodes)
 
     def apply(
         self,
         edges_table,
-        nodes,
+        split_ids,
         aux_dict,
         syn_class,
         prob_model_spec,
@@ -166,8 +167,8 @@ class ConnectomeRewiring(Manipulation):
         stats_dict["num_conn_rewired"] = []
         stats_dict["num_syn_added"] = []
         stats_dict["num_conn_added"] = []
-        src_node_ids = get_node_ids(nodes[0], sel_src)
-        src_class = nodes[0].get(src_node_ids, properties="synapse_class")
+        src_node_ids = get_node_ids(self.nodes[0], sel_src)
+        src_class = self.nodes[0].get(src_node_ids, properties="synapse_class")
         src_node_ids = src_class[
             src_class == syn_class
         ].index.to_numpy()  # Select only source nodes with given synapse class (EXC/INH)
@@ -180,16 +181,14 @@ class ConnectomeRewiring(Manipulation):
             "Synapse class error!",
         )
         src_pos = conn_prob.get_neuron_positions(
-            nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
+            self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
         )[
             0
         ]  # Get neuron positions (incl. position mapping, if provided)
 
-        tgt_node_ids = get_node_ids(nodes[1], sel_dest)
+        # Only select target nodes that are actually in current split of edges_table
+        tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, split_ids)
         num_tgt_total = len(tgt_node_ids)
-        tgt_node_ids = np.intersect1d(
-            tgt_node_ids, aux_dict["split_ids"]
-        )  # Only select target nodes that are actually in current split of edges_table
         num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
         tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
         if len(tgt_node_ids) > 0:
@@ -200,7 +199,7 @@ class ConnectomeRewiring(Manipulation):
                 f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
                 i_split=aux_dict["i_split"],
                 N_split=aux_dict["N_split"],
-                split_ids=aux_dict["split_ids"],
+                split_ids=split_ids,
                 tgt_node_ids=tgt_node_ids,
                 tgt_sel=tgt_sel,
             )
@@ -276,7 +275,7 @@ class ConnectomeRewiring(Manipulation):
 
             # Determine conn. prob. of all source nodes to be connected with target node
             tgt_pos = conn_prob.get_neuron_positions(
-                nodes[1].positions if pos_acc is None else pos_acc, [[tgt]]
+                self.nodes[1].positions if pos_acc is None else pos_acc, [[tgt]]
             )[
                 0
             ]  # Get neuron positions (incl. position mapping, if provided)
@@ -375,7 +374,6 @@ class ConnectomeRewiring(Manipulation):
                         src_gen,
                         tidx,
                         edges_table,
-                        nodes,
                         syn_sel_idx,
                         syn_sel_idx_tgt,
                         tgt_node_ids,
@@ -387,7 +385,6 @@ class ConnectomeRewiring(Manipulation):
                     new_edges = self._duplicate_randomize_synapses(
                         src_gen,
                         edges_table,
-                        nodes,
                         syn_sel_idx,
                         syn_sel_idx_tgt,
                         tgt,
@@ -424,7 +421,7 @@ class ConnectomeRewiring(Manipulation):
 
             # Assign new distance-dependent delays (in-place), based on (generative) delay model
             self.assign_delays_from_model(
-                delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx
+                delay_model, edges_table, src_new, src_syn_idx, syn_sel_idx
             )
 
         # Estimate resulting number of connections for computing a global probability scaling factor [returns empty edges table!!]
@@ -586,7 +583,7 @@ class ConnectomeRewiring(Manipulation):
             out_syn_per_conn=out_syn_per_conn,
             i_split=aux_dict["i_split"],
             N_split=aux_dict["N_split"],
-            split_ids=aux_dict["split_ids"],
+            split_ids=split_ids,
             src_node_ids=src_node_ids,
             tgt_node_ids=tgt_node_ids,
             tgt_sel=tgt_sel,
@@ -713,7 +710,6 @@ class ConnectomeRewiring(Manipulation):
         src_gen,
         tidx,
         edges_table,
-        nodes,
         syn_sel_idx,
         syn_sel_idx_tgt,
         tgt_node_ids,
@@ -725,8 +721,8 @@ class ConnectomeRewiring(Manipulation):
         """
         # Sample #synapses/connection from other existing synapses targetting neurons of the same mtype (or layer) as tgt (incl. tgt)
         tgt = tgt_node_ids[tidx]
-        tgt_layers = nodes[1].get(tgt_node_ids, properties="layer").to_numpy()
-        tgt_mtypes = nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
+        tgt_layers = self.nodes[1].get(tgt_node_ids, properties="layer").to_numpy()
+        tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
         tgt_mtype = tgt_mtypes[tidx]
         num_gen_conn = len(src_gen)
         if (
@@ -795,7 +791,7 @@ class ConnectomeRewiring(Manipulation):
         new_edges["@source_node"] = src_gen[syn_conn_idx]
 
         # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
-        self.assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
+        self.assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
 
         return new_edges
 
@@ -803,7 +799,6 @@ class ConnectomeRewiring(Manipulation):
         self,
         src_gen,
         edges_table,
-        nodes,
         syn_sel_idx,
         syn_sel_idx_tgt,
         tgt_id,
@@ -820,8 +815,8 @@ class ConnectomeRewiring(Manipulation):
             f"Required properties missing in properties model (must include: {self.props_sel})!",
         )
         # Generate new synapse properties based on properties model
-        src_mtypes = nodes[0].get(src_gen, properties="mtype").to_numpy()
-        tgt_mtype = nodes[1].get(tgt_id, properties="mtype")
+        src_mtypes = self.nodes[0].get(src_gen, properties="mtype").to_numpy()
+        tgt_mtype = self.nodes[1].get(tgt_id, properties="mtype")
         new_syn_props = [props_model.apply(src_type=s, tgt_type=tgt_mtype) for s in src_mtypes]
         num_syn_per_conn = [syn.shape[0] for syn in new_syn_props]
         syn_conn_idx = np.concatenate(
@@ -844,7 +839,7 @@ class ConnectomeRewiring(Manipulation):
         new_edges["@source_node"] = src_gen[syn_conn_idx]
 
         # Assign distance-dependent delays (in-place), based on (generative) delay model
-        self.assign_delays_from_model(delay_model, nodes, new_edges, src_gen, syn_conn_idx)
+        self.assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
 
         # [TESTING] #
         for cidx, c in enumerate(src_gen):
@@ -857,7 +852,7 @@ class ConnectomeRewiring(Manipulation):
         return new_edges
 
     def assign_delays_from_model(
-        self, delay_model, nodes, edges_table, src_new, src_syn_idx, syn_sel_idx=None
+        self, delay_model, edges_table, src_new, src_syn_idx, syn_sel_idx=None
     ):
         """Assign new distance-dependent delays, drawn from truncated normal distribution, to new synapses within edges_table (in-place)."""
         log.log_assert(delay_model is not None, "Delay model required!")
@@ -871,7 +866,7 @@ class ConnectomeRewiring(Manipulation):
             return
 
         # Determine distance from source neuron (soma) to synapse on target neuron
-        src_new_pos = nodes[0].positions(src_new).to_numpy()
+        src_new_pos = self.nodes[0].positions(src_new).to_numpy()
         syn_pos = edges_table.loc[
             syn_sel_idx, ["afferent_center_x", "afferent_center_y", "afferent_center_z"]
         ].to_numpy()  # Synapse position on post-synaptic dendrite

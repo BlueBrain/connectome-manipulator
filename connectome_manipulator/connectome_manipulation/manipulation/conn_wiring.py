@@ -58,10 +58,28 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         "delay": "float32",
     }
 
+    def __init__(self, nodes):
+        """Initialize a ConnectomeWiring manipulator with a node set.
+
+        The initialization will itself initialize the MorphHelper object. Split indices are passed
+        via the apply function.
+        """
+        super().__init__(nodes)
+        # Prepare to load target (dendritic) morphologies
+        morph_dir = self.nodes[1].config["morphologies_dir"]
+        self.tgt_morph = MorphHelper(
+            morph_dir,
+            self.nodes[1],
+            {
+                "h5v1": os.path.join(morph_dir, "h5v1"),
+                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
+            },
+        )
+
     def apply(
         self,
         edges_table,
-        nodes,
+        split_ids,
         aux_dict,
         prob_model_spec={"model": "ConnProb1stOrderModel"},  # Default 1st-oder model
         nsynconn_model_spec={"model": "NSynConnModel"},  # Default #syn/conn model
@@ -91,7 +109,25 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             log.warning(
                 f"Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses."
             )
-
+        # Intersect target nodes with split IDs and return if intersection is empty
+        tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, aux_dict["id_selection"])
+        num_tgt_total = len(tgt_node_ids)
+        if num_tgt_total == 0:  # Nothing to wire
+            log.info("No target nodes selected, nothing to wire")
+            return edges_table
+        if amount_pct < 100:
+            num_tgt = np.round(amount_pct * num_tgt_total / 100).astype(int)
+            tgt_sel = np.random.permutation(
+                np.concatenate(
+                    (np.full(num_tgt, True), np.full(num_tgt_total - num_tgt, False)), axis=None
+                )
+            )
+        else:
+            num_tgt = num_tgt_total
+            tgt_sel = np.full(num_tgt_total, True)
+        if num_tgt == 0:  # Nothing to wire
+            log.info("No target nodes selected, nothing to wire")
+            return edges_table
         # Load connection probability model
         p_model = model_types.AbstractModel.init_model(prob_model_spec)
         log.log_assert(
@@ -118,48 +154,26 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             log.info("No position mapping model provided")
 
         # Determine source/target nodes for wiring
-        src_node_ids = get_node_ids(nodes[0], sel_src)
-        src_class = nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
-        src_mtypes = nodes[0].get(src_node_ids, properties="mtype").to_numpy()
+        src_node_ids = get_node_ids(self.nodes[0], sel_src)
+        src_class = self.nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
+        src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
         log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
         src_pos = conn_prob.get_neuron_positions(
-            nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
+            self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
         )[
             0
         ]  # Get neuron positions (incl. position mapping, if provided)
 
-        tgt_node_ids = get_node_ids(nodes[1], sel_dest)
-        num_tgt_total = len(tgt_node_ids)
-        tgt_node_ids = np.intersect1d(
-            tgt_node_ids, aux_dict["split_ids"]
-        )  # Only select target nodes that are actually in current split of edges_table
-        num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
-        tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
-        if np.sum(tgt_sel) == 0:  # Nothing to wire
-            log.info("No target nodes selected, nothing to wire")
-            return edges_table
         tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
-        tgt_mtypes = nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
+        tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
         tgt_pos = conn_prob.get_neuron_positions(
-            nodes[1].positions if pos_acc is None else pos_acc, [tgt_node_ids]
+            self.nodes[1].positions if pos_acc is None else pos_acc, [tgt_node_ids]
         )[
             0
         ]  # Get neuron positions (incl. position mapping, if provided)
 
         log.info(
             f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
-        )
-        # Prepare to load target (dendritic) morphologies
-        # tgt_morph = nodes[1].morph ### ERROR with path/file format!
-        # get_tgt_morph = lambda node_id: tgt_morph.get(node_id, transform=True) # Access function
-        morph_dir = nodes[1].config["morphologies_dir"]
-        tgt_morph = MorphHelper(
-            morph_dir,
-            nodes[1],
-            {
-                "h5v1": os.path.join(morph_dir, "h5v1"),
-                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
-            },
         )
 
         # Run connection wiring
@@ -168,7 +182,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             src_pos,
             src_mtypes,
             src_class,
-            tgt_morph,
             morph_ext,
             tgt_node_ids,
             tgt_pos,
@@ -243,7 +256,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         src_positions,
         src_mtypes,
         src_class,
-        tgt_morph,
         morph_ext,
         tgt_node_ids,
         tgt_positions,
@@ -306,7 +318,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
             # Place synapses randomly on soma/dendrite sections
             # [TODO: Add model for synapse placement??]
-            morph = self._get_tgt_morph(tgt_morph, morph_ext, tgt)
+            morph = self._get_tgt_morph(self.tgt_morph, morph_ext, tgt)
 
             sec_ind = np.hstack(
                 [
@@ -374,17 +386,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         # Init random seed for connectome building and sampling from parameter distributions
         np.random.seed(seed)
 
-        # Prepare to load target (dendritic) morphologies
-        morph_dir = nodes.config["morphologies_dir"]
-        tgt_morph = MorphHelper(
-            morph_dir,
-            nodes,
-            {
-                "h5v1": os.path.join(morph_dir, "h5v1"),
-                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
-            },
-        )
-        conn_wiring = cls()
+        conn_wiring = cls(nodes)
 
         # Loop over pathways
         new_edges_per_pathway = []
@@ -419,7 +421,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                     src_positions,
                     src_mtypes,
                     src_class,
-                    tgt_morph,
                     morph_ext,
                     tgt_node_ids,
                     tgt_positions,

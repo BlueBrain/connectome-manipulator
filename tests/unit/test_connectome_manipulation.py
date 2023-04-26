@@ -93,15 +93,15 @@ def test_manipulation_registration():
     print(manip_mods)
     for mod_name in manip_mods:
         if mod_name not in ["base", "__init__"]:
-            m = Manipulation.get(mod_name)()
+            m = Manipulation.get(mod_name)(None)
 
 
 def test_null_manipulation():
     module_name = "null_manipulation"
     manip_config = {"manip": {"name": "test", "fcts": [{"source": module_name, "kwargs": {}}]}}
 
-    m = Manipulation.get(module_name)()
-    out_edges_table = m.apply(None, None, None, **manip_config)
+    m = Manipulation.get(module_name)
+    out_edges_table = m(None).apply(None, None, None, **manip_config)
 
     assert out_edges_table is None
 

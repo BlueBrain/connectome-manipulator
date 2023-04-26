@@ -14,8 +14,9 @@ from connectome_manipulator.model_building import model_types
 
 @pytest.fixture
 def manipulation():
+    Manipulation.destroy_instances()
     m = Manipulation.get("conn_rewiring")
-    return m()
+    return m
 
 
 def test_apply(manipulation):
@@ -43,9 +44,9 @@ def test_apply(manipulation):
     with pytest.raises(
         AssertionError, match=re.escape("Edges table must be ordered by @target_node!")
     ):
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class="EXC",
             prob_model_spec=None,
@@ -169,9 +170,9 @@ def test_apply(manipulation):
         prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__ConnProb1p0.json")
         pct = 0.0
 
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -196,9 +197,9 @@ def test_apply(manipulation):
             AssertionError,
             match=re.escape("Keeping indegree not possible since connection probability zero!"),
         ):
-            res = manipulation.apply(
+            res = manipulation(nodes).apply(
                 edges_table.copy(),
-                nodes,
+                tgt_ids,
                 aux_dict,
                 syn_class=syn_class,
                 prob_model_spec={"file": prob_model_file},
@@ -214,9 +215,9 @@ def test_apply(manipulation):
             )
 
         ## (b) Not keeping indegree => All selected (EXC or INH) connections should be removed
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -243,9 +244,9 @@ def test_apply(manipulation):
         pct = 100.0
 
         ## (a) Keeping indegree & reusing connections
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -271,9 +272,9 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
 
         ## (b) Keeping indegree & w/o reusing connections
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -296,9 +297,9 @@ def test_apply(manipulation):
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
 
         ## (c) W/o keeping indegree & w/o reusing connections ("duplicate_sample" method)
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -334,9 +335,9 @@ def test_apply(manipulation):
             }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                manipulation.apply(
+                manipulation(nodes).apply(
                     edges_table_split,
-                    nodes,
+                    split_ids,
                     aux_dict_split,
                     syn_class=syn_class,
                     prob_model_spec={"file": prob_model_file},
@@ -364,9 +365,9 @@ def test_apply(manipulation):
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
 
         ## (e) W/o keeping indegree & w/o reusing connections ("duplicate_randomize" method)
-        res = manipulation.apply(
+        res = manipulation(nodes).apply(
             edges_table.copy(),
-            nodes,
+            tgt_ids,
             aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
@@ -402,9 +403,9 @@ def test_apply(manipulation):
             }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                manipulation.apply(
+                manipulation(nodes).apply(
                     edges_table_split,
-                    nodes,
+                    split_ids,
                     aux_dict_split,
                     syn_class=syn_class,
                     prob_model_spec={"file": prob_model_file},

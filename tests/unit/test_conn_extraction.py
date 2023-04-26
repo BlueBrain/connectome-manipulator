@@ -11,8 +11,9 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 @pytest.fixture
 def manipulation():
+    Manipulation.destroy_instances()
     m = Manipulation.get("conn_extraction")
-    return m()
+    return m
 
 
 def test_apply(manipulation):
@@ -24,8 +25,8 @@ def test_apply(manipulation):
 
     # Test that given intrinsic cell target is extracted (no extra node sets file given)
     for tgt_name in ["LayerA", "RegionB"]:
-        res = manipulation.apply(
-            edges_table, nodes, None, target_name=tgt_name, node_sets_file=None
+        res = manipulation(nodes).apply(
+            edges_table, None, None, target_name=tgt_name, node_sets_file=None
         )
 
         src_ids = nodes[0].ids(tgt_name)
@@ -48,8 +49,8 @@ def test_apply(manipulation):
     with open(node_sets_file, "r") as f:
         node_sets = json.load(f)
     for tgt_name in ["NSet1", "NSet1"]:
-        res = manipulation.apply(
-            edges_table, nodes, None, target_name=tgt_name, node_sets_file=node_sets_file
+        res = manipulation(nodes).apply(
+            edges_table, None, None, target_name=tgt_name, node_sets_file=node_sets_file
         )
 
         src_ids = node_sets[tgt_name]["node_id"]
@@ -68,6 +69,6 @@ def test_apply(manipulation):
         )
 
     # Test special case when no cell target specified (should return empty connectome)
-    res = manipulation.apply(edges_table, nodes, None, target_name=None, node_sets_file=None)
+    res = manipulation(nodes).apply(edges_table, None, None, target_name=None, node_sets_file=None)
     assert res.empty
     assert np.all(res.columns == edges_table.columns)

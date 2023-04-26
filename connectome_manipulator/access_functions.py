@@ -1,28 +1,60 @@
 """Collection of function for flexible nodes/edges access, to be used by model building and manipulation operations"""
 
 import numpy as np
+
+import libsonata
+
 from connectome_manipulator import log
 
 
-def get_node_ids(nodes, sel_spec):
+def get_node_ids(nodes, sel_spec, split_ids=None):
     """Returns list of selected node IDs of given nodes population.
 
     nodes ... NodePopulation
     sel_spec ... Node selection specifier, as accepted by nodes.ids(group=sel_spec).
                  In addition, if sel_spec is a dict, 'node_set': '<node_set_name>'
                  can be specified in combination with other selection properties.
+    split_ids ... Node IDs to filter the selection by, either as an array or a
+                  libsonata.Selection
     """
+    # pylint: disable=protected-access
+    pop = nodes._population
+    enumeration_names = pop.enumeration_names
+    if split_ids is None:
+        sel_ids = pop.select_all()
+    else:
+        sel_ids = libsonata.Selection(split_ids)
     if isinstance(sel_spec, dict):
         sel_group = sel_spec.copy()
         node_set = sel_group.pop("node_set", None)
 
-        gids = nodes.ids(sel_group)
+        selection = None
+        for sel_k, sel_v in sel_group.items():
+            if sel_k in enumeration_names:
+                sel_idx = pop.enumeration_values(sel_k).index(sel_v)
+                sel_prop = pop.get_enumeration(sel_k, sel_ids) == sel_idx
+            else:
+                sel_prop = pop.get_attribute(sel_k, sel_ids) == sel_v
+            if selection is None:
+                selection = sel_prop
+            else:
+                selection &= sel_prop
+        # selection is not of all nodes (starting with node id 0), but a generic subset specified by sel_ids
+        if len(sel_ids.ranges) == 1:
+            # First turn selection array into an index array then
+            # because we filtered contiguous ids with a simple offset, just shift by the first node id
+            gids = np.nonzero(selection)[0] + sel_ids.ranges[0][0]
+        else:
+            # for more complex cases, fully resolve the node-preselection
+            gids = sel_ids.flatten().astype(np.int64)[selection]
 
         if node_set is not None:
             log.log_assert(isinstance(node_set, str), "Node set must be a string!")
             gids = np.intersect1d(gids, nodes.ids(node_set))
     else:
         gids = nodes.ids(sel_spec)
+        if split_ids is not None:
+            gids = np.intersect1d(gids, sel_ids.flatten().astype(np.int64))
 
     return gids
 

@@ -36,6 +36,13 @@ class MetaManipulation(ABCMeta):
         return cls.__instances[cls]
 
     @classmethod
+    def destroy_instances(mcs):
+        """Destroy all instances (for testing)"""
+        # deal with pylint false-positive
+        # pylint: disable=unused-private-member
+        mcs.__instances = {}
+
+    @classmethod
     def get(mcs, name):
         """Returns a concrete Manipulation class given a string"""
         log.log_assert(name in mcs.__manipulations, f"Manipulation algorithm {name} does not exist")
@@ -48,8 +55,12 @@ class Manipulation(metaclass=MetaManipulation):
     The abstract base class of which all manipulation classes must inherit and implement its methods.
     """
 
+    def __init__(self, nodes):
+        """Initialize with the nodes and split_ids"""
+        self.nodes = nodes
+
     @abstractmethod
-    def apply(self, edges_table, nodes, aux_config, **kwargs):
+    def apply(self, edges_table, split_ids, aux_config, **kwargs):
         """An abstract method for the actual application of the algorithm
 
         This funciton is to be implemented by concrete Manipulation subclasses.
@@ -66,9 +77,10 @@ class MorphologyCachingManipulation(Manipulation):
 
     # pylint: disable=abstract-method
 
-    def __init__(self):
+    def __init__(self, nodes):
         """Setup a morphologies cache when initializing"""
         self.morphologies = {}
+        super().__init__(nodes)
 
     def _get_tgt_morph(self, tgt_morph, morph_ext, node_id):
         """Access function (incl. transformation!), using specified format (swc/h5/...)"""

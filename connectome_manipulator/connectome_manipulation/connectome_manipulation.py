@@ -14,6 +14,7 @@ import subprocess
 import time
 
 from bluepysnap.circuit import Circuit
+import libsonata
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -85,7 +86,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     return c.config, nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
 
 
-def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
+def apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
     for m_step in range(len(manip_config["manip"]["fcts"])):
@@ -95,9 +96,8 @@ def apply_manipulation(edges_table, nodes, manip_config, aux_dict):
         log.info(
             f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}'
         )
-        m = Manipulation.get(manip_source)()
-        edges_table = m.apply(edges_table, nodes, aux_dict, **manip_kwargs)
-
+        m = Manipulation.get(manip_source)(nodes)
+        edges_table = m.apply(edges_table, split_ids, aux_dict, **manip_kwargs)
     return edges_table
 
 
@@ -493,7 +493,7 @@ def check_if_done(parquet_file, done_file):
 
 
 def manip_wrapper(
-    nodes, edges, N_split, i_split, split_ids, config, parquet_file_manip, csv_file, in_job
+    nodes, edges, N_split, i_split, id_selection, config, parquet_file_manip, csv_file, in_job
 ):
     """Wrapper function that can be optionally executed by a submitit Slurm job"""
     if in_job:
@@ -504,11 +504,18 @@ def manip_wrapper(
         csv_file = os.path.splitext(log_file)[0] + ".csv"
     np.random.seed(config.get("seed", 123456) * (i_split + 1))
     # Apply connectome wiring
+    split_ids = libsonata.Selection(id_selection).flatten().astype(np.int64)
     edges_table = _get_afferent_edges_table(split_ids, edges)
     resource_profiling(config["profile"], f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
-    aux_dict = {"N_split": N_split, "i_split": i_split, "split_ids": split_ids}
+    aux_dict = {
+        "N_split": N_split,
+        "i_split": i_split,
+        "id_selection": id_selection,
+        "split_ids": split_ids,
+    }
     new_edges_table = _generate_partition_edges(
         nodes=nodes,
+        split_ids=split_ids,
         edges_table=edges_table,
         manip_config=config,
         aux_dict=aux_dict,
@@ -615,6 +622,7 @@ def main(
                     log.info(
                         f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
                     )
+                    id_selection = libsonata.Selection(split_ids).ranges
 
                     job = executor.submit(
                         manip_wrapper,
@@ -622,7 +630,7 @@ def main(
                         edges,
                         N_split,
                         i_split,
-                        split_ids,
+                        id_selection,
                         config,
                         output_parquet_file,
                         csv_file,
@@ -651,12 +659,13 @@ def main(
                 log.info(
                     f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
                 )
+                id_selection = libsonata.Selection(split_ids).ranges
                 nsyn_in, nsyn_out = manip_wrapper(
                     nodes,
                     edges,
                     N_split,
                     i_split,
-                    split_ids,
+                    id_selection,
                     config,
                     output_parquet_file,
                     csv_file,
@@ -705,13 +714,13 @@ def _get_afferent_edges_table(node_ids, edges):
     return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
 
 
-def _generate_partition_edges(nodes, edges_table, manip_config, aux_dict):
+def _generate_partition_edges(nodes, split_ids, edges_table, manip_config, aux_dict):
     if edges_table is None:
-        new_edges_table = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
+        new_edges_table = apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict)
     else:
         column_types = {col: edges_table[col].dtype for col in edges_table.columns}
 
-        new_edges_table = apply_manipulation(edges_table, nodes, manip_config, aux_dict)
+        new_edges_table = apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict)
 
         # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
         column_types = {col: column_types[col] for col in new_edges_table.columns}
