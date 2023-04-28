@@ -89,13 +89,11 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
 def apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
-    for m_step in range(len(manip_config["manip"]["fcts"])):
-        manip_source = manip_config["manip"]["fcts"][m_step]["source"]
-        manip_kwargs = manip_config["manip"]["fcts"][m_step]["kwargs"]
-        # log.info(f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}, kwargs={manip_kwargs}')
-        log.info(
-            f'>>Step {m_step + 1} of {len(manip_config["manip"]["fcts"])}: source={manip_source}'
-        )
+    n_fcts = len(manip_config["manip"]["fcts"])
+    for m_step, m_config in enumerate(manip_config["manip"]["fcts"]):
+        manip_source = m_config["source"]
+        manip_kwargs = m_config["kwargs"]
+        log.info(f">>Step {m_step + 1} of {n_fcts}: source={manip_source}")
         m = Manipulation.get(manip_source)(nodes)
         edges_table = m.apply(edges_table, split_ids, aux_dict, **manip_kwargs)
     return edges_table
@@ -432,7 +430,7 @@ def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
             utils.write_json(data=done_list, filepath=done_file)
         else:
             # Load completed files from existing list [can be in arbitrary order!!]
-            utils.load_json(done_file)
+            done_list = utils.load_json(done_file)
             log.log_assert(
                 all(
                     os.path.join(parquet_path, f) + ".parquet" in parquet_file_list
@@ -493,20 +491,31 @@ def check_if_done(parquet_file, done_file):
 
 
 def manip_wrapper(
-    nodes, edges, N_split, i_split, id_selection, config, parquet_file_manip, csv_file, in_job
+    nodes,
+    edges,
+    N_split,
+    i_split,
+    id_selection,
+    config_path,
+    parquet_file_manip,
+    csv_file,
+    logging_path,
+    do_profiling,
+    in_job,
 ):
     """Wrapper function that can be optionally executed by a submitit Slurm job"""
     if in_job:
         job_env = submitit.JobEnvironment()
         log_file = log.logging_init(
-            config["logging_dir"], name="connectome_manipulation." + str(job_env.job_id)
+            logging_path, name="connectome_manipulation." + str(job_env.job_id)
         )
         csv_file = os.path.splitext(log_file)[0] + ".csv"
+    config = utils.load_json(config_path)
     np.random.seed(config.get("seed", 123456) * (i_split + 1))
-    # Apply connectome wiring
     split_ids = libsonata.Selection(id_selection).flatten().astype(np.int64)
+    # Apply connectome wiring
     edges_table = _get_afferent_edges_table(split_ids, edges)
-    resource_profiling(config["profile"], f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
+    resource_profiling(do_profiling, f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
     aux_dict = {
         "N_split": N_split,
         "i_split": i_split,
@@ -524,7 +533,7 @@ def manip_wrapper(
     N_syn_in = len(edges_table) if edges_table is not None else 0
     N_syn_out = len(new_edges_table)
     resource_profiling(
-        config["profile"],
+        do_profiling,
         f"{'manipulated' if edges else 'wired'}-{i_split + 1}/{N_split}",
         csv_file=csv_file,
     )
@@ -532,7 +541,7 @@ def manip_wrapper(
     # Write back connectome to .parquet file
     edges_to_parquet(new_edges_table, parquet_file_manip)
     resource_profiling(
-        config["profile"],
+        do_profiling,
         f"saved-{aux_dict['i_split'] + 1}/{aux_dict['N_split']}",
         csv_file=csv_file,
     )
@@ -540,18 +549,21 @@ def manip_wrapper(
 
 
 def main(
-    config,
+    config_path,
     output_dir,
     do_profiling=False,
     do_resume=False,
     keep_parquet=False,
     convert_to_sonata=False,
     overwrite_edges=False,
+    splits=None,
     parallel=False,
     max_parallel_jobs=256,
     slurm_args=[],
 ):
     """Build local connectome."""
+    config = utils.load_json(config_path)
+
     log.log_assert(output_dir != Path("circuit_path"), "Input directory == Output directory")
 
     # Initialize logger
@@ -562,6 +574,13 @@ def main(
     # Initialize profiler
     csv_file = os.path.splitext(log_file)[0] + ".csv"
     resource_profiling(do_profiling, "initial", reset=True, csv_file=csv_file)
+
+    if splits is not None:
+        if "N_split_nodes" in config:
+            log.warning(
+                f"Overwriting N_split_nodes ({config['N_split_nodes']}) from configuration file with command line argument --split {splits}"
+            )
+        config["N_split_nodes"] = splits
 
     # Load circuit (nodes only)
     sonata_config_file = config["circuit_config"]
@@ -631,9 +650,11 @@ def main(
                         N_split,
                         i_split,
                         id_selection,
-                        config,
+                        config_path,
                         output_parquet_file,
                         csv_file,
+                        str(logging_path),
+                        do_profiling,
                         True,
                     )
                     jobs.append((job, output_parquet_file))
@@ -665,10 +686,12 @@ def main(
                     edges,
                     N_split,
                     i_split,
-                    id_selection,
-                    config,
+                    split_ids,
+                    config_path,
                     output_parquet_file,
                     csv_file,
+                    str(logging_path),
+                    do_profiling,
                     False,
                 )
                 N_syn_in.append(nsyn_in)

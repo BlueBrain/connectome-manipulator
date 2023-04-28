@@ -86,6 +86,7 @@ def logging_init(log_path, name):
     logging.addLevelName(PROFILING_LOG_LEVEL, "PROFILING")
     logging.addLevelName(ASSERTION_LOG_LEVEL, "ASSERTION")
 
-    logging.basicConfig(level=PROFILING_LOG_LEVEL, handlers=[file_handler, stream_handler])
+    # logging.basicConfig(level=PROFILING_LOG_LEVEL, handlers=[file_handler, stream_handler])
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 
     return log_file

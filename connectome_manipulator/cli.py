@@ -2,6 +2,7 @@
 
 
 import logging
+import sys
 
 import click
 
@@ -118,29 +119,21 @@ def _manipulate_connectome(
     max_parallel_jobs,
     sbatch_arg,
 ):
-    config_dict = utils.load_json(config)
-
     if parallel:
         if utils.clear_slurm_env():
             log.info("Prepared environment for parallel run from within SLURM job.")
 
-    if splits is not None:
-        if "N_split_nodes" in config_dict:
-            log.warning(
-                f"Overwriting N_split_nodes ({config_dict['N_split_nodes']}) from configuration file with command line argument --split {splits}"
-            )
-        config_dict["N_split_nodes"] = splits
-
     output_dir = utils.create_dir(output_dir)
 
     connectome_manipulation.main(
-        config=config_dict,
+        config_path=config,
         output_dir=output_dir,
         do_profiling=profile,
         do_resume=resume,
         keep_parquet=keep_parquet,
         convert_to_sonata=convert_to_sonata,
         overwrite_edges=overwrite_edges,
+        splits=splits,
         parallel=parallel,
         max_parallel_jobs=max_parallel_jobs,
         slurm_args=sbatch_arg,
@@ -148,4 +141,4 @@ def _manipulate_connectome(
 
 
 if __name__ == "__main__":
-    app(True)
+    app(sys.argv[1:])

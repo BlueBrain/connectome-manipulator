@@ -130,10 +130,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             return edges_table
         # Load connection probability model
         p_model = model_types.AbstractModel.init_model(prob_model_spec)
-        log.log_assert(
-            p_model.input_names == ["src_pos", "tgt_pos"],
-            'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!',
-        )
         log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
         # Load #synapses/connection model
@@ -277,11 +273,16 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             #  if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
             #     print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
 
-            # Determine conn. prob. of all source nodes to be connected with target node
+            # Determine conn. prob. of all source nodes to be connected with target node (mtype-specific)
             tgt_pos = tgt_positions[
                 tidx : tidx + 1, :
             ]  # Get neuron positions (incl. position mapping, if provided)
-            p_src = p_model.apply(src_pos=src_positions, tgt_pos=tgt_pos).flatten()
+            p_src = p_model.apply(
+                src_pos=src_positions,
+                tgt_pos=tgt_pos,
+                src_type=src_mtypes,
+                tgt_type=tgt_mtypes[tidx],
+            ).flatten()
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
             p_src[
                 src_node_ids == tgt
@@ -294,7 +295,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             if num_new == 0:
                 continue  # Nothing to wire
 
-            # Sample number of synapses per connection
+            # Sample number of synapses per connection (mtype-specific)
             num_syn_per_conn = [
                 nsynconn_model.apply(src_type=s, tgt_type=tgt_mtypes[tidx])
                 for s in src_mtypes[src_new_sel]
@@ -364,13 +365,16 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             new_edges[["afferent_center_x", "afferent_center_y", "afferent_center_z"]] = pos_sel
             new_edges["syn_type_id"] = syn_type
 
-            # Assign distance-dependent delays, based on (generative) delay model (optional)
+            # Assign distance-dependent delays (mtype-specific), based on (generative) delay model (optional)
             if delay_model is not None:
-                src_new_pos = src_positions[src_new_sel]
+                src_new_pos = src_positions[src_new_sel, :]
                 syn_dist = np.sqrt(
                     np.sum((pos_sel - src_new_pos[syn_conn_idx, :]) ** 2, 1)
                 )  # Distance from source neurons (soma) to synapse positions on target neuron
-                new_edges["delay"] = delay_model.apply(distance=syn_dist)
+                new_edges["delay"] = [
+                    delay_model.apply(distance=[d], src_type=s, tgt_type=tgt_mtypes[tidx])
+                    for s, d in zip(src_mtypes[src_new_sel][syn_conn_idx], syn_dist)
+                ]
 
             # Add new_edges to edges table
             #         all_new_edges = all_new_edges.append(new_edges)

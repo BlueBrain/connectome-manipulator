@@ -127,10 +127,6 @@ class ConnectomeRewiring(Manipulation):
 
         # Load connection probability model
         p_model = model_types.AbstractModel.init_model(prob_model_spec)
-        log.log_assert(
-            p_model.input_names == ["src_pos", "tgt_pos"],
-            'Conn. prob. model must have "src_pos" and "tgt_pos" as inputs!',
-        )
         log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
         if p_scale != 1.0:
             log.info(f"Using probability scaling factor p_scale={p_scale}")
