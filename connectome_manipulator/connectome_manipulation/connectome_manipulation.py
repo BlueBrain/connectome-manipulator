@@ -492,9 +492,14 @@ def main(options, log_file, slurm_args=()):
     """Build local connectome."""
     config = utils.load_json(options.config_path)
 
-    log.log_assert(
-        options.output_path != Path(config["circuit_path"]), "Input directory == Output directory"
-    )
+    sonata_config_file = config["circuit_config"]
+
+    if "circuit_path" in config:
+        circuit_path = Path(config["circuit_path"])
+        sonata_config_file = circuit_path / sonata_config_file
+    else:
+        circuit_path = Path(os.path.split(config["circuit_config"])[0])
+    log.log_assert(options.output_path != circuit_path, "Input directory == Output directory")
 
     csv_file = os.path.splitext(log_file)[0] + ".csv"
 
