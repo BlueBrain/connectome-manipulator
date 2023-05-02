@@ -34,8 +34,8 @@ class Helper:
 
     def run(self, arglist):
         result = CliRunner().invoke(
-            app,
-            arglist,
+            cli=app,
+            args=arglist,
             catch_exceptions=False,
         )
         print(result.output)

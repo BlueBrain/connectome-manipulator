@@ -1,34 +1,28 @@
 """Main CLI entry point"""
 
 
-import logging
 import sys
+from pathlib import Path
 
 import click
 
-from connectome_manipulator import utils
-from connectome_manipulator.connectome_manipulation import connectome_manipulation
-
-
-log = logging.getLogger(__name__)
+from . import log, utils
+from .connectome_manipulation import connectome_manipulation
 
 
 @click.group(context_settings={"show_default": True})
 @click.version_option()
 @click.option("-v", "--verbose", count=True, default=0, help="-v for INFO, -vv for DEBUG")
-def app(verbose):
+@click.pass_context
+def app(ctx, verbose):
     """Connectome manipulation tools."""
-    level = (logging.WARNING, logging.INFO, logging.DEBUG)[min(verbose, 2)]
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    ctx.ensure_object(dict)
+    ctx.obj["VERBOSITY"] = verbose
 
 
 @app.command()
-@click.argument("config", required=True, type=str)
-@click.option("--output-dir", required=True, type=str, help="Output directory.")
+@click.argument("config", required=True, type=Path)
+@click.option("--output-dir", required=True, type=Path, help="Output directory.")
 @click.option("--profile", required=False, is_flag=True, type=bool, help="Enable profiling.")
 @click.option(
     "--resume",
@@ -50,7 +44,7 @@ def app(verbose):
 @click.option(
     "--splits",
     required=False,
-    default=None,
+    default=0,
     type=int,
     help="Number of blocks, overwrites value in config file",
 )
@@ -77,7 +71,9 @@ def app(verbose):
     type=str,
     help="Overwrite sbatch arguments with key=value",
 )
+@click.pass_context
 def manipulate_connectome(
+    ctx,
     config,
     output_dir,
     profile,
@@ -91,43 +87,22 @@ def manipulate_connectome(
     sbatch_arg,
 ):
     """Manipulate or build a circuit's connectome."""
-    _manipulate_connectome(
-        config,
-        output_dir,
-        profile,
-        resume,
-        keep_parquet,
-        convert_to_sonata,
-        overwrite_edges,
-        splits,
-        parallel,
-        max_parallel_jobs,
-        sbatch_arg,
-    )
+    # until we start using verbosity with the logging refactoring
+    # pylint: disable=unused-argument
+    # Initialize logger
+    logging_path = output_dir / "logs"
+    log_file = log.logging_init(logging_path, name="connectome_manipulation")
 
-
-def _manipulate_connectome(
-    config,
-    output_dir,
-    profile,
-    resume,
-    keep_parquet,
-    convert_to_sonata,
-    overwrite_edges,
-    splits,
-    parallel,
-    max_parallel_jobs,
-    sbatch_arg,
-):
     if parallel:
         if utils.clear_slurm_env():
             log.info("Prepared environment for parallel run from within SLURM job.")
 
-    output_dir = utils.create_dir(output_dir)
+    output_path = utils.create_dir(output_dir)
 
-    connectome_manipulation.main(
+    options = connectome_manipulation.Options(
         config_path=config,
-        output_dir=output_dir,
+        output_path=output_path,
+        logging_path=logging_path,
         do_profiling=profile,
         do_resume=resume,
         keep_parquet=keep_parquet,
@@ -136,9 +111,10 @@ def _manipulate_connectome(
         splits=splits,
         parallel=parallel,
         max_parallel_jobs=max_parallel_jobs,
-        slurm_args=sbatch_arg,
     )
+
+    connectome_manipulation.main(options, log_file, slurm_args=sbatch_arg)
 
 
 if __name__ == "__main__":
-    app(sys.argv[1:])
+    click.get_current_context().invoke(app, sys.argv[1:])

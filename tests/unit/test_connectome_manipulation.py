@@ -3,7 +3,6 @@ import json
 import os
 
 from mock import patch, Mock
-import pandas as pd
 from pathlib import Path
 import pytest
 
@@ -14,6 +13,7 @@ from bluepysnap.edges import EdgePopulation
 from utils import setup_tempdir, TEST_DATA_DIR
 
 import connectome_manipulator.connectome_manipulation.connectome_manipulation as test_module
+import connectome_manipulator.connectome_manipulation.converters as converters
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
 
@@ -176,11 +176,11 @@ def test_parquet_to_sonata():
             with patch("pyarrow.parquet.read_metadata", MockReadMetadataEmpty):
                 # check that error is raised if empty input file(s)
                 with pytest.raises(AssertionError, match="All .parquet files must be non-empty"):
-                    test_module.parquet_to_sonata(inpath, outfile, nodes, nodefiles)
+                    converters.parquet_to_sonata(inpath, outfile, nodes, nodefiles)
             with patch("pyarrow.parquet.read_metadata", MockReadMetadata):
                 with patch("subprocess.Popen", MockPopen):
                     with patch(
-                        "connectome_manipulator.connectome_manipulation.connectome_manipulation.create_parquet_metadata",
+                        "connectome_manipulator.connectome_manipulation.converters.create_parquet_metadata",
                         mock_create_parquet_metadata,
                     ):
                         # monkeypatch.setattr(test_module, 'create_parquet_metadata',
@@ -188,7 +188,7 @@ def test_parquet_to_sonata():
 
                         # check that error is raised if file does not exist after
                         with pytest.raises(AssertionError, match="SONATA"):
-                            test_module.parquet_to_sonata(inpath, outfile, nodes, nodefiles)
+                            converters.parquet_to_sonata(inpath, outfile, nodes, nodefiles)
 
                         # check that the file was removed
                         assert not os.path.exists(outfile)
