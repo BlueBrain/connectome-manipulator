@@ -12,6 +12,7 @@
 from copy import deepcopy
 import importlib
 import json
+import logging
 import os.path
 import pickle
 import sys
@@ -26,6 +27,7 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
+logger = logging.getLogger(__name__)
 
 # NOT USED ANY MORE
 # def get_model(model, model_inputs, model_params):
@@ -304,8 +306,8 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
         if not os.path.exists(os.path.split(model_dir)[0]):
             os.makedirs(os.path.split(model_dir)[0])
 
-        # Initialize logger
-        log.logging_init(out_dir, name="model_building")
+        # Initialize logger file
+        log.create_log_file(out_dir, "model_building")
 
         # Prepare computation module
         comp_source = model_config["model"]["fct"]["source"]

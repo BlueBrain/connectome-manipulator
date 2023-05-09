@@ -2,6 +2,7 @@ from contextlib import redirect_stdout
 import io
 import os
 import re
+import logging
 
 import pytest
 from mock import patch
@@ -27,7 +28,8 @@ def test_logging_init():
     logname = "chronicle"
     with setup_tempdir(__name__) as tempdir:
         logdir = os.path.join(tempdir, "logs")
-        test_module.logging_init(logdir, logname)
+        test_module.setup_logging(logging.DEBUG)
+        test_module.create_log_file(logdir, logname)
 
         assert os.path.isdir(logdir)
 
@@ -38,6 +40,5 @@ def test_logging_init():
         # check that the file matches the naming policy
         assert re.match(rf"^{logname}.*\.log$", dir_listing[0])
 
-        # check that PROFILING and ASSERTION log levels exist
-        assert test_module.logging.getLevelName(test_module.logging.INFO + 5) == "PROFILING"
-        assert test_module.logging.getLevelName(test_module.logging.ERROR + 5) == "ASSERTION"
+        # check the log level is set correctly
+        assert logging.getLogger().getEffectiveLevel() == logging.DEBUG

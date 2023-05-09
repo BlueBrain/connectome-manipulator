@@ -1,25 +1,16 @@
 """Customized logging"""
-from datetime import datetime
-import importlib
+from time import strftime
 import logging
 import os
 import sys
 
 import numpy as np
-
-
-PROFILING_LOG_LEVEL = logging.INFO + 5
-ASSERTION_LOG_LEVEL = logging.ERROR + 5
+from connectome_manipulator import utils
 
 
 def info(msg, *args, **kwargs):  # pragma: no cover
     """Wrapper for info logging"""
     return logging.info(msg, *args, **kwargs)
-
-
-def profiling(msg, *args, **kwargs):  # pragma: no cover
-    """Wrapper for profiling logging"""
-    return logging.log(PROFILING_LOG_LEVEL, msg, *args, **kwargs)
 
 
 def warning(msg, *args, **kwargs):  # pragma: no cover
@@ -35,7 +26,7 @@ def error(msg, *args, **kwargs):  # pragma: no cover
 def log_assert(cond, msg):
     """Assertion with logging"""
     if not cond:
-        logging.log(ASSERTION_LOG_LEVEL, msg)
+        logging.log(logging.ERROR, msg)
     assert cond, msg
 
 
@@ -63,30 +54,107 @@ def data(filespec, **kwargs):
     info(f'Data log ({", ".join(list(kwargs.keys()))}) written to "{data_file}"')
 
 
-def logging_init(log_path, name):
-    """Initialize logger (with custom log level for profiling and assert with logging)."""
-    # Configure logging
+class _LevelColorFormatter(logging.Formatter):
+    COLORS = {
+        logging.CRITICAL: utils.ConsoleColors.RED,
+        logging.ERROR: utils.ConsoleColors.RED,
+        logging.WARNING: utils.ConsoleColors.YELLOW,
+        logging.INFO: utils.ConsoleColors.BLUE,
+        logging.DEBUG: utils.ConsoleColors.DEFAULT + utils.ConsoleColors.DIM,
+    }
+
+    _logfmt = "[%(levelname)s] %(message)s"
+    _datefmt = "%b.%d %H:%M:%S"
+
+    def __init__(self, with_time=True, use_color=True, **kw):
+        super().__init__(self._logfmt, self._datefmt, **kw)
+        self._with_time = with_time
+        self._use_color = use_color
+
+    def format(self, record):
+        if hasattr(record, "ulevel"):
+            record.levelno = record.ulevel
+            record.levelname = logging.getLevelName(record.levelno)
+        style = self.COLORS.get(record.levelno)
+        if style is not None:
+            record.levelname = self._format_level(record, style)
+            record.msg = self._format_msg(record, style)
+        return super().format(record)
+
+    def _format_level(self, record, style):
+        if not self._use_color:
+            return record.levelname
+        return utils.ConsoleColors.format_text(record.levelname, style)
+
+    def _format_msg(self, record, style):
+        msg = ""
+        if self._with_time:
+            msg += "(%s) " % self.formatTime(record, self._datefmt) + msg
+
+        levelno = record.levelno
+        msg += record.msg
+
+        if not self._use_color:
+            return msg
+        return (
+            utils.ConsoleColors.format_text(msg, style)
+            if levelno >= logging.WARNING
+            else utils.ConsoleColors.format_text(msg, utils.ConsoleColors.DEFAULT, style)
+        )
+
+
+class LogLevel:
+    """Class to select the log level."""
+
+    ERROR_ONLY = 0
+    DEFAULT = 1
+    DEBUG = 2
+
+
+def setup_logging(log_level=LogLevel.DEFAULT):
+    """Features tabs and colors output to stdout
+
+    Args:
+      log_level (int): minimum log level for emitting messages
+    """
+    assert isinstance(log_level, int)
+    log_level = min(log_level, 2)
+
+    verbosity_levels = [
+        logging.WARNING,  # pos 0: Minimum possible logging level
+        logging.INFO,
+        logging.DEBUG,
+    ]
+
+    # Stdout
+    hdlr = logging.StreamHandler(sys.stdout)
+    use_color = True
+    if os.environ.get("ENVIRONMENT") == "BATCH":
+        use_color = False
+    else:
+        try:
+            sys.stdout.tell()  # works only if it's file
+            use_color = False
+        except IOError:
+            pass
+    hdlr.setFormatter(_LevelColorFormatter(False, use_color))
+    logging.root.setLevel(verbosity_levels[log_level])
+
+    del logging.root.handlers[:]
+    logging.root.addHandler(hdlr)
+
+
+def create_log_file(log_path, name):
+    """Create the log file
+
+    Args:
+      log_path: The destination directory for log messages besides stdout
+      name: Name of the module to log
+    """
     if not os.path.exists(log_path):
         os.makedirs(log_path)
-
-    # Reload logging module, in case it has already been initialized before
-    # [In future versions: logging.basicConfig(..., force=True, ...) supported instead!]
-    importlib.reload(logging)
-
-    # Initialize logging
-    log_file = os.path.join(log_path, f'{name}.{datetime.today().strftime("%Y%m%dT%H%M%S")}.log')
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s [%(module)s] %(levelname)s: %(message)s")
-    )
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-
-    # Add custom log levels
-    logging.addLevelName(PROFILING_LOG_LEVEL, "PROFILING")
-    logging.addLevelName(ASSERTION_LOG_LEVEL, "ASSERTION")
-
-    # logging.basicConfig(level=PROFILING_LOG_LEVEL, handlers=[file_handler, stream_handler])
-    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
-
-    return log_file
+    logfile = os.path.join(log_path, "{}_{}".format(name, strftime("%Y-%m-%d_%Hh%M")))
+    fileh = logging.FileHandler(logfile + ".log", encoding="utf-8")
+    fileh.setFormatter(_LevelColorFormatter(use_color=False))
+    logging.root.addHandler(fileh)
+    return logfile

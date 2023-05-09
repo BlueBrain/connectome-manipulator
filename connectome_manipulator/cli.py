@@ -3,21 +3,23 @@
 
 import sys
 from pathlib import Path
+import logging
 
 import click
 
-from . import log, utils
+from . import utils, log, profiler
 from .connectome_manipulation import connectome_manipulation
+
+logger = logging.getLogger(__name__)
 
 
 @click.group(context_settings={"show_default": True})
 @click.version_option()
 @click.option("-v", "--verbose", count=True, default=0, help="-v for INFO, -vv for DEBUG")
-@click.pass_context
-def app(ctx, verbose):
+def app(verbose):
     """Connectome manipulation tools."""
-    ctx.ensure_object(dict)
-    ctx.obj["VERBOSITY"] = verbose
+    level = min(verbose, 2)
+    log.setup_logging(log_level=level)
 
 
 @app.command()
@@ -71,9 +73,7 @@ def app(ctx, verbose):
     type=str,
     help="Overwrite sbatch arguments with key=value",
 )
-@click.pass_context
 def manipulate_connectome(
-    ctx,
     config,
     output_dir,
     profile,
@@ -91,13 +91,14 @@ def manipulate_connectome(
     # pylint: disable=unused-argument
     # Initialize logger
     logging_path = output_dir / "logs"
-    log_file = log.logging_init(logging_path, name="connectome_manipulation")
+    log_file = log.create_log_file(logging_path, "connectome_manipulation")
 
     if parallel:
         if utils.clear_slurm_env():
-            log.info("Prepared environment for parallel run from within SLURM job.")
+            logger.info("Prepared environment for parallel run from within SLURM job.")
 
     output_path = utils.create_dir(output_dir)
+    profiler.ProfilerManager.set_enabled(profile)
 
     options = connectome_manipulation.Options(
         config_path=config,
@@ -114,6 +115,7 @@ def manipulate_connectome(
     )
 
     connectome_manipulation.main(options, log_file, slurm_args=sbatch_arg)
+    profiler.ProfilerManager.show_stats()
 
 
 if __name__ == "__main__":

@@ -118,3 +118,31 @@ def _reduce_populations(populations_dict: dict, base_dir: os.PathLike) -> dict:
         pop_name: {key: reduce_entry(key, value) for key, value in pop_dict.items()}
         for pop_name, pop_dict in populations_dict.items()
     }
+
+
+class ConsoleColors:
+    """Helper class for formatting console text."""
+
+    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, _, DEFAULT = range(30, 40)
+    NORMAL, BOLD, DIM, UNDERLINED, BLINK, INVERTED, HIDDEN = [a << 8 for a in range(7)]
+
+    # These are the sequences needed to control output
+    _CHANGE_SEQ = "\033[{}m"
+    _RESET_SEQ = "\033[0m"
+
+    @classmethod
+    def reset(cls):
+        """Reset colors."""
+        return cls._RESET_SEQ
+
+    @classmethod
+    def set_text_color(cls, color):
+        """Change text color."""
+        return cls._CHANGE_SEQ.format(color)
+
+    @classmethod
+    def format_text(cls, text, color, style=None):
+        """Format the text."""
+        style = (style or color) >> 8
+        format_seq = str(color & 0x00FF) + ((";" + str(style)) if style else "")
+        return cls._CHANGE_SEQ.format(format_seq) + text + cls._RESET_SEQ

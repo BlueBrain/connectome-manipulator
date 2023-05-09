@@ -7,21 +7,21 @@
 import copy
 import glob
 import os
-import resource
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import logging
 
 import libsonata
 import numpy as np
-import pandas as pd
 from bluepysnap.circuit import Circuit
 
-from .. import log, utils
+from .. import log, utils, profiler
 from ..access_functions import get_edges_population, get_nodes_population
 from .converters import create_parquet_metadata, edges_to_parquet, parquet_to_sonata
 from .manipulation import Manipulation
+
+logger = logging.getLogger(__name__)
 
 
 def load_circuit(sonata_config, N_split=1, popul_name=None):
@@ -178,140 +178,6 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
     )
 
 
-def resource_profiling(
-    enabled=False, description="", reset=False, csv_file=None
-):  # pragma: no cover
-    """Resources profiling (memory consumption, execution time) and writing to log file.
-
-    Optional: If csv_file is provided, data is also written to a .csv file for
-              better machine readability.
-    """
-    if not enabled:
-        return
-
-    mem_curr = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
-    if not hasattr(resource_profiling, "mem_before") or reset:
-        mem_diff = None
-    else:
-        mem_diff = mem_curr - resource_profiling.mem_before
-    resource_profiling.mem_before = mem_curr
-
-    if not hasattr(resource_profiling, "t_init") or reset:
-        resource_profiling.t_init = time.time()
-        resource_profiling.t_start = resource_profiling.t_init
-        t_tot = None
-        t_dur = None
-    else:
-        t_end = time.time()
-        t_tot = t_end - resource_profiling.t_init
-        t_dur = t_end - resource_profiling.t_start
-        resource_profiling.t_start = t_end
-
-    if len(description) > 0:
-        description_log = " [" + description + "]"
-
-    field_width = 36 + max(len(description_log) - 14, 0)
-
-    log_msg = "\n"
-    log_msg = log_msg + "*" * field_width + "\n"
-    log_msg = (
-        log_msg
-        + "* "
-        + "RESOURCE PROFILING{}".format(description_log).ljust(field_width - 4)
-        + " *"
-        + "\n"
-    )
-    log_msg = log_msg + "*" * field_width + "\n"
-
-    log_msg = (
-        log_msg
-        + "* "
-        + "Max. memory usage (GB):"
-        + "{:.3f}".format(mem_curr).rjust(field_width - 27)
-        + " *"
-        + "\n"
-    )
-
-    if mem_diff is not None:
-        log_msg = (
-            log_msg
-            + "* "
-            + "Max. memory diff. (GB):"
-            + "{:.3f}".format(mem_diff).rjust(field_width - 27)
-            + " *"
-            + "\n"
-        )
-
-    if t_tot is not None and t_dur is not None:
-        log_msg = log_msg + "*" * field_width + "\n"
-
-        if t_tot > 3600:
-            t_tot_log = t_tot / 3600
-            t_tot_unit = "h"
-        else:
-            t_tot_log = t_tot
-            t_tot_unit = "s"
-        log_msg = (
-            log_msg
-            + "* "
-            + f"Total time ({t_tot_unit}):        "
-            + "{:.3f}".format(t_tot_log).rjust(field_width - 27)
-            + " *"
-            + "\n"
-        )
-
-        if t_dur > 3600:
-            t_dur_log = t_dur / 3600
-            t_dur_unit = "h"
-        else:
-            t_dur_log = t_dur
-            t_dur_unit = "s"
-        log_msg = (
-            log_msg
-            + "* "
-            + f"Elapsed time ({t_dur_unit}):      "
-            + "{:.3f}".format(t_dur_log).rjust(field_width - 27)
-            + " *"
-            + "\n"
-        )
-
-    log_msg = log_msg + "*" * field_width + "\n"
-
-    log.profiling(log_msg)
-
-    # Add entry to performance table and write to .csv file (optional)
-    if csv_file is not None:
-        if not hasattr(resource_profiling, "perf_table") or reset:
-            resource_profiling.perf_table = pd.DataFrame(
-                [],
-                columns=["label", "i_split", "N_split", "mem_curr", "mem_diff", "t_tot", "t_dur"],
-            )
-            resource_profiling.perf_table.index.name = "id"
-            if not os.path.exists(os.path.split(csv_file)[0]):
-                os.makedirs(os.path.split(csv_file)[0])
-
-        label, *spec = description.split("-")
-        i_split = np.nan
-        N_split = np.nan
-
-        if len(spec) == 1:
-            spec = spec[0].split("/")
-            if len(spec) == 2:
-                i_split = spec[0]
-                N_split = spec[1]
-
-        resource_profiling.perf_table.loc[resource_profiling.perf_table.shape[0]] = [
-            label,
-            i_split,
-            N_split,
-            mem_curr,
-            mem_diff,
-            t_tot,
-            t_dur,
-        ]
-        resource_profiling.perf_table.to_csv(csv_file)
-
-
 def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
     """Setup and check of output parquet directory and preparation of .parquet file list.
 
@@ -412,7 +278,6 @@ def manip_wrapper(
     id_selection,
     options,
     output_parquet_file,
-    csv_file,
     in_job,
 ):
     """Wrapper function that can be optionally executed by a submitit Slurm job"""
@@ -420,46 +285,34 @@ def manip_wrapper(
         import submitit
 
         job_env = submitit.JobEnvironment()
-        log_file = log.logging_init(
-            options.logging_path, name="connectome_manipulation." + str(job_env.job_id)
-        )
-        csv_file = os.path.splitext(log_file)[0] + ".csv"
+        log.create_log_file(options.logging_path, "connectome_manipulation." + str(job_env.job_id))
+    profiler.ProfilerManager.set_enabled(options.do_profiling)
     config = utils.load_json(options.config_path)
     np.random.seed(config.get("seed", 123456) * (i_split + 1))
     split_ids = libsonata.Selection(id_selection).flatten().astype(np.int64)
     # Apply connectome wiring
     edges_table = _get_afferent_edges_table(split_ids, edges)
-    resource_profiling(options.do_profiling, f"loaded-{i_split + 1}/{N_split}", csv_file=csv_file)
-    aux_dict = {
-        "N_split": N_split,
-        "i_split": i_split,
-        "id_selection": id_selection,
-        "split_ids": split_ids,
-    }
-    new_edges_table = _generate_partition_edges(
-        nodes=nodes,
-        split_ids=split_ids,
-        edges_table=edges_table,
-        manip_config=config,
-        aux_dict=aux_dict,
-    )
-    # [TESTING/DEBUGGING]
-    N_syn_in = len(edges_table) if edges_table is not None else 0
-    N_syn_out = len(new_edges_table)
-    resource_profiling(
-        options.do_profiling,
-        f"{'manipulated' if edges else 'wired'}-{i_split + 1}/{N_split}",
-        csv_file=csv_file,
-    )
-
-    # Write back connectome to .parquet file
-    edges_to_parquet(new_edges_table, output_parquet_file)
-    resource_profiling(
-        options.do_profiling,
-        f"saved-{aux_dict['i_split'] + 1}/{aux_dict['N_split']}",
-        csv_file=csv_file,
-    )
-    return N_syn_in, N_syn_out
+    with profiler.profileit(name=f"processing_{i_split+1}"):
+        aux_dict = {
+            "N_split": N_split,
+            "i_split": i_split,
+            "id_selection": id_selection,
+            "split_ids": split_ids,
+        }
+        new_edges_table = _generate_partition_edges(
+            nodes=nodes,
+            split_ids=split_ids,
+            edges_table=edges_table,
+            manip_config=config,
+            aux_dict=aux_dict,
+        )
+        # [TESTING/DEBUGGING]
+        N_syn_in = len(edges_table) if edges_table is not None else 0
+        N_syn_out = len(new_edges_table)
+    with profiler.profileit(name=f"write_to_parquet_{i_split+1}"):
+        # Write back connectome to .parquet file
+        edges_to_parquet(new_edges_table, output_parquet_file)
+    return N_syn_in, N_syn_out, profiler.ProfilerManager
 
 
 @dataclass
@@ -488,6 +341,7 @@ class ChunkId:
         self.i_split = i_split
 
 
+@profiler.profileit(name="connectome_manipulation_main")
 def main(options, log_file, slurm_args=()):
     """Build local connectome."""
     config = utils.load_json(options.config_path)
@@ -501,7 +355,9 @@ def main(options, log_file, slurm_args=()):
         circuit_path = Path(os.path.split(config["circuit_config"])[0])
     log.log_assert(options.output_path != circuit_path, "Input directory == Output directory")
 
-    csv_file = os.path.splitext(log_file)[0] + ".csv"
+    # Initialize the profiler
+    csv_file = log_file + ".csv"
+    profiler.ProfilerManager.init_perf_table(csv_file=csv_file)
 
     if options.splits > 0:
         if "N_split_nodes" in config:
@@ -535,7 +391,7 @@ def main(options, log_file, slurm_args=()):
     edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
 
     if options.parallel:
-        extra_params = [N_split, node_ids_split, log_file, done_file, parquet_file_list, slurm_args]
+        extra_params = [N_split, node_ids_split, done_file, parquet_file_list, slurm_args]
         syn_count_in, syn_count_out = _run_submitit(nodes, edges, options, *extra_params)
     else:
         syn_count_in = 0
@@ -544,7 +400,7 @@ def main(options, log_file, slurm_args=()):
         for i_split, split_ids in enumerate(node_ids_split):
             chunk = ChunkId(i_split, N_split)
             output_parquet_file = parquet_file_list[i_split]
-            extra_params = [split_ids, chunk, output_parquet_file, done_file, csv_file]
+            extra_params = [split_ids, chunk, output_parquet_file, done_file]
             n_in, n_out = _run_part(nodes, edges, options, *extra_params)
             syn_count_in += n_in
             syn_count_out += n_out
@@ -579,11 +435,9 @@ def main(options, log_file, slurm_args=()):
             )
         create_parquet_metadata(parquet_dir, nodes)
 
-    resource_profiling(options.do_profiling, "final", csv_file=csv_file)
-
 
 def _run_part(
-    nodes, edges, options: Options, split_ids, chunk: ChunkId, output_parquet_file, done_f, csv_f
+    nodes, edges, options: Options, split_ids, chunk: ChunkId, output_parquet_file, done_f
 ):
     # Resume option: Don't recompute, if .parquet file of current split already exists
     if options.do_resume and check_if_done(output_parquet_file, done_f):
@@ -596,7 +450,7 @@ def _run_part(
         f"Split {chunk.i_split + 1}/{chunk.count}: Wiring connectome targeting {len(split_ids)} neurons"
     )
 
-    nsyn_in, nsyn_out = manip_wrapper(
+    nsyn_in, nsyn_out, _ = manip_wrapper(
         nodes,
         edges,
         chunk.count,
@@ -604,7 +458,6 @@ def _run_part(
         libsonata.Selection(split_ids).ranges,
         options,
         output_parquet_file,
-        csv_f,
         False,
     )
     mark_as_done(output_parquet_file, done_f)
@@ -617,7 +470,6 @@ def _run_submitit(
     options: Options,
     N_split,
     node_ids_split,
-    log_file,
     done_file,
     parquet_file_list,
     slurm_args,
@@ -626,10 +478,6 @@ def _run_submitit(
 
     job_logs = str(options.logging_path) + "/%j"
     jobs = []
-
-    # Initialize profiler
-    csv_file = os.path.splitext(log_file)[0] + ".csv"
-    resource_profiling(options.do_profiling, "initial", reset=True, csv_file=csv_file)
 
     executor = submitit.AutoExecutor(folder=job_logs)
     executor.update_parameters(
@@ -642,8 +490,6 @@ def _run_submitit(
     executor.update_parameters(**extra_args)
 
     log.info(f"Setting up {N_split} processing batch jobs...")
-    resource_profiling(options.do_profiling, "start_processing", csv_file=csv_file)
-
     # FIXME: There is a known corner-case when 1 split is chosen and parallelization is enabled.
     # This should be addressed.
     with executor.batch():
@@ -669,7 +515,6 @@ def _run_submitit(
                 libsonata.Selection(split_ids).ranges,
                 options,
                 output_parquet_file,
-                csv_file,
                 True,
             )
             jobs.append((job, output_parquet_file))
@@ -680,13 +525,12 @@ def _run_submitit(
     N_syn_out = 0
 
     for idx, (j, output_parquet_file) in enumerate(jobs):
-        nsyn_in, nsyn_out = j.result()
+        nsyn_in, nsyn_out, resource_manager = j.result()
         log.info(f"Job {idx} (SLURM job id: {j.job_id}) has completed")
         N_syn_in += nsyn_in
         N_syn_out += nsyn_out
         mark_as_done(output_parquet_file, done_file)
-
-    resource_profiling(options.do_profiling, "end_processing", csv_file=csv_file)
+        profiler.ProfilerManager.merge(resource_manager)
 
     return N_syn_in, N_syn_out
 
