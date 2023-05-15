@@ -13,7 +13,7 @@ import os
 import numpy as np
 import scipy.sparse as sps
 
-from connectome_manipulator import log
+from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import get_node_ids
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
@@ -30,6 +30,7 @@ class ConnectomeRemoval(Manipulation):
     exactly matching the size of the selected src/dest neurons and indexed in increasing order.
     """
 
+    @profiler.profileit(name="conn_removal")
     def apply(
         self,
         edges_table,

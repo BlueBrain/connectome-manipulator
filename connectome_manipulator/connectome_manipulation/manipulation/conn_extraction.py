@@ -11,7 +11,7 @@ import os
 import json
 import numpy as np
 
-from connectome_manipulator import log
+from connectome_manipulator import log, profiler
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 
 
@@ -22,6 +22,7 @@ class ConnectomeExtraction(Manipulation):
     Note 2: If no cell target is given, an empty connectome is returned!
     """
 
+    @profiler.profileit(name="conn_extraction")
     def apply(self, edges_table, split_ids, _aux_dict, target_name=None, node_sets_file=None):
         """Extraction of a cell target as given by target_name
 

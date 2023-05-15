@@ -292,7 +292,7 @@ def manip_wrapper(
     split_ids = libsonata.Selection(id_selection).flatten().astype(np.int64)
     # Apply connectome wiring
     edges_table = _get_afferent_edges_table(split_ids, edges)
-    with profiler.profileit(name=f"processing_{i_split+1}"):
+    with profiler.profileit(name="processing"):
         aux_dict = {
             "N_split": N_split,
             "i_split": i_split,
@@ -309,7 +309,7 @@ def manip_wrapper(
         # [TESTING/DEBUGGING]
         N_syn_in = len(edges_table) if edges_table is not None else 0
         N_syn_out = len(new_edges_table)
-    with profiler.profileit(name=f"write_to_parquet_{i_split+1}"):
+    with profiler.profileit(name="write_to_parquet"):
         # Write back connectome to .parquet file
         edges_to_parquet(new_edges_table, output_parquet_file)
     return N_syn_in, N_syn_out, profiler.ProfilerManager
@@ -357,7 +357,7 @@ def main(options, log_file, slurm_args=()):
 
     # Initialize the profiler
     csv_file = log_file + ".csv"
-    profiler.ProfilerManager.init_perf_table(csv_file=csv_file)
+    profiler.ProfilerManager.set_csv_file(csv_file=csv_file)
 
     if options.splits > 0:
         if "N_split_nodes" in config:

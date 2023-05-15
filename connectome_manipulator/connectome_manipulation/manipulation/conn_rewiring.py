@@ -28,7 +28,7 @@ NOTE: Input edges_table assumed to be sorted by @target_node.
 import numpy as np
 import pandas as pd
 
-from connectome_manipulator import log
+from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import get_node_ids
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 from connectome_manipulator.model_building import model_types, conn_prob
@@ -53,6 +53,7 @@ class ConnectomeRewiring(Manipulation):
         self.syn_sel_idx_type = None
         super().__init__(nodes)
 
+    @profiler.profileit(name="conn_rewiring")
     def apply(
         self,
         edges_table,

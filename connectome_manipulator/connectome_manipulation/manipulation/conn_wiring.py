@@ -14,7 +14,7 @@ import pandas as pd
 import tqdm
 
 from bluepysnap.morph import MorphHelper
-from connectome_manipulator import log
+from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import get_node_ids
 from connectome_manipulator.connectome_manipulation.manipulation import (
     MorphologyCachingManipulation,
@@ -76,6 +76,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             },
         )
 
+    @profiler.profileit(name="conn_wiring")
     def apply(
         self,
         edges_table,
@@ -109,68 +110,71 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             log.warning(
                 f"Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses."
             )
-        # Intersect target nodes with split IDs and return if intersection is empty
-        tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, aux_dict["id_selection"])
-        num_tgt_total = len(tgt_node_ids)
-        if num_tgt_total == 0:  # Nothing to wire
-            log.info("No target nodes selected, nothing to wire")
-            return edges_table
-        if amount_pct < 100:
-            num_tgt = np.round(amount_pct * num_tgt_total / 100).astype(int)
-            tgt_sel = np.random.permutation(
-                np.concatenate(
-                    (np.full(num_tgt, True), np.full(num_tgt_total - num_tgt, False)), axis=None
+        with profiler.profileit(name="conn_wiring/setup"):
+            # Intersect target nodes with split IDs and return if intersection is empty
+            tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, aux_dict["id_selection"])
+            num_tgt_total = len(tgt_node_ids)
+            if num_tgt_total == 0:  # Nothing to wire
+                log.info("No target nodes selected, nothing to wire")
+                return edges_table
+            if amount_pct < 100:
+                num_tgt = np.round(amount_pct * num_tgt_total / 100).astype(int)
+                tgt_sel = np.random.permutation(
+                    np.concatenate(
+                        (np.full(num_tgt, True), np.full(num_tgt_total - num_tgt, False)), axis=None
+                    )
                 )
+            else:
+                num_tgt = num_tgt_total
+                tgt_sel = np.full(num_tgt_total, True)
+            if num_tgt == 0:  # Nothing to wire
+                log.info("No target nodes selected, nothing to wire")
+                return edges_table
+            # Load connection probability model
+            p_model = model_types.AbstractModel.init_model(prob_model_spec)
+            log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
+
+            # Load #synapses/connection model
+            nsynconn_model = model_types.AbstractModel.init_model(nsynconn_model_spec)
+            log.info(
+                f'Loaded #synapses/connection model of type "{nsynconn_model.__class__.__name__}"'
             )
-        else:
-            num_tgt = num_tgt_total
-            tgt_sel = np.full(num_tgt_total, True)
-        if num_tgt == 0:  # Nothing to wire
-            log.info("No target nodes selected, nothing to wire")
-            return edges_table
-        # Load connection probability model
-        p_model = model_types.AbstractModel.init_model(prob_model_spec)
-        log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
-        # Load #synapses/connection model
-        nsynconn_model = model_types.AbstractModel.init_model(nsynconn_model_spec)
-        log.info(f'Loaded #synapses/connection model of type "{nsynconn_model.__class__.__name__}"')
+            # Load delay model (optional)
+            if delay_model_spec is not None:
+                delay_model = model_types.AbstractModel.init_model(delay_model_spec)
+                log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
+            else:
+                delay_model = None
+                log.info("No delay model provided")
 
-        # Load delay model (optional)
-        if delay_model_spec is not None:
-            delay_model = model_types.AbstractModel.init_model(delay_model_spec)
-            log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
-        else:
-            delay_model = None
-            log.info("No delay model provided")
+            # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
+            _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
+            if pos_acc is None:
+                log.info("No position mapping model provided")
 
-        # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
-        _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
-        if pos_acc is None:
-            log.info("No position mapping model provided")
+            # Determine source/target nodes for wiring
+            src_node_ids = get_node_ids(self.nodes[0], sel_src)
+            src_class = self.nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
+            src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
+            log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
+            src_pos = conn_prob.get_neuron_positions(
+                self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
+            )[
+                0
+            ]  # Get neuron positions (incl. position mapping, if provided)
 
-        # Determine source/target nodes for wiring
-        src_node_ids = get_node_ids(self.nodes[0], sel_src)
-        src_class = self.nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
-        src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
-        log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
-        src_pos = conn_prob.get_neuron_positions(
-            self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
-        )[
-            0
-        ]  # Get neuron positions (incl. position mapping, if provided)
+            tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
+            tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
+            tgt_pos = conn_prob.get_neuron_positions(
+                self.nodes[1].positions if pos_acc is None else pos_acc, [tgt_node_ids]
+            )[
+                0
+            ]  # Get neuron positions (incl. position mapping, if provided)
 
-        tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
-        tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
-        tgt_pos = conn_prob.get_neuron_positions(
-            self.nodes[1].positions if pos_acc is None else pos_acc, [tgt_node_ids]
-        )[
-            0
-        ]  # Get neuron positions (incl. position mapping, if provided)
-
-        log.info(
-            f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
-        )
+            log.info(
+                f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
+            )
 
         # Run connection wiring
         all_new_edges = self._connectome_wiring_wrapper(
@@ -246,6 +250,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
         return all_new_edges
 
+    @profiler.profileit(name="conn_wiring/wiring")
     def _connectome_wiring_wrapper(
         self,
         src_node_ids,

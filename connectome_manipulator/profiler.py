@@ -18,14 +18,10 @@ class _ResourceProfiler:
         self._enabled = enabled
 
         self._start_mem = None
-        self._diff_mem = None
-        self.total_mem = 0
+        self.diff_mem = None
 
         self._start_time = None
-        self._diff_time = None
-        self.total_time = 0
-
-        logger_profiling.setLevel(logging.INFO)
+        self.diff_time = None
 
     def start(self):
         """Start profiling."""
@@ -39,14 +35,12 @@ class _ResourceProfiler:
         """Stop profiling."""
         if not self._enabled:
             return
-        self._diff_time = time.perf_counter() - self._start_time
-        self.total_time += self._diff_time
+        self.diff_time = time.perf_counter() - self._start_time
         self._start_time = None  # invalidate start time
 
-        self._diff_mem = (
+        self.diff_mem = (
             resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2 - self._start_mem
         )
-        self.total_mem += self._diff_mem
         self._start_mem = None  # invalidate start memory
 
 
@@ -56,66 +50,108 @@ class _ProfilerManager:
     def __init__(self):
         self.profilers = {}
         self._enable = False
-        self._perf_table = None
+        self.perf_table = None
         self._csv_file = None
+        self._parent_labels = []
 
-    def init_perf_table(self, csv_file=None):
+        self.init_perf_table()
+        logger_profiling.setLevel(logging.INFO)
+
+    def init_perf_table(self):
         """Initialize the performance table."""
-        self._perf_table = pd.DataFrame(
+        self.perf_table = pd.DataFrame(
             [],
-            columns=["label", "time", "memory"],
+            columns=["label", "time", "memory", "parent_labels"],
         )
-        self._perf_table.index.name = "id"
+        self.perf_table.index.name = "id"
+
+    def set_csv_file(self, csv_file=None):
+        """Set the profiling output csv file"""
         if csv_file is None:
             return
         if not os.path.exists(os.path.split(csv_file)[0]):
             os.makedirs(os.path.split(csv_file)[0])
         self._csv_file = csv_file
 
-    def init(self, name):
+    def start(self, name):
         """Starts profiling"""
-        self.profilers.setdefault(name, _ResourceProfiler(enabled=self._enable))
-        self.profilers[name].start()
+        self._parent_labels.append(name)
+        self.profilers.setdefault(name, []).append(_ResourceProfiler(enabled=self._enable))
+        self.profilers[name][-1].start()
 
-    def update(self, name):
+    def stop(self, name):
         """Stops profiling"""
         if name not in self.profilers:
             raise KeyError("{} not initialized in profilers dict".format(name))
-        self.profilers[name].stop()
+        pinfo = self.profilers[name][-1]
+        pinfo.stop()
+        self._parent_labels.pop()
+        # Update the performance table with the new row of profiling data
+        self.perf_table.loc[self.perf_table.shape[0]] = [
+            name,
+            pinfo.diff_time,
+            pinfo.diff_mem,
+            ":".join(self._parent_labels),
+        ]
 
     def show_stats(self):
         """Logs profiling stats"""
         if not self._enable:
             return
+
+        # Simplify perf table and add min, max, avg
+        self.perf_table = (
+            self.perf_table.groupby("label")
+            .agg(
+                {
+                    "time": ["min", "mean", "max"],
+                    "memory": ["min", "mean", "max"],
+                    "parent_labels": "first",
+                }
+            )
+            .reset_index()
+        )
+
         delim = "\u255a"
         stats_name = " PROFILER STATS "
-        logger_profiling.info("+{:=^80s}+".format(stats_name))
+        logger_profiling.info("+{:=^110s}+".format(stats_name))
         logger_profiling.info(
-            "|{:^58s}|{:^10s}|{:^10s}|".format("Event Label", "Time (s)", "Mem. (MB)")
+            "|{:^44s}|{:^10s}|{:^10s}|{:^10s}|{:^10s}|{:^10s}|{:^10s}|".format(
+                "Event Label", "Min.Time", "Avg.Time", "Max.Time", "Min.Mem", "Avg.Mem", "Max.Mem"
+            )
         )
-        logger_profiling.info("+{:-^80s}+".format("-"))
+        logger_profiling.info("+{:-^110s}+".format("-"))
 
-        for name, pinfo in self.profilers.items():
-            base_name = delim.join("  ") * name.count(delim) + name.split(delim)[-1]
+        # Loop through the labels in order
+        for label_name in self.profilers:
+            # Access the row in perf_table based on the label
+            row = self.perf_table.loc[self.perf_table["label"] == label_name]
+            label = row["label"].item().strip()
+            time_min = row[("time", "min")].item()
+            time_mean = row[("time", "mean")].item()
+            time_max = row[("time", "max")].item()
+            mem_min = row[("memory", "min")].item()
+            mem_mean = row[("memory", "mean")].item()
+            mem_max = row[("memory", "max")].item()
+            parents = row[("parent_labels", "first")].item()
+            num_tabs = len(parents.split(":")) if parents else 0
+            base_name = (
+                "  " * num_tabs + delim.join("  ") * label.count(delim) + label.split(delim)[-1]
+            )
             logger_profiling.info(
-                "| {:<56s} | {:8.2f} | {:8.2f} |".format(
-                    base_name, pinfo.total_time, pinfo.total_mem
+                "| {:<42s} | {:8.2f} | {:8.2f} | {:8.2f} | {:8.2f} | {:8.2f} | {:8.2f} |".format(
+                    base_name, time_min, time_mean, time_max, mem_min, mem_mean, mem_max
                 )
             )
-            self._perf_table.loc[self._perf_table.shape[0]] = [
-                name,
-                pinfo.total_time,
-                pinfo.total_mem,
-            ]
         self.write_to_csv()
-        logger_profiling.info("+{:-^80s}+".format("-"))
+        logger_profiling.info("+{:-^110s}+".format("-"))
 
     def write_to_csv(self):
         """Add entry to performance table and write to .csv file."""
         if self._csv_file is None:
             return
 
-        self._perf_table.to_csv(self._csv_file)
+        self.perf_table.to_csv(self._csv_file, index=False)
 
     def set_enabled(self, enable):
         """Enables profiling"""
@@ -123,7 +159,14 @@ class _ProfilerManager:
 
     def merge(self, profiler_manager):
         """Merges profile managers"""
+        if not self._enable:
+            return
+
         self.profilers.update(profiler_manager.profilers)
+        if self.perf_table is not None and profiler_manager.perf_table is not None:
+            self.perf_table = pd.concat([self.perf_table, profiler_manager.perf_table])
+        elif profiler_manager.perf_table is not None:
+            self.perf_table = profiler_manager.perf_table
 
 
 ProfilerManager = _ProfilerManager()  # singleon
@@ -139,8 +182,8 @@ class profileit(ContextDecorator):
 
     def __enter__(self):
         """Enter the context and starts profiling"""
-        ProfilerManager.init(self._name)
+        ProfilerManager.start(self._name)
 
     def __exit__(self, exc_type, exc, exc_tb):
         """Leave the context and stops profiling"""
-        ProfilerManager.update(self._name)
+        ProfilerManager.stop(self._name)
