@@ -312,7 +312,10 @@ class JobInfo:
 def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     """Wrapper function (remote) that can be optionally executed by a Slurm/Dask worker"""
     if options.parallel:
-        log.create_log_file(options.logging_path, f"connectome_manipulation.task-{job.i_split}")
+        path = options.logging_path
+        if host := os.environ.get("HOSTNAME"):
+            path = os.path.join(path, host)
+        log.create_log_file(path, f"connectome_manipulation.task-{job.i_split}")
 
     log.info("Processing job %s (common: %s)", job, jobs_common)
     profiler.ProfilerManager.set_enabled(options.do_profiling)

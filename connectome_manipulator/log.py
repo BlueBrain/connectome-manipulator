@@ -5,7 +5,11 @@ import os
 import sys
 
 import numpy as np
-from connectome_manipulator import utils
+
+
+_LOG_FORMAT = "[%(levelname)s] %(message)s"
+_LOG_FORMAT_WITH_DATE = "[%(levelname)s] (%(asctime)s) %(message)s"
+_DATE_FORMAT = "%b.%d %H:%M:%S"
 
 
 def info(msg, *args, **kwargs):  # pragma: no cover
@@ -54,55 +58,6 @@ def data(filespec, **kwargs):
     info(f'Data log ({", ".join(list(kwargs.keys()))}) written to "{data_file}"')
 
 
-class _LevelColorFormatter(logging.Formatter):
-    COLORS = {
-        logging.CRITICAL: utils.ConsoleColors.RED,
-        logging.ERROR: utils.ConsoleColors.RED,
-        logging.WARNING: utils.ConsoleColors.YELLOW,
-        logging.INFO: utils.ConsoleColors.BLUE,
-        logging.DEBUG: utils.ConsoleColors.DEFAULT + utils.ConsoleColors.DIM,
-    }
-
-    _logfmt = "[%(levelname)s] %(message)s"
-    _datefmt = "%b.%d %H:%M:%S"
-
-    def __init__(self, with_time=True, use_color=True, **kw):
-        super().__init__(self._logfmt, self._datefmt, **kw)
-        self._with_time = with_time
-        self._use_color = use_color
-
-    def format(self, record):
-        if hasattr(record, "ulevel"):
-            record.levelno = record.ulevel
-            record.levelname = logging.getLevelName(record.levelno)
-        style = self.COLORS.get(record.levelno)
-        if style is not None:
-            record.levelname = self._format_level(record, style)
-            record.msg = self._format_msg(record, style)
-        return super().format(record)
-
-    def _format_level(self, record, style):
-        if not self._use_color:
-            return record.levelname
-        return utils.ConsoleColors.format_text(record.levelname, style)
-
-    def _format_msg(self, record, style):
-        msg = ""
-        if self._with_time:
-            msg += "(%s) " % self.formatTime(record, self._datefmt) + msg
-
-        levelno = record.levelno
-        msg += record.msg
-
-        if not self._use_color:
-            return msg
-        return (
-            utils.ConsoleColors.format_text(msg, style)
-            if levelno >= logging.WARNING
-            else utils.ConsoleColors.format_text(msg, utils.ConsoleColors.DEFAULT, style)
-        )
-
-
 class LogLevel:
     """Class to select the log level."""
 
@@ -128,16 +83,7 @@ def setup_logging(log_level=LogLevel.DEFAULT):
 
     # Stdout
     hdlr = logging.StreamHandler(sys.stdout)
-    use_color = True
-    if os.environ.get("ENVIRONMENT") == "BATCH":
-        use_color = False
-    else:
-        try:
-            sys.stdout.tell()  # works only if it's file
-            use_color = False
-        except IOError:
-            pass
-    hdlr.setFormatter(_LevelColorFormatter(False, use_color))
+    hdlr.setFormatter(logging.Formatter(_LOG_FORMAT, _DATE_FORMAT))
     hdlr.setLevel(verbosity_levels[log_level])
     logging.root.setLevel(verbosity_levels[log_level])
 
@@ -152,11 +98,10 @@ def create_log_file(log_path, name):
       log_path: The destination directory for log messages besides stdout
       name: Name of the module to log
     """
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-    logfile = os.path.join(log_path, "{}_{}".format(name, strftime("%Y-%m-%d_%Hh%M")))
-    fileh = logging.FileHandler(logfile + ".log", encoding="utf-8")
-    fileh.setFormatter(_LevelColorFormatter(use_color=False))
+    os.makedirs(log_path, exist_ok=True)
+    logfile = os.path.join(log_path, "{}_{}.log".format(name, strftime("%Y-%m-%d_%Hh%M")))
+    fileh = logging.FileHandler(logfile, encoding="utf-8")
+    fileh.setFormatter(logging.Formatter(_LOG_FORMAT_WITH_DATE, _DATE_FORMAT))
     logging.root.setLevel(logging.DEBUG)  # So that log files write everything
     logging.root.addHandler(fileh)
     return logfile
