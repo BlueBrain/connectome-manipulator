@@ -53,9 +53,9 @@ def app(verbose):
 @click.option(
     "--parallel",
     required=False,
-    is_flag=True,
-    default=False,
-    help="Run using SLURM job array",
+    default=None,
+    type=click.Choice(["Slurm", "Dask"], case_sensitive=False),
+    help="Run using a parallel job scheduler, either Slurm of Dask",
 )
 @click.option(
     "--max-parallel-jobs",
@@ -66,12 +66,12 @@ def app(verbose):
     help="Maximum number of parallel jobs to run in array",
 )
 @click.option(
-    "--sbatch-arg",
-    "-s",
+    "--parallel-arg",
+    "-a",
     required=False,
     multiple=True,
     type=str,
-    help="Overwrite sbatch arguments with key=value",
+    help="Overwrite the parallel system args with key=value, e.g. for slurm",
 )
 def manipulate_connectome(
     config,
@@ -84,7 +84,7 @@ def manipulate_connectome(
     splits,
     parallel,
     max_parallel_jobs,
-    sbatch_arg,
+    parallel_arg,
 ):
     """Manipulate or build a circuit's connectome."""
     # until we start using verbosity with the logging refactoring
@@ -114,7 +114,7 @@ def manipulate_connectome(
         max_parallel_jobs=max_parallel_jobs,
     )
 
-    connectome_manipulation.main(options, log_file, slurm_args=sbatch_arg)
+    connectome_manipulation.main(options, log_file, executor_args=parallel_arg)
     profiler.ProfilerManager.show_stats()
 
 

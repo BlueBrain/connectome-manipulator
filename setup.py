@@ -44,6 +44,7 @@ setup(
         "jsonpickle",
         "scikit-learn",
         "tables",
+        "distributed",  # Dask
     ],
     packages=find_packages(),
     python_requires=">=3.7",

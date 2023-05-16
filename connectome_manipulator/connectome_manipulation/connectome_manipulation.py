@@ -9,15 +9,18 @@ import glob
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Union, List
 from pathlib import Path
 import logging
 
 import libsonata
 import numpy as np
+
 from bluepysnap.circuit import Circuit
 
 from .. import log, utils, profiler
 from ..access_functions import get_edges_population, get_nodes_population
+from . import executors
 from .converters import create_parquet_metadata, edges_to_parquet, parquet_to_sonata
 from .manipulation import Manipulation
 
@@ -54,7 +57,7 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
 
         src_nodes = tgt_nodes = get_nodes_population(c)
 
-    nodes = [src_nodes, tgt_nodes]
+    nodes = (src_nodes, tgt_nodes)
 
     src_file_idx = np.where(np.array(c.nodes.population_names) == src_nodes.name)[0]
     log.log_assert(len(src_file_idx) == 1, "Source nodes population file index error!")
@@ -270,51 +273,6 @@ def check_if_done(parquet_file, done_file):
     return is_done
 
 
-def manip_wrapper(
-    nodes,
-    edges,
-    N_split,
-    i_split,
-    id_selection,
-    options,
-    output_parquet_file,
-    in_job,
-):
-    """Wrapper function that can be optionally executed by a submitit Slurm job"""
-    if in_job:
-        import submitit
-
-        job_env = submitit.JobEnvironment()
-        log.create_log_file(options.logging_path, "connectome_manipulation." + str(job_env.job_id))
-    profiler.ProfilerManager.set_enabled(options.do_profiling)
-    config = utils.load_json(options.config_path)
-    np.random.seed(config.get("seed", 123456) * (i_split + 1))
-    split_ids = libsonata.Selection(id_selection).flatten().astype(np.int64)
-    # Apply connectome wiring
-    edges_table = _get_afferent_edges_table(split_ids, edges)
-    with profiler.profileit(name="processing"):
-        aux_dict = {
-            "N_split": N_split,
-            "i_split": i_split,
-            "id_selection": id_selection,
-            "split_ids": split_ids,
-        }
-        new_edges_table = _generate_partition_edges(
-            nodes=nodes,
-            split_ids=split_ids,
-            edges_table=edges_table,
-            manip_config=config,
-            aux_dict=aux_dict,
-        )
-        # [TESTING/DEBUGGING]
-        N_syn_in = len(edges_table) if edges_table is not None else 0
-        N_syn_out = len(new_edges_table)
-    with profiler.profileit(name="write_to_parquet"):
-        # Write back connectome to .parquet file
-        edges_to_parquet(new_edges_table, output_parquet_file)
-    return N_syn_in, N_syn_out, profiler.ProfilerManager
-
-
 @dataclass
 class Options:
     """CLI Options which have defaults"""
@@ -332,20 +290,69 @@ class Options:
     max_parallel_jobs: int = 256
 
 
-class ChunkId:
+@dataclass
+class JobsCommonInfo:
+    """Information shared across all jobs"""
+
+    nodes: libsonata.NodePopulation
+    edges: libsonata.EdgePopulation
+    done_file: str
+
+
+@dataclass
+class JobInfo:
     """An abstraction for a chunk of work, defined by its index and total"""
 
-    def __init__(self, i_split, count):
-        """Initialize a ChunkId"""
-        self.count = count
-        self.i_split = i_split
+    i_split: int
+    N_split: int
+    selection: Union[libsonata.Selection, List]
+    out_parquet_file: str
+
+
+def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
+    """Wrapper function (remote) that can be optionally executed by a Slurm/Dask worker"""
+    if options.parallel:
+        log.create_log_file(options.logging_path, f"connectome_manipulation.task-{job.i_split}")
+
+    log.info("Processing job %s (common: %s)", job, jobs_common)
+    profiler.ProfilerManager.set_enabled(options.do_profiling)
+    config = utils.load_json(options.config_path)
+    np.random.seed(config.get("seed", 123456) * (job.i_split + 1))
+    split_ids = libsonata.Selection(job.selection).flatten().astype(np.int64)
+
+    # Apply connectome wiring
+    edges_table = _get_afferent_edges_table(split_ids, jobs_common.edges)
+    aux_dict = {
+        "N_split": job.N_split,
+        "i_split": job.i_split,
+        "id_selection": job.selection,
+        "split_ids": split_ids,
+    }
+
+    with profiler.profileit(name="processing"):
+        new_edges_table = _generate_partition_edges(
+            nodes=jobs_common.nodes,
+            split_ids=split_ids,
+            edges_table=edges_table,
+            manip_config=config,
+            aux_dict=aux_dict,
+        )
+
+    # [TESTING/DEBUGGING]
+    N_syn_in = len(edges_table) if edges_table is not None else 0
+    N_syn_out = len(new_edges_table)
+
+    # Write back connectome to .parquet file
+    with profiler.profileit(name="write_to_parquet"):
+        edges_to_parquet(new_edges_table, job.out_parquet_file)
+
+    return N_syn_in, N_syn_out, profiler.ProfilerManager
 
 
 @profiler.profileit(name="connectome_manipulation_main")
-def main(options, log_file, slurm_args=()):
+def main(options, log_file, executor_args=()):
     """Build local connectome."""
     config = utils.load_json(options.config_path)
-
     sonata_config_file = config["circuit_config"]
 
     if "circuit_path" in config:
@@ -368,14 +375,13 @@ def main(options, log_file, slurm_args=()):
 
     # Load circuit (nodes only)
     sonata_config_file = config["circuit_config"]
-
     if "circuit_path" in config:
         sonata_config_file = os.path.join(config["circuit_path"], sonata_config_file)
 
     N_split = max(config.get("N_split_nodes", 1), 1)
+    log.info(f"Setting up {N_split} processing batch jobs...")
 
     sonata_config, nodes, _, node_ids_split, edges, _, _ = load_circuit(sonata_config_file, N_split)
-
     edges_file = options.output_path / "edges.h5"
     log.log_assert(
         options.overwrite_edges or not edges_file.exists(),
@@ -390,24 +396,39 @@ def main(options, log_file, slurm_args=()):
     # Follow SONATA convention for edge population naming
     edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
 
-    if options.parallel:
-        extra_params = [N_split, node_ids_split, done_file, parquet_file_list, slurm_args]
-        syn_count_in, syn_count_out = _run_submitit(nodes, edges, options, *extra_params)
-    else:
-        syn_count_in = 0
-        syn_count_out = 0
+    # Prepare global result variables
+    # Provide a result hook so that we automatically block for results
+    syn_count_in = 0
+    syn_count_out = 0
+    jobs_done = 0
+
+    def result_hook(result, info):
+        nonlocal syn_count_in, syn_count_out, jobs_done
+        syn_count_in += result[0]
+        syn_count_out += result[1]
+        mark_as_done(info["out_parquet_file"], done_file)
+        resource_manager = result[2]
+        profiler.ProfilerManager.merge(resource_manager)
+        jobs_done += 1
+        done_percent = jobs_done * 100 / N_split
+        log.info(f"[{done_percent:3.0f}%] Finished {jobs_done} (out of {N_split}) splits")
+
+    # Prepare params to the executor. Slurm executor will add the prefix itself
+    executor_params = dict(x.split("=", 1) for x in executor_args)
+    params = {"executor_params": executor_params}
+
+    with executors.in_context(options, params, result_hook=result_hook) as executor:
+        log.info("Start job submission")
+        jobs_common_info = JobsCommonInfo(nodes, edges, done_file)
 
         for i_split, split_ids in enumerate(node_ids_split):
-            chunk = ChunkId(i_split, N_split)
-            output_parquet_file = parquet_file_list[i_split]
-            extra_params = [split_ids, chunk, output_parquet_file, done_file]
-            n_in, n_out = _run_part(nodes, edges, options, *extra_params)
-            syn_count_in += n_in
-            syn_count_out += n_out
+            sonata_selection = libsonata.Selection(split_ids)
+            job_info = JobInfo(i_split, N_split, sonata_selection, parquet_file_list[i_split])
+            _submit_part(executor, jobs_common_info, job_info, options)
 
-    log.info(
-        f"Done processing.\nTotal input/output synapse counts: {syn_count_in}/{syn_count_out} (Diff: {syn_count_out-syn_count_in})\n"
-    )
+    sdiff = syn_count_out - syn_count_in
+    log.info("Done processing")
+    log.info(f"  Total input/output synapse counts: {syn_count_in}/{syn_count_out} (Diff: {sdiff})")
 
     if options.convert_to_sonata:
         # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
@@ -436,103 +457,21 @@ def main(options, log_file, slurm_args=()):
         create_parquet_metadata(parquet_dir, nodes)
 
 
-def _run_part(
-    nodes, edges, options: Options, split_ids, chunk: ChunkId, output_parquet_file, done_f
-):
+def _submit_part(executor, jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     # Resume option: Don't recompute, if .parquet file of current split already exists
-    if options.do_resume and check_if_done(output_parquet_file, done_f):
+    split_id = job.i_split + 1
+    if options.do_resume and check_if_done(job.out_parquet_file, jobs_common.done_file):
         log.info(
-            f"Split {chunk.i_split + 1}/{chunk.count}: Parquet file already exists - SKIPPING (do_resume={options.do_resume})"
+            f"Split {split_id}/{job.N_split}: Parquet file already exists - SKIPPING (do_resume={options.do_resume})"
         )
-        return 0, 0
+        return
 
-    log.info(
-        f"Split {chunk.i_split + 1}/{chunk.count}: Wiring connectome targeting {len(split_ids)} neurons"
-    )
+    n_neurons = job.selection.flat_size
+    log.info(f"Split {split_id}/{job.N_split}: Wiring connectome targeting {n_neurons} neurons")
 
-    nsyn_in, nsyn_out, _ = manip_wrapper(
-        nodes,
-        edges,
-        chunk.count,
-        chunk.i_split,
-        libsonata.Selection(split_ids).ranges,
-        options,
-        output_parquet_file,
-        False,
-    )
-    mark_as_done(output_parquet_file, done_f)
-    return nsyn_in, nsyn_out
-
-
-def _run_submitit(
-    nodes,
-    edges,
-    options: Options,
-    N_split,
-    node_ids_split,
-    done_file,
-    parquet_file_list,
-    slurm_args,
-):
-    import submitit
-
-    job_logs = str(options.logging_path) + "/%j"
-    jobs = []
-
-    executor = submitit.AutoExecutor(folder=job_logs)
-    executor.update_parameters(
-        slurm_array_parallelism=options.max_parallel_jobs,
-        slurm_partition="prod",
-        name="connectome_manipulator",
-        timeout_min=120,
-    )
-    extra_args = {"slurm_" + k: v for k, v in map(lambda x: x.split("="), slurm_args)}
-    executor.update_parameters(**extra_args)
-
-    log.info(f"Setting up {N_split} processing batch jobs...")
-    # FIXME: There is a known corner-case when 1 split is chosen and parallelization is enabled.
-    # This should be addressed.
-    with executor.batch():
-        # Start processing
-        for i_split, split_ids in enumerate(node_ids_split):
-            # Resume option: Don't recompute, if .parquet file of current split already exists
-            output_parquet_file = parquet_file_list[i_split]
-            if options.do_resume and check_if_done(output_parquet_file, done_file):
-                log.info(
-                    f"Split {i_split + 1}/{N_split}: Parquet file already exists - SKIPPING (do_resume={options.do_resume})"
-                )
-                continue
-
-            log.info(
-                f"Split {i_split + 1}/{N_split}: Wiring connectome targeting {len(split_ids)} neurons"
-            )
-            job = executor.submit(
-                manip_wrapper,
-                nodes,
-                edges,
-                N_split,
-                i_split,
-                libsonata.Selection(split_ids).ranges,
-                options,
-                output_parquet_file,
-                True,
-            )
-            jobs.append((job, output_parquet_file))
-
-    # Wait for jobs to return
-
-    N_syn_in = 0
-    N_syn_out = 0
-
-    for idx, (j, output_parquet_file) in enumerate(jobs):
-        nsyn_in, nsyn_out, resource_manager = j.result()
-        log.info(f"Job {idx} (SLURM job id: {j.job_id}) has completed")
-        N_syn_in += nsyn_in
-        N_syn_out += nsyn_out
-        mark_as_done(output_parquet_file, done_file)
-        profiler.ProfilerManager.merge(resource_manager)
-
-    return N_syn_in, N_syn_out
+    job.selection = job.selection.ranges  # ! transform because selection is not serializable
+    manip_params = (jobs_common, job, options)
+    executor.submit(manip_wrapper, manip_params, {"out_parquet_file": job.out_parquet_file})
 
 
 def _get_afferent_edges_table(node_ids, edges):
@@ -548,7 +487,6 @@ def _generate_partition_edges(nodes, split_ids, edges_table, manip_config, aux_d
         column_types = {col: edges_table[col].dtype for col in edges_table.columns}
 
         new_edges_table = apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict)
-
         # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
         column_types = {col: column_types[col] for col in new_edges_table.columns}
         new_edges_table = new_edges_table.astype(column_types)

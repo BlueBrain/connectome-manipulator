@@ -138,6 +138,7 @@ def setup_logging(log_level=LogLevel.DEFAULT):
         except IOError:
             pass
     hdlr.setFormatter(_LevelColorFormatter(False, use_color))
+    hdlr.setLevel(verbosity_levels[log_level])
     logging.root.setLevel(verbosity_levels[log_level])
 
     del logging.root.handlers[:]
@@ -156,5 +157,6 @@ def create_log_file(log_path, name):
     logfile = os.path.join(log_path, "{}_{}".format(name, strftime("%Y-%m-%d_%Hh%M")))
     fileh = logging.FileHandler(logfile + ".log", encoding="utf-8")
     fileh.setFormatter(_LevelColorFormatter(use_color=False))
+    logging.root.setLevel(logging.DEBUG)  # So that log files write everything
     logging.root.addHandler(fileh)
     return logfile

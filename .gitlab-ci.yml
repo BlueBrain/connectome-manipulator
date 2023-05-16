@@ -29,6 +29,6 @@ integration:
     SLURM_ACCOUNT:
       proj9998
     TOXENV:
-      integration
+      integration_dask
     EXTRA_MODULES:
       unstable:parquet-converters
