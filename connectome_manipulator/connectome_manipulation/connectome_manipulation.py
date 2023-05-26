@@ -69,11 +69,11 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     nodes_files = [src_nodes_file, tgt_nodes_file]
 
     if edges is None:
-        log.info(
+        log.debug(
             f'No edges population defined between nodes "{src_nodes.name}" and "{tgt_nodes.name}"'
         )
     else:
-        log.info(
+        log.debug(
             f'Using edges population "{edges.name}" between nodes "{src_nodes.name}" and "{tgt_nodes.name}"'
         )
 
@@ -371,7 +371,7 @@ def main(options, log_file, executor_args=()):
 
     if options.splits > 0:
         if "N_split_nodes" in config:
-            log.warning(
+            log.debug(
                 f"Overwriting N_split_nodes ({config['N_split_nodes']}) from configuration file with command line argument --split {options.splits}"
             )
         config["N_split_nodes"] = options.splits
@@ -464,7 +464,7 @@ def _submit_part(executor, jobs_common: JobsCommonInfo, job: JobInfo, options: O
     # Resume option: Don't recompute, if .parquet file of current split already exists
     split_id = job.i_split + 1
     if options.do_resume and check_if_done(job.out_parquet_file, jobs_common.done_file):
-        log.info(
+        log.debug(
             f"Split {split_id}/{job.N_split}: Parquet file already exists - SKIPPING (do_resume={options.do_resume})"
         )
         return
@@ -596,6 +596,6 @@ def _write_blue_config(manip_config, output_path, edges_fn_manip, edges_file_man
                     manip_config["workflow_template"],
                 )
             else:
-                log.warning(
+                log.error(
                     f'Unable to create workflow config! Workflow template file "{manip_config["workflow_template"]}" not found!'
                 )

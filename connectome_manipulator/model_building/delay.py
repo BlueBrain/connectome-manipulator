@@ -59,7 +59,7 @@ def extract(
         ],
     )
 
-    log.info(
+    log.debug(
         f"Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)"
     )
 
@@ -81,7 +81,7 @@ def extract(
     dist_delays_std = np.full(num_bins, np.nan)
     dist_count = np.zeros(num_bins).astype(int)
 
-    log.info("Extracting distance-dependent synaptic delays...")
+    log.debug("Extracting distance-dependent synaptic delays...")
     pbar = progressbar.ProgressBar()
     for idx in pbar(range(num_bins)):
         d_sel = np.logical_and(
@@ -125,7 +125,7 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     model = model_types.LinDelayModel(
         delay_mean_coefs=delay_mean_coefs, delay_std=delay_std, delay_min=delay_min
     )
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     return model
 

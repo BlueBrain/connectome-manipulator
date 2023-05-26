@@ -43,7 +43,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0)
         nrn_pos2 = nodes[0].positions(gids2)
         dist_mat = distance_matrix(nrn_pos1.to_numpy(), nrn_pos2.to_numpy())
 
-        log.info(
+        log.debug(
             f"Upper limit of possible pairs: {np.min(dist_mat.shape)} (|grp1|={len(gids1)}, |grp2|={len(gids2)})"
         )
 
@@ -59,7 +59,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0)
         dist_mat_R = dist_mat_R[sel_idx1, :]
         dist_mat_R = dist_mat_R[:, sel_idx2]
 
-        log.info(f"Radius-dependent upper limit: {np.min(dist_mat_R.shape)} (R={R}um)")
+        log.debug(f"Radius-dependent upper limit: {np.min(dist_mat_R.shape)} (R={R}um)")
 
         # Assure that first dimension is always the lower one (= the one used to run pair selection)
         if dist_mat_R.shape[0] > dist_mat_R.shape[1]:

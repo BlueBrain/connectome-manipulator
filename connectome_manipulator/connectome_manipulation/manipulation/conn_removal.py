@@ -118,7 +118,7 @@ class ConnectomeRemoval(Manipulation):
         conn_sel_idx = np.where(conn_sel)[0]
         num_conn = len(conn_sel_idx)
         if num_conn == 0:
-            log.warning("Selection empty, nothing to remove!")
+            log.debug("Selection empty, nothing to remove!")
         num_remove = np.round(amount_pct * num_conn / 100).astype(int)
         conn_idx_remove = np.random.choice(conn_sel_idx, num_remove, replace=False)
         syn_idx_remove = np.isin(syn_conn_idx, conn_idx_remove)

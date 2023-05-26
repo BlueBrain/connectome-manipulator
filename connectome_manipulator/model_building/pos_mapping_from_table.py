@@ -38,7 +38,7 @@ def extract(
             f"ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!",
         )
         nodes_pop_name = circuit.nodes.population_names[0]
-        log.info(f'Loading nodes population "{nodes_pop_name}"')
+        log.debug(f'Loading nodes population "{nodes_pop_name}"')
     nodes = circuit.nodes[nodes_pop_name]
 
     nrn_ids = get_node_ids(nodes, nodes_spec)
@@ -57,7 +57,7 @@ def extract(
     else:
         log.log_assert(False, f'ERROR: "{file_format}" format not supported!')
 
-    log.info(f'Loaded position table for {nrn_table.shape[0]} neurons from "{pos_file}"')
+    log.debug(f'Loaded position table for {nrn_table.shape[0]} neurons from "{pos_file}"')
 
     # Assign mapped positions
     if gid_column is None:  # Use index column
@@ -101,7 +101,7 @@ def build(nrn_ids, coord_names, map_pos, model_coord_names=None, **_):
 
     # Create model
     model = model_types.PosMapModel(pos_table=map_pos_table)
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     return model
 
@@ -161,7 +161,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
                 ax.set_ylabel(coo[1])
                 ax.set_zlabel(coo[2])
             else:
-                log.warning(f'Only 2D/3D plotting supported! Skipping "{lbl}"...')
+                log.debug(f'Only 2D/3D plotting supported! Skipping "{lbl}"...')
                 continue
             plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
             if vidx == 0:
@@ -175,7 +175,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     # Cell distances in atlas vs. flat space
     max_plot = 10000
     if len(nrn_ids) > max_plot:
-        log.warning("Using subsampling for distance plots!")
+        log.debug("Using subsampling for distance plots!")
         nrn_sel = np.random.choice(len(nrn_ids), max_plot)
         nrn_ids = nrn_ids[nrn_sel]
         nrn_pos = nrn_pos[nrn_sel, :]
@@ -211,7 +211,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     num_NN_list = list(range(1, 30, 1))
     NN_match = np.full(len(num_NN_list), np.nan)
 
-    log.info("Computing nearest neighbors in atlas vs. flat space...")
+    log.debug("Computing nearest neighbors in atlas vs. flat space...")
     pbar = progressbar.ProgressBar()
     for nidx in pbar(range(len(num_NN_list))):
         num_NN = num_NN_list[nidx]

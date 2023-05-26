@@ -90,7 +90,7 @@ def extract(
                 f"Selected synapse properties not found: {np.array(syn_props)[~syn_props_check]}",
             )
 
-    log.info(
+    log.debug(
         f"Estimating statistics for {len(syn_props)} properties (plus #synapses/connection) between {len(m_types[0])}x{len(m_types[1])} m-types (min_sample_size_per_group={min_sample_size_per_group}, max_sample_size_per_group={max_sample_size_per_group})"
     )
 
@@ -235,7 +235,7 @@ def extract(
                     conn_prop_data["p"][sidx, tidx, pidx] = []
                     # log.warning(f'Discrete {syn_props[pidx]} values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(means_within[:, pidx])} unique values)!')
 
-    log.info(
+    log.debug(
         f'Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.'
     )
 
@@ -425,7 +425,7 @@ def build(
     model = model_types.ConnPropsModel(
         src_types=m_types[0], tgt_types=m_types[1], prop_stats=prop_model_dict
     )
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     return model
 

@@ -103,11 +103,11 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 with_delay=delay_model_spec is not None
             )  # Create empty edges table
         elif edges_table.shape[0] == 0:
-            log.warning(
+            log.debug(
                 f"Empty connectome with {edges_table.shape[1]} properties! Existing properties may be removed to match newly generated synapses."
             )
         else:
-            log.warning(
+            log.debug(
                 f"Initial connectome not empty ({edges_table.shape[0]} synapses, {edges_table.shape[1]} properties)! Connections will be added to existing connectome. Existing properties may be removed to match newly generated synapses."
             )
         with profiler.profileit(name="conn_wiring/setup"):
@@ -132,26 +132,26 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 return edges_table
             # Load connection probability model
             p_model = model_types.AbstractModel.init_model(prob_model_spec)
-            log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
+            log.debug(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
 
             # Load #synapses/connection model
             nsynconn_model = model_types.AbstractModel.init_model(nsynconn_model_spec)
-            log.info(
+            log.debug(
                 f'Loaded #synapses/connection model of type "{nsynconn_model.__class__.__name__}"'
             )
 
             # Load delay model (optional)
             if delay_model_spec is not None:
                 delay_model = model_types.AbstractModel.init_model(delay_model_spec)
-                log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
+                log.debug(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
             else:
                 delay_model = None
-                log.info("No delay model provided")
+                log.debug("No delay model provided")
 
             # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
             _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
             if pos_acc is None:
-                log.info("No position mapping model provided")
+                log.debug("No position mapping model provided")
 
             # Determine source/target nodes for wiring
             src_node_ids = get_node_ids(self.nodes[0], sel_src)

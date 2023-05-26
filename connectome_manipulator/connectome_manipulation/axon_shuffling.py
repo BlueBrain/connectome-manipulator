@@ -23,7 +23,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         "pair_gids", None
     )  # Load GID mapping from earlier split iteration, if existing
     if pair_gids is None:
-        log.info("INFO: Sampling pairs of neurons for axon shuffling...")
+        log.info("Sampling pairs of neurons for axon shuffling...")
 
         gids = get_node_ids(nodes[0], sel_grp)
 
@@ -34,7 +34,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         nrn_pos = nodes[0].positions(gids).to_numpy()
         dist_mat = distance_matrix(nrn_pos, nrn_pos)
 
-        log.info(
+        log.debug(
             f"Upper limit of possible pairs: {np.floor(dist_mat.shape[0] / 2).astype(int)} (|grp|={len(gids)})"
         )
 
@@ -50,7 +50,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         dist_mat_R = dist_mat_R[sel_idx, :]
         dist_mat_R = dist_mat_R[:, sel_idx]
 
-        log.info(
+        log.debug(
             f"Radius-dependent upper limit: {np.floor(dist_mat_R.shape[0] / 2).astype(int)} (R={R}um)"
         )
 

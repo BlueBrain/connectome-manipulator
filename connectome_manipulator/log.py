@@ -12,6 +12,11 @@ _LOG_FORMAT_WITH_DATE = "[%(levelname)s] (%(asctime)s) %(message)s"
 _DATE_FORMAT = "%b.%d %H:%M:%S"
 
 
+def debug(msg, *args, **kwargs):  # pragma: no cover
+    """Wrapper for debug logging"""
+    return logging.debug(msg, *args, **kwargs)
+
+
 def info(msg, *args, **kwargs):  # pragma: no cover
     """Wrapper for info logging"""
     return logging.info(msg, *args, **kwargs)

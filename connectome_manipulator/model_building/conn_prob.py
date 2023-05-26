@@ -256,7 +256,7 @@ def extract_dependent_p_conn(
     else:
         adj_mat = csr_matrix((max(src_node_ids) + 1, max(tgt_node_ids) + 1))  # Empty matrix
     if np.any(adj_mat.diagonal()):
-        log.warning("Autaptic connection(s) found!")
+        log.debug("Autaptic connection(s) found!")
 
     # Extract connection probability
     num_bins = [len(b) - 1 for b in dep_bins]
@@ -268,7 +268,7 @@ def extract_dependent_p_conn(
         num_bins, -1
     )  # Count of connected pairs of neurons for each combination of dependencies
 
-    log.info(
+    log.debug(
         f'Extracting {num_dep}-dimensional ({"x".join([str(n) for n in num_bins])}) connection probabilities...'
     )
     pbar = progressbar.ProgressBar(maxval=np.prod(num_bins) - 1)
@@ -377,7 +377,7 @@ def build_1st_order(p_conn, **_):
     """Build 1st order model (Erdos-Renyi, capturing average conn. prob.)."""
     # Create model
     model = model_types.ConnProb1stOrderModel(p_conn=p_conn)
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     return model
 
@@ -494,7 +494,7 @@ def build_2nd_order(
                 rel_err = np.sqrt(np.diag(pcov)) / np.array(
                     [a_opt, b_opt]
                 )  # Rel. standard error of the coefficients
-                log.info(f"Rel. error of simple 2nd-order model fit: {rel_err}")
+                log.debug(f"Rel. error of simple 2nd-order model fit: {rel_err}")
                 if rel_fit_err_th is not None:
                     assert (
                         max(rel_err) <= rel_fit_err_th
@@ -506,7 +506,7 @@ def build_2nd_order(
                         p_conn_dist[0]
                     ), "Strict fit violation: Lowest-distance bin empty!"
             except Exception as e:
-                log.warning(e)
+                log.error(e)
                 (a_opt, b_opt) = (np.nan, np.nan)
 
         # Create simple model
@@ -536,7 +536,7 @@ def build_2nd_order(
                 rel_err = np.sqrt(np.diag(pcov)) / np.array(
                     [a_opt, b_opt, c_opt, d_opt, e_opt]
                 )  # Rel. standard error of the coefficients
-                log.info(f"Rel. error of complex 2nd-order model fit: {rel_err}")
+                log.debug(f"Rel. error of complex 2nd-order model fit: {rel_err}")
                 if rel_fit_err_th is not None:
                     assert (
                         max(rel_err) <= rel_fit_err_th
@@ -548,7 +548,7 @@ def build_2nd_order(
                         p_conn_dist[0]
                     ), "Strict fit violation: Lowest-distance bin empty!"
             except Exception as e:
-                log.warning(e)
+                log.error(e)
                 (a_opt, b_opt, c_opt, d_opt, e_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
 
         # Create complex model
@@ -559,7 +559,7 @@ def build_2nd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist * count_all).astype(int)
@@ -773,7 +773,7 @@ def build_3rd_order(
                 rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array(
                     [aN_opt, bN_opt, aP_opt, bP_opt]
                 )  # Rel. standard error of the coefficients
-                log.info(f"Rel. error of simple 3rd-order model fit: {rel_err}")
+                log.debug(f"Rel. error of simple 3rd-order model fit: {rel_err}")
                 if rel_fit_err_th is not None:
                     assert (
                         max(rel_err) <= rel_fit_err_th
@@ -785,7 +785,7 @@ def build_3rd_order(
                         np.isfinite(p_conn_dist_bip[0, :])
                     ), "Strict fit violation: Lowest-distance bin empty!"
             except Exception as e:
-                log.warning(e)
+                log.error(e)
                 (aN_opt, bN_opt) = (np.nan, np.nan)
                 (aP_opt, bP_opt) = (np.nan, np.nan)
 
@@ -826,7 +826,7 @@ def build_3rd_order(
                 rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array(
                     [aN_opt, bN_opt, cN_opt, dN_opt, eN_opt, aP_opt, bP_opt, cP_opt, dP_opt, eP_opt]
                 )  # Rel. standard error of the coefficients
-                log.info(f"Rel. error of complex 3rd-order model fit: {rel_err}")
+                log.debug(f"Rel. error of complex 3rd-order model fit: {rel_err}")
                 if rel_fit_err_th is not None:
                     assert (
                         max(rel_err) <= rel_fit_err_th
@@ -837,7 +837,7 @@ def build_3rd_order(
                         p_conn_dist_bip[0]
                     ), "Strict fit violation: Lowest-distance bin empty!"
             except Exception as e:
-                log.warning(e)
+                log.error(e)
                 (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
                 (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
 
@@ -858,7 +858,7 @@ def build_3rd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist_bip * count_all).astype(int)
@@ -1101,7 +1101,7 @@ def build_4th_order(
             "ERROR: Smoothing sigma must be non-negative!",
         )
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        log.info(
+        log.debug(
             f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms'
         )
         p_conn_offset = gaussian_filter(p_conn_offset, sigmas, mode="constant")
@@ -1136,7 +1136,7 @@ def build_4th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1483,7 +1483,7 @@ def build_4th_order_reduced(
             "ERROR: Smoothing sigma must be non-negative!",
         )
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        log.info(
+        log.debug(
             f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms'
         )
         p_reflect = np.vstack(
@@ -1512,7 +1512,7 @@ def build_4th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1798,7 +1798,7 @@ def build_5th_order(
             "ERROR: Smoothing sigma must be non-negative!",
         )
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        log.info(
+        log.debug(
             f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms'
         )
         p_conn_position = gaussian_filter(p_conn_position, sigmas, mode="constant")
@@ -1842,7 +1842,7 @@ def build_5th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
@@ -2312,7 +2312,7 @@ def build_5th_order_reduced(
             "ERROR: Smoothing sigma must be non-negative!",
         )
         sigmas = [sig / b for sig, b in zip(smoothing_sigma_um, bin_sizes)]
-        log.info(
+        log.debug(
             f'Applying data smoothing with sigma {"/".join([str(sig) for sig in smoothing_sigma_um])}ms'
         )
         p_reflect = np.concatenate(
@@ -2343,7 +2343,7 @@ def build_5th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)

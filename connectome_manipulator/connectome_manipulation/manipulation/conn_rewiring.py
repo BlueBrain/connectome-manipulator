@@ -95,7 +95,7 @@ class ConnectomeRewiring(Manipulation):
                 keep_indegree is False,
                 'Connectivity estimation not supported with "keep_indegree" option!',
             )
-            log.info("*** Estimation run enabled ***")
+            log.debug("*** Estimation run enabled ***")
 
         if opt_nconn:
             log.log_assert(
@@ -106,7 +106,7 @@ class ConnectomeRewiring(Manipulation):
                 estimation_run is False,
                 '#Connections optimization not supported with "estimation_run" option!',
             )
-            log.info(
+            log.debug(
                 f"Enabled optimization of #connections to match expected number on average (max. {OPT_NCONN_MAX_ITER} iterations)"
             )
 
@@ -128,18 +128,18 @@ class ConnectomeRewiring(Manipulation):
 
         # Load connection probability model
         p_model = model_types.AbstractModel.init_model(prob_model_spec)
-        log.info(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
+        log.debug(f'Loaded conn. prob. model of type "{p_model.__class__.__name__}"')
         if p_scale != 1.0:
-            log.info(f"Using probability scaling factor p_scale={p_scale}")
+            log.debug(f"Using probability scaling factor p_scale={p_scale}")
 
         # Load delay model
         delay_model = model_types.AbstractModel.init_model(delay_model_spec)
-        log.info(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
+        log.debug(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
 
         # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
         _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
         if pos_acc is None:
-            log.info("No position mapping model provided")
+            log.debug("No position mapping model provided")
 
         # Load connection/synapse properties model [required for "duplicate_randomize" method]
         if gen_method == "duplicate_randomize":
@@ -148,7 +148,7 @@ class ConnectomeRewiring(Manipulation):
                 f'Properties model required for generation method "{gen_method}"!',
             )
             props_model = model_types.AbstractModel.init_model(props_model_spec)
-            log.info(f'Loaded properties model of type "{props_model.__class__.__name__}"')
+            log.debug(f'Loaded properties model of type "{props_model.__class__.__name__}"')
         else:
             log.log_assert(
                 props_model_spec is None,
@@ -191,7 +191,7 @@ class ConnectomeRewiring(Manipulation):
         if len(tgt_node_ids) > 0:
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
         if np.sum(tgt_sel) == 0:  # Nothing to rewire
-            log.info("No target nodes selected, nothing to rewire")
+            log.debug("No target nodes selected, nothing to rewire")
             log.data(
                 f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
                 i_split=aux_dict["i_split"],
@@ -441,7 +441,7 @@ class ConnectomeRewiring(Manipulation):
                 for k, v in stats_dict.items()
                 if k in stat_sel
             ]
-            log.info("CONNECTIVITY ESTIMATION:\n%s", "\n".join(stat_str))
+            log.debug("CONNECTIVITY ESTIMATION:\n%s", "\n".join(stat_str))
             log.data(
                 f'EstimationStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
                 **{k: v for k, v in stats_dict.items() if k in stat_sel},
@@ -458,7 +458,7 @@ class ConnectomeRewiring(Manipulation):
         # Delete unused synapses (if any)
         if np.any(syn_del_idx):
             edges_table = edges_table[~syn_del_idx].copy()
-            log.info(f"Deleted {np.sum(syn_del_idx)} unused synapses")
+            log.debug(f"Deleted {np.sum(syn_del_idx)} unused synapses")
 
         # Add new synapses to table, re-sort, and assign new index
         if len(new_edges_list) > 0:
@@ -480,7 +480,7 @@ class ConnectomeRewiring(Manipulation):
             syn_new_dupl_idx = syn_new_dupl_idx[
                 edges_table.index[syn_new_idx] - max_idx - 1
             ]  # Restore sorting, so that in same order as in merged & sorted edges table
-            log.info(f"Generated {all_new_edges.shape[0]} new synapses")
+            log.debug(f"Generated {all_new_edges.shape[0]} new synapses")
         else:  # No new synapses
             syn_new_dupl_idx = np.array([])
             syn_new_idx = np.full(edges_table.shape[0], False)
@@ -519,7 +519,7 @@ class ConnectomeRewiring(Manipulation):
             else f"      {k}: {v}"
             for k, v in stats_dict.items()
         ]
-        log.info("STATISTICS:\n%s", "\n".join(stat_str))
+        log.debug("STATISTICS:\n%s", "\n".join(stat_str))
         log.log_assert(
             stats_dict["num_syn_unchanged"]
             == stats_dict["output_syn_count"]

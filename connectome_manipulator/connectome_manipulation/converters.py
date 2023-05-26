@@ -12,7 +12,7 @@ from .. import log, __version__
 def edges_to_parquet(edges_table, output_file):
     """Write edge properties table to parquet file (if non-empty!)."""
     if edges_table.size == 0:
-        log.info(f"Edges table empty - SKIPPING {os.path.split(output_file)[-1]}")
+        log.debug(f"Edges table empty - SKIPPING {os.path.split(output_file)[-1]}")
     else:
         edges_table = edges_table.rename(
             columns={"@target_node": "target_node_id", "@source_node": "source_node_id"}
@@ -75,7 +75,7 @@ def parquet_to_sonata(
         stderr=subprocess.STDOUT,
         env={"PATH": os.getenv("PATH", "")},
     ) as proc:
-        log.info(proc.communicate()[0].decode())
+        log.debug(proc.communicate()[0].decode())
     log.log_assert(
         os.path.exists(output_file),
         "Parquet conversion error - SONATA file not created successfully!",

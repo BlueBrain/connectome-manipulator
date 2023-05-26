@@ -38,7 +38,7 @@ def extract(
             f"ERROR: Nodes population could not be determined (found {circuit.nodes.population_names})!",
         )
         nodes_pop_name = circuit.nodes.population_names[0]
-        log.info(f'Loading nodes population "{nodes_pop_name}"')
+        log.debug(f'Loading nodes population "{nodes_pop_name}"')
     nodes = circuit.nodes[nodes_pop_name]
     nrn_pos = nodes.positions()
     nrn_ids = nrn_pos.index.to_numpy()
@@ -103,7 +103,7 @@ def extract(
 
     # Nearest-neighbor interpolation only (FASTER)
     if NN_only:
-        log.warning("Using nearest-neighbor interpolation only!")
+        log.debug("Using nearest-neighbor interpolation only!")
         flat_x_intpl = griddata(
             map_pos[flat_x != -1], flat_x[flat_x != -1], map_indices, method="nearest"
         )
@@ -151,7 +151,7 @@ def build(nrn_ids, flat_pos, **_):
 
     # Create model
     model = model_types.PosMapModel(pos_table=flat_pos_table)
-    log.info("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)
 
     return model
 
@@ -201,7 +201,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     # Cell distances in atlas vs. flat space
     max_plot = 10000
     if len(nrn_ids) > max_plot:
-        log.warning("Using subsampling for distance plots!")
+        log.debug("Using subsampling for distance plots!")
         nrn_sel = np.random.choice(len(nrn_ids), max_plot)
         nrn_ids = nrn_ids[nrn_sel]
         nrn_pos = nrn_pos[nrn_sel, :]
@@ -237,7 +237,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     num_NN_list = list(range(1, 30, 1))
     NN_match = np.full(len(num_NN_list), np.nan)
 
-    log.info("Computing nearest neighbors in atlas vs. flat space...")
+    log.debug("Computing nearest neighbors in atlas vs. flat space...")
     pbar = progressbar.ProgressBar()
     for nidx in pbar(range(len(num_NN_list))):
         num_NN = num_NN_list[nidx]
