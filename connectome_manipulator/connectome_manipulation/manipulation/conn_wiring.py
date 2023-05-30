@@ -8,6 +8,7 @@ Only specific properties like source/target node, afferent synapse positions, sy
 
 import os
 
+import libsonata
 import neurom as nm
 import numpy as np
 import pandas as pd
@@ -158,19 +159,37 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             src_class = self.nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
             src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
             log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
-            src_pos = conn_prob.get_neuron_positions(
-                self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
-            )[
-                0
-            ]  # Get neuron positions (incl. position mapping, if provided)
 
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
             tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
-            tgt_pos = conn_prob.get_neuron_positions(
-                self.nodes[1].positions if pos_acc is None else pos_acc, [tgt_node_ids]
-            )[
-                0
-            ]  # Get neuron positions (incl. position mapping, if provided)
+
+            if pos_acc:
+                # FIXME: this is going to be VERY SLOW!
+                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[
+                    0
+                ]  # Get neuron positions (incl. position mapping, if provided)
+                tgt_pos = conn_prob.get_neuron_positions(pos_acc, [tgt_node_ids])[
+                    0
+                ]  # Get neuron positions (incl. position mapping, if provided)
+            else:
+                _src_pop = self.nodes[0]._population  # pylint: disable=protected-access
+                _src_sel = libsonata.Selection(src_node_ids)
+                src_pos = np.column_stack(
+                    (
+                        _src_pop.get_attribute("x", _src_sel),
+                        _src_pop.get_attribute("y", _src_sel),
+                        _src_pop.get_attribute("z", _src_sel),
+                    )
+                )
+                _tgt_pop = self.nodes[1]._population  # pylint: disable=protected-access
+                _tgt_sel = libsonata.Selection(tgt_node_ids)
+                tgt_pos = np.column_stack(
+                    (
+                        _tgt_pop.get_attribute("x", _tgt_sel),
+                        _tgt_pop.get_attribute("y", _tgt_sel),
+                        _tgt_pop.get_attribute("z", _tgt_sel),
+                    )
+                )
 
             log.info(
                 f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
