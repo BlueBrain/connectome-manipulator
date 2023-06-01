@@ -161,11 +161,10 @@ Options:
                                   False]
   --splits INTEGER                Number of blocks, overwrites value in config
                                   file
-  --parallel                      Run using SLURM job array  [default: False]
-  -n, --max-parallel-jobs INTEGER
-                                  Maximum number of parallel jobs to run in
-                                  array  [default: 256]
-  -s, --sbatch-arg TEXT           Overwrite sbatch arguments with key=value
+  --parallel                      Run using a parallel DASK job scheduler  [default:
+                                  False]
+  -a, --parallel-arg TEXT         Overwrite the arguments for the Dask Client with
+                                  key=value
   --help                          Show this message and exit.  [default:
                                   False]
 ```
@@ -177,12 +176,13 @@ connectome-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1
     --output-dir ${OUTPATH} --profile --splits 1
 ```
 
-Running in parallel (with submitit) you could do this:
+Running in parallel (with Dask) you can use the `parallel-manipulator` executable that
+will set up Dask automatically (and switch the `--parallel` flag to default to `True`,
+too):
 
 ```
-connectome-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
-    --profile --parallel -n 800 --splits=5000 \
-    -s account=proj16 -s constraint=cpu -s mem=20G
+srun dplace parallel-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
+    --profile --splits=5000
 ```
 
 ### Profiling the code

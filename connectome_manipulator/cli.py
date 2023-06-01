@@ -53,17 +53,8 @@ def app(verbose):
 @click.option(
     "--parallel",
     required=False,
-    default=None,
-    type=click.Choice(["Slurm", "Dask"], case_sensitive=False),
-    help="Run using a parallel job scheduler, either Slurm of Dask",
-)
-@click.option(
-    "--max-parallel-jobs",
-    "-n",
-    required=False,
-    default=256,
-    type=int,
-    help="Maximum number of parallel jobs to run in array",
+    is_flag=True,
+    help="Run using a parallel DASK job scheduler",
 )
 @click.option(
     "--parallel-arg",
@@ -71,7 +62,7 @@ def app(verbose):
     required=False,
     multiple=True,
     type=str,
-    help="Overwrite the parallel system args with key=value, e.g. for slurm",
+    help="Overwrite the arguments for the Dask Client with key=value",
 )
 def manipulate_connectome(
     config,
@@ -83,7 +74,6 @@ def manipulate_connectome(
     overwrite_edges,
     splits,
     parallel,
-    max_parallel_jobs,
     parallel_arg,
 ):
     """Manipulate or build a circuit's connectome."""
@@ -92,10 +82,6 @@ def manipulate_connectome(
     # Initialize logger
     logging_path = output_dir / "logs"
     log_file = log.create_log_file(logging_path, "connectome_manipulation")
-
-    if parallel:
-        if utils.clear_slurm_env():
-            logger.info("Prepared environment for parallel run from within SLURM job.")
 
     output_path = utils.create_dir(output_dir)
     profiler.ProfilerManager.set_enabled(profile)
@@ -111,7 +97,6 @@ def manipulate_connectome(
         overwrite_edges=overwrite_edges,
         splits=splits,
         parallel=parallel,
-        max_parallel_jobs=max_parallel_jobs,
     )
 
     connectome_manipulation.main(options, log_file, executor_args=parallel_arg)

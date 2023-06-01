@@ -287,7 +287,6 @@ class Options:
     overwrite_edges: bool = False
     splits: int = 0  # sentinel value to use config value
     parallel: bool = False
-    max_parallel_jobs: int = 256
 
 
 @dataclass
@@ -310,11 +309,11 @@ class JobInfo:
 
 
 def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
-    """Wrapper function (remote) that can be optionally executed by a Slurm/Dask worker"""
+    """Wrapper function (remote) that can be optionally executed by a Dask worker"""
     if options.parallel:
-        path = options.logging_path
-        if host := os.environ.get("HOSTNAME"):
-            path = os.path.join(path, host)
+        import socket
+
+        path = os.path.join(options.logging_path, socket.getfqdn())
         log.create_log_file(path, f"connectome_manipulation.task-{job.i_split}")
 
     log.info("Processing job %s (common: %s)", job, jobs_common)
@@ -413,14 +412,13 @@ def main(options, log_file, executor_args=()):
         resource_manager = result[2]
         profiler.ProfilerManager.merge(resource_manager)
         jobs_done += 1
-        done_percent = jobs_done * 100 / N_split
-        log.info(f"[{done_percent:3.0f}%] Finished {jobs_done} (out of {N_split}) splits")
+        done_percent = jobs_done * 100 // N_split
+        log.info(f"[{done_percent:3d}%] Finished {jobs_done} (out of {N_split}) splits")
 
     # Prepare params to the executor. Slurm executor will add the prefix itself
     executor_params = dict(x.split("=", 1) for x in executor_args)
-    params = {"executor_params": executor_params}
 
-    with executors.in_context(options, params, result_hook=result_hook) as executor:
+    with executors.in_context(options, executor_params, result_hook=result_hook) as executor:
         log.info("Start job submission")
         jobs_common_info = JobsCommonInfo(nodes, edges, done_file)
 

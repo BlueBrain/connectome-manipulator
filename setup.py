@@ -38,18 +38,23 @@ setup(
         "pyarrow",
         "scipy",
         "scikit-learn",
-        "submitit",
         "voxcell",
         "pyarrow",
         "jsonpickle",
         "scikit-learn",
         "tables",
         "distributed",  # Dask
+        "dask-mpi",
     ],
     packages=find_packages(),
     python_requires=">=3.7",
     extras_require={"docs": ["sphinx", "sphinx-bluebrain-theme"]},
-    entry_points={"console_scripts": ["connectome-manipulator=connectome_manipulator.cli:app"]},
+    entry_points={
+        "console_scripts": [
+            "connectome-manipulator=connectome_manipulator.cli:app",
+            "parallel-manipulator=connectome_manipulator.cli_parallel:app",
+        ]
+    },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Education",

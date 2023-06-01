@@ -5,22 +5,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-def clear_slurm_env() -> bool:
-    """Clear all SLURM related environment variables.
-
-    If we are starting connectome-manipulator from within an SLURM job, we must clear
-    the environment of any SLURM-related variables (except for SLURM_TIME_FORMAT) to allow
-    submitit to submit an array job.
-    """
-    if "SLURM_JOBID" in os.environ:
-        for key in os.environ:
-            if key != "SLURM_TIME_FORMAT" and key.startswith("SLURM_"):
-                os.environ.pop(key)
-        return True
-    else:
-        return False
-
-
 def create_dir(path: os.PathLike) -> Path:
     """Create directory and parents if it doesn't already exist."""
     path = Path(path)

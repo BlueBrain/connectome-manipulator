@@ -7,6 +7,7 @@ Only specific properties like source/target node, afferent synapse positions, sy
 """
 
 import os
+from datetime import datetime, timedelta
 
 import libsonata
 import neurom as nm
@@ -293,7 +294,13 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         new_edges_list = [all_new_edges]
         # Run connection wiring
         # progress_pct = np.maximum(0, np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int))
+
+        log_time = datetime.now()
         for tidx, tgt in enumerate(tgt_node_ids):
+            new_time = datetime.now()
+            if (new_time - log_time) / timedelta(minutes=1) > 1:
+                log.info("Processing target node %d out of %d", tidx, len(tgt_node_ids))
+                log_time = new_time
             #  if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
             #     print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
 
