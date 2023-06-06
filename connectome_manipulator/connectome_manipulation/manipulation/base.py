@@ -8,6 +8,7 @@ import inspect
 import os.path
 
 from connectome_manipulator import log
+from connectome_manipulator.access_functions import get_enumeration_map
 
 
 class MetaManipulation(ABCMeta):
@@ -58,9 +59,12 @@ class Manipulation(metaclass=MetaManipulation):
     def __init__(self, nodes):
         """Initialize with the nodes and split_ids"""
         self.nodes = nodes
+        if self.nodes:
+            self.src_type_map = get_enumeration_map(self.nodes[0], "mtype")
+            self.tgt_type_map = get_enumeration_map(self.nodes[1], "mtype")
 
     @abstractmethod
-    def apply(self, edges_table, split_ids, aux_config, **kwargs):
+    def apply(self, edges_table, split_ids, aux_dict, **kwargs):
         """An abstract method for the actual application of the algorithm
 
         This funciton is to be implemented by concrete Manipulation subclasses.

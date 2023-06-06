@@ -1,12 +1,10 @@
 """Definition and mapping of model types to classes"""
 
 from abc import ABCMeta, abstractmethod
-from functools import cached_property, lru_cache
-import itertools
 import os
 import sys
 
-import jsonpickle
+import json
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interpn
@@ -80,7 +78,7 @@ class AbstractModel(metaclass=ABCMeta):
             'Model file must be of type ".json"!',
         )
         with open(model_file, "r") as f:
-            model_dict = jsonpickle.decode(f.read())
+            model_dict = json.loads(f.read())
         data_keys = model_dict.pop("data_keys", [])
         data_dict = AbstractModel.load_data_dict(model_file, data_keys)
 
@@ -107,6 +105,7 @@ class AbstractModel(metaclass=ABCMeta):
         model_dict = model_dict.copy()
         model_type = model_dict.pop("model")
         model_class = getattr(sys.modules[__class__.__module__], model_type)  # Get model subclass
+
         model = model_class(**model_dict, **data_dict)  # Initialize model object
 
         return model
@@ -130,13 +129,9 @@ class AbstractModel(metaclass=ABCMeta):
         )
         for p in self.param_names:
             if p in model_dict:
-                val = np.array(
-                    model_dict.pop(p)
-                ).tolist()  # Convert to numpy and back to list, so that reduced to basic (non-numpy) data types
+                val = model_dict.pop(p)
             else:  # Use value from defaults
-                val = np.array(
-                    self.param_defaults[p]
-                ).tolist()  # Convert to numpy and back to list, so that reduced to basic (non-numpy) data types
+                val = self.param_defaults[p]
             setattr(self, p, val)
 
     def init_data(self, data_dict):
@@ -190,15 +185,14 @@ class AbstractModel(metaclass=ABCMeta):
             df.to_hdf(data_file, key, append=idx > 0)
         model_dict["data_keys"] = list(data_dict.keys())
 
-        # Save model dict to .json file [using jsonpickle, so also non-serializable objects can be stored!]
+        # Save model dict to .json file
         model_dict["model"] = self.__class__.__name__
         model_dict["__version_info__"] = {
             "python": sys.version,
-            "jsonpickle": jsonpickle.__version__,
             "pandas": pd.__version__,
         }
         with open(model_file, "w") as f:
-            f.write(jsonpickle.encode(model_dict, indent=2))
+            f.write(json.dumps(model_dict, indent=2))
 
 
 # MODEL TEMPLATE #
@@ -244,143 +238,107 @@ class PathwayModel(AbstractModel, metaclass=ABCMeta):
     """
 
     # Names of base model inputs and parameters that are part of this model
-    pathway_param_name = "pathway_specs"
     pathway_input_names = ["src_type", "tgt_type"]
 
-    def __init__(self, **kwargs):
+    def init_params(self, _):
+        """Overwritten to avoid setting class variables."""
+
+    def get_param_dict(self):
+        """Return model default parameters as dict."""
+        return {p: getattr(self, p)[-1, -1] for p in self.param_names}
+
+    @property
+    def shorthand(self):
+        """Pathway column prefix for this model."""
+        return self.__class__.__name__.replace("Model", "").lower()
+
+    def __init__(self, src_type_map=None, tgt_type_map=None, pathway_specs=None, **kwargs):
         """Model initialization."""
-        log.log_assert(
-            self.pathway_param_name not in self.param_names,
-            f'"{self.pathway_param_name}" must not be part of model parameter names!',
-        )
-        log.log_assert(
-            not any(p in self.input_names for p in self.pathway_input_names),
-            f"Model inputs {self.pathway_input_names} already part of base model!",
-        )
         self.property_names = self.param_names
-        self.param_names = [self.pathway_param_name] + self.param_names
         self.input_names = self.pathway_input_names + self.input_names
-        if self.pathway_param_name not in kwargs:
-            kwargs[self.pathway_param_name] = {}  # Add empty dict for initialization
+
+        if pathway_specs is not None and (src_type_map is None or tgt_type_map is None):
+            raise ValueError("Need to specify both type maps when using pathway specs.")
+
+        self.default_enforce = False
+        if src_type_map:
+            self.src_type_map = src_type_map
+        else:
+            self.default_enforce = True
+            self.src_type_map = {}
+        if tgt_type_map:
+            self.tgt_type_map = tgt_type_map
+        else:
+            self.default_enforce = True
+            self.tgt_type_map = {}
+
+        self.default_types = (len(self.src_type_map), len(self.tgt_type_map))
+        shape = tuple(s + 1 for s in self.default_types)
+        for param in self.param_names:
+            if param in kwargs:
+                default = kwargs.pop(param)
+            else:
+                default = self.param_defaults[param]
+            matrix = np.full(shape, default)
+            colname = "_".join([self.shorthand, param])
+            if pathway_specs is not None and colname in pathway_specs.columns:
+                col = pathway_specs[colname]
+                if ("*", "*") in col:
+                    if not np.isnan(default := col.pop(("*", "*"))):
+                        matrix[:] = default
+                for (src, dst), val in col.items():
+                    if not np.isnan(val):
+                        i = self.src_type_map[src]
+                        j = self.tgt_type_map[dst]
+                        matrix[i][j] = val
+            setattr(self, param, matrix)
+
         super().__init__(**kwargs)
 
-        def dict_conv(data):
-            """Recursively convert numpy to basic data types, to have a clean JSON file"""
-            if isinstance(data, dict):
-                return {k: dict_conv(v) for k, v in data.items()}
-            elif isinstance(data, (list, tuple)):
-                return [dict_conv(d) for d in data]
-            elif hasattr(data, "tolist"):  # Convert numpy types
-                return data.tolist()
-            else:
-                return data
-
-        # Check & convert parameters
-        # pylint: disable=access-member-before-definition
-        log.log_assert(isinstance(self.pathway_specs, dict), '"pathway_specs" dictionary required!')
-        for src, tgt_dict in self.pathway_specs.items():
-            log.log_assert(
-                isinstance(tgt_dict, dict) and len(tgt_dict) > 0,
-                "Pathway target dictionary missing or empty!",
-            )
-            for tgt, distr_dict in tgt_dict.items():
-                log.log_assert(
-                    isinstance(distr_dict, dict)
-                    and len(distr_dict) >= 1  # At least one property must be set
-                    and all(attr in self.property_names for attr in distr_dict),
-                    f"Pathway property missing or unknown (must be of: {self.property_names})!",
-                )
-                log.log_assert(src is not None and tgt is not None, "Invalid pathway identifier!")
-        self.pathway_specs = dict_conv(self.pathway_specs)  # Convert dict to basic data types
-
-    def has_property(self, prop_name):
-        """Return if a property is part of this model."""
-        return prop_name in self.property_names
-
-    def get_properties(self):
-        """Return list of model property names."""
-        return self.property_names.copy()
-
-    def has_pathway(self, src_type, tgt_type, prop_name=None):
-        """Return if the given pathway (and optionally, the given property) is stored in this model."""
-        types_in_spec = src_type in self.pathway_specs and tgt_type in self.pathway_specs[src_type]
-        if not types_in_spec:
-            return False
-        if prop_name:
-            return prop_name in self.pathway_specs[src_type][tgt_type]
-        return True
-
-    def get_pathways(self):
-        """Return list of pathways stored in this model."""
-        for k, v in self.pathway_specs.items():
-            for el in v:
-                yield k, el
-
-    def has_default(self, prop_name):
-        """Return if a property has a default value stored in this model."""
-        log.log_assert(self.has_property(prop_name), f'Property "{prop_name}" unknown!')
-        return hasattr(self, prop_name) and getattr(self, prop_name) is not None
-
-    def get_default(self, prop_name):
-        """Return default value for given property."""
-        log.log_assert(self.has_property(prop_name), f'Property "{prop_name}" unknown!')
-        log.log_assert(self.has_default(prop_name), f'No default value for "{prop_name}"!')
-        return getattr(self, prop_name)
-
-    @cached_property
-    def default_dict(self):
-        """Return dictionary with default property values, if any."""
-        default_dict = {}
-        for prop in self.property_names:
-            if self.has_default(prop):
-                default_dict[prop] = self.get_default(prop)
-        return default_dict
-
-    def get_pathway_property(self, prop_name, src_type=None, tgt_type=None):
-        """Acces method returning a pathway property value for a given pair of src_type and tgt_type.
-
-        Note: This method can be used in any derived class to access pathway properties.
-        """
-        try:
-            return self.pathway_specs[src_type][tgt_type][prop_name]
-        except KeyError:
-            return self.get_default(prop_name)
-
-    @lru_cache(maxsize=1_000_000)
-    def get_pathway_dict(self, src_type=None, tgt_type=None, default_if_missing=True):
-        """Access method returning a pathway properties dict for a given pair of src_type and tgt_type.
-
-        Optionally, if a pathway or property is not specified or does not exists in the model, the default is returned.
-        Note: This method is can be used in any derived class to access pathway properties.
-        """
-        try:
-            if not default_if_missing:
-                return self.pathway_specs[src_type][tgt_type]
-            else:
-                return self.default_dict | self.pathway_specs[src_type][tgt_type]
-        except KeyError:
-            if not default_if_missing:
-                raise
-            return self.default_dict
-
     def apply(self, **kwargs):
-        """Apply model, but setting pathway inputs to default values (None)."""
-        for inp in self.pathway_input_names:
-            if inp not in kwargs:
-                kwargs[inp] = None
+        """Apply the model.
+
+        Makes sure that the source and destination type values are set according to the
+        inputs to the model: if no pathways have been given at construction time, the
+        application will always use the default values.
+        """
+        for way, default in zip(("src", "tgt"), self.default_types):
+            way_type = f"{way}_type"
+            way_pos = f"{way}_pos"
+            if self.default_enforce or way_type not in kwargs:
+                log.debug(f"Using default values for {way_type} in {self}")
+                if way_type in kwargs:
+                    kwargs[way_type] = np.full_like(kwargs[way_type], default)
+                elif way_pos in kwargs:
+                    kwargs[way_type] = np.full((kwargs[way_pos].shape[0],), default)
+                else:
+                    kwargs[way_type] = [default]
+            elif (types := kwargs.get(way_type, None)) is not None:
+                if np.isscalar(types):
+                    if way_pos in kwargs:
+                        types = np.full((kwargs[way_pos].shape[0],), types)
+                    else:
+                        types = np.array([types])
+                    kwargs[way_type] = types
+                kind = np.array(types).dtype.kind
+                if kind in ("i", "u"):
+                    # No mapping needed for integer indices
+                    pass
+                elif kind == "U":
+                    mapping = getattr(self, f"{way}_type_map")
+                    kwargs[way_type] = np.array([mapping[t] for t in types])
+                else:
+                    raise ValueError(f"Cannot have types '{kind}' for '{way_type}'")
         return super().apply(**kwargs)
 
     def __str__(self):
         """Return model string describing the model."""
         model_str = f"{self.__class__.__name__}\n"
-        model_str = model_str + f"  Model properties: {self.property_names}\n"
-        pw_list = list(self.get_pathways())
-        model_str = model_str + f"  Property values for {len(pw_list)} pathways: "
-        if len(pw_list) > 2:
-            model_str = model_str + f"[{pw_list[0]}..{pw_list[-1]}]\n"
-        else:
-            model_str = model_str + f"{pw_list}\n"
-        model_str = model_str + f"  Default: {self.default_dict}"
+        model_str += f"  Model properties: {self.property_names}\n"
+        if self.default_types[0] > 0 or self.default_types[1] > 0:
+            counts = "×".join([str(cnt) for cnt in self.default_types if cnt > 0])
+            model_str += f"  Property values for {counts} pathways\n"
+        model_str += f"  Default: {self.get_param_dict()}"
         return model_str
 
 
@@ -404,21 +362,14 @@ class NSynConnModel(PathwayModel):
         """Model initialization."""
         super().__init__(**kwargs)
 
-        # Check init values of all pathways + default
-        pw_list = self.get_pathways()
-        for src, tgt in itertools.chain(pw_list, [(None, None)]):
-            attr_dict = self.get_pathway_dict(src, tgt, default_if_missing=True)
-            if "mean" in attr_dict:
-                log.log_assert(attr_dict["mean"] > 0.0, "Mean must be larger than zero!")
-            if "std" in attr_dict:
-                log.log_assert(attr_dict["std"] >= 0.0, "Std cannot be negative!")
+        log.log_assert(np.all(self.mean > 0.0), "Mean must be larger than zero!")
+        log.log_assert(np.all(self.std >= 0.0), "Std cannot be negative!")
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_type, tgt_type, **kwargs):  # pylint: disable=arguments-differ
         """Draw #syn/conn value for one connection between src_type and tgt_type [seeded through numpy]."""
         # Get distribution attribute values
-        attr_dict = self.get_pathway_dict(kwargs["src_type"], kwargs["tgt_type"])
-        distr_mean = attr_dict["mean"]
-        distr_std = attr_dict["std"]
+        distr_mean = self.mean[src_type, tgt_type]
+        distr_std = self.std[src_type, tgt_type]
 
         # Draw number of synapses
         if distr_std > 0.0:
@@ -439,7 +390,7 @@ class NSynConnModel(PathwayModel):
 class LinDelayModel(PathwayModel):
     """Linear distance-dependent delay model for pairs of m-types [generative model]:
 
-    - Delay mean: delay_mean_coefs[1] * distance + delay_mean_coefs[0] (linear)
+    - Delay mean: delay_mean_coeff_b * distance + delay_mean_coeff_a (linear)
     - Delay std: delay_std (constant)
     - Delay min: delay_min (constant)
     - Different delay attributes for specific pathways
@@ -448,8 +399,13 @@ class LinDelayModel(PathwayModel):
 
     # Names of model inputs, parameters and data frames which are part of this model
     # (other than the ones inherited from PathwayModel class)
-    param_names = ["delay_mean_coefs", "delay_std", "delay_min"]
-    param_defaults = {"delay_mean_coefs": [0.75, 0.003], "delay_std": 0.5, "delay_min": 0.2}
+    param_names = ["delay_mean_coeff_a", "delay_mean_coeff_b", "delay_std", "delay_min"]
+    param_defaults = {
+        "delay_mean_coeff_a": 0.75,
+        "delay_mean_coeff_b": 0.003,
+        "delay_std": 0.5,
+        "delay_min": 0.2,
+    }
     data_names = []
     input_names = ["distance"]
 
@@ -457,43 +413,24 @@ class LinDelayModel(PathwayModel):
         """Model initialization."""
         super().__init__(**kwargs)
 
-        # Check init values of all pathways + default
-        pw_list = self.get_pathways()
-        for src, tgt in itertools.chain(pw_list, [(None, None)]):
-            attr_dict = self.get_pathway_dict(src, tgt, default_if_missing=True)
-            if "delay_mean_coefs" in attr_dict:
-                log.log_assert(
-                    hasattr(attr_dict["delay_mean_coefs"], "__iter__")
-                    and len(attr_dict["delay_mean_coefs"]) == 2,
-                    "Two mean coefficients required for linear delay model!",
-                )
-            if "delay_std" in attr_dict:
-                log.log_assert(attr_dict["delay_std"] >= 0.0, "Delay std cannot be negative!")
-            if "delay_min" in attr_dict:
-                log.log_assert(attr_dict["delay_min"] >= 0.0, "Delay min cannot be negative!")
+        log.log_assert(np.all(self.delay_std >= 0.0), "Delay std cannot be negative!")
+        log.log_assert(np.all(self.delay_min >= 0.0), "Delay min cannot be negative!")
 
-    def get_mean(self, distance, src_type=None, tgt_type=None):
-        """Get delay mean for given distance (linear)."""
-        delay_mean_coefs = self.get_pathway_property("delay_mean_coefs", src_type, tgt_type)
-        return delay_mean_coefs[1] * distance + delay_mean_coefs[0]
-
-    def get_std(self, distance, src_type=None, tgt_type=None):
-        """Get delay std for given distance (constant)."""
-        delay_std = self.get_pathway_property("delay_std", src_type, tgt_type)
-        return np.full_like(distance, delay_std, dtype=type(delay_std))
-
-    def get_min(self, distance, src_type=None, tgt_type=None):
-        """Get delay min for given distance (constant)."""
-        delay_min = self.get_pathway_property("delay_min", src_type, tgt_type)
-        return np.full_like(distance, delay_min, dtype=type(delay_min))
-
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_type, tgt_type, distance):  # pylint: disable=arguments-differ
         """Draw distance-dependent delay values from truncated normal distribution [seeded through numpy]."""
-        d_mean = self.get_mean(np.array(kwargs["distance"]), kwargs["src_type"], kwargs["tgt_type"])
-        d_std = self.get_std(np.array(kwargs["distance"]), kwargs["src_type"], kwargs["tgt_type"])
-        d_min = self.get_min(np.array(kwargs["distance"]), kwargs["src_type"], kwargs["tgt_type"])
+        d_mean = (
+            self.delay_mean_coeff_b[src_type, tgt_type] * np.array(distance)
+            + self.delay_mean_coeff_a[src_type, tgt_type]
+        )
+        d_std = np.full_like(
+            distance, self.delay_std[src_type, tgt_type], dtype=self.delay_std.dtype
+        )
+        d_min = np.full_like(
+            distance, self.delay_min[src_type, tgt_type], dtype=self.delay_min.dtype
+        )
+
         if all(d_std > 0.0):
-            return truncnorm(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std).rvs()
+            return truncnorm.rvs(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std)
         else:
             return np.maximum(d_mean, d_min)  # Deterministic
 
@@ -555,103 +492,34 @@ class ConnProbModel(PathwayModel):
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
-    param_names = ["order", "coeffs"]
-    param_defaults = {"order": 1, "coeffs": (0.0,)}
+    param_names = ["order", "coeff_a", "coeff_b"]
+    param_defaults = {"order": 1, "coeff_a": 0.0, "coeff_b": np.nan}
     data_names = []
     input_names = ["src_pos", "tgt_pos"]
 
-    def __init__(self, **kwargs):
-        """Model initialization."""
-        # Derive default model order from coefficients (if possible)
-        if "order" not in kwargs and "coeffs" in kwargs:
-            if np.isscalar(kwargs["coeffs"]):
-                kwargs["coeffs"] = (kwargs["coeffs"],)  # Convert scalar to tuple
-            if len(kwargs["coeffs"]) == 1:
-                kwargs["order"] = 1
-            elif len(kwargs["coeffs"]) == 2:
-                kwargs["order"] = 2
-            else:
-                log.log_assert(False, "Default model order cannot be determined!")
-
-        # Derive pathway model order from coefficients (if possible)
-        if "pathway_specs" in kwargs:
-            for src, tgt_dict in kwargs["pathway_specs"].items():
-                for tgt, attr_dict in tgt_dict.items():
-                    if "order" not in attr_dict and "coeffs" in attr_dict:
-                        if np.isscalar(attr_dict["coeffs"]):
-                            attr_dict["coeffs"] = (attr_dict["coeffs"],)  # Convert scalar to tuple
-                        if len(attr_dict["coeffs"]) == 1:
-                            attr_dict["order"] = 1
-                        elif len(attr_dict["coeffs"]) == 2:
-                            attr_dict["order"] = 2
-                        else:
-                            log.log_assert(False, "Model order cannot be determined!")
-        super().__init__(**kwargs)
-
-        # Check init values of all pathways + default
-        pw_list = self.get_pathways()
-        for src, tgt in itertools.chain(pw_list, [(None, None)]):
-            attr_dict = self.get_pathway_dict(src, tgt, default_if_missing=True)
-            if np.all(np.isnan(attr_dict["coeffs"])):
-                log.warning("Empty/invalid model!")
-                # FIXME: should this not fail?
-            if attr_dict["order"] == 1:
-                log.log_assert(
-                    len(attr_dict["coeffs"]) == 1, "Number of provided coefficients must be 1!"
-                )
-                log.log_assert(
-                    0.0 <= attr_dict["coeffs"][0] <= 1.0,
-                    "Connection probability must be between 0 and 1!",
-                )
-            elif attr_dict["order"] == 2:
-                log.log_assert(
-                    len(attr_dict["coeffs"]) == 2, "Number of provided coefficients must be 2"
-                )
-                log.log_assert(
-                    0.0 <= attr_dict["coeffs"][0] <= 1.0, '"Scale" must be between 0 and 1!'
-                )
-                log.log_assert(attr_dict["coeffs"][1] >= 0.0, '"Exponent" must be non-negative!')
-            else:
-                log.log_assert(False, f"Order-{attr_dict['order']} model not implemented!")
-
-    @staticmethod
-    def exp_fct(distance, scale, exponent):
-        """Distance-dependent exponential probability function."""
-        return scale * np.exp(-exponent * np.array(distance))
-
-    @staticmethod
-    def prob_fct(order, coeffs, src_pos, tgt_pos):
-        """Connection probability of given order."""
-        if order == 1:
-            return coeffs[0]
-        elif order == 2:
-            distance = np.sqrt(np.sum((src_pos - tgt_pos) ** 2))  # Euclidean distance
-            return coeffs[0] * np.exp(-coeffs[1] * np.array(distance))
-        else:
-            raise ValueError("Order-{order} probability function not implemented!")
-
-    def get_model_output(self, **kwargs):
+    def get_model_output(
+        self, src_type, tgt_type, src_pos, tgt_pos
+    ):  # pylint: disable=arguments-differ
         """Return pathway-specific connection probabilities <#ysrc x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
-        src_type = kwargs[
-            "src_type"
-        ]  # May be scalar (or None), or array-like matching the size of src_pos
-        tgt_type = kwargs[
-            "tgt_type"
-        ]  # May be scalar (or None), or array-like matching the size of tgt_pos
-        if src_type is None or np.isscalar(src_type):
+        if np.isscalar(src_type):
             src_type = [src_type] * src_pos.shape[0]
-        if tgt_type is None or np.isscalar(tgt_type):
+        if np.isscalar(tgt_type):
             tgt_type = [tgt_type] * tgt_pos.shape[0]
 
         p_mat = np.zeros((len(src_type), len(tgt_type)))
-        for si, st in enumerate(src_type):
-            for ti, tt in enumerate(tgt_type):
-                props = self.get_pathway_dict(st, tt)
-                p_mat[si, ti] = self.prob_fct(
-                    props["order"], props["coeffs"], src_pos[si], tgt_pos[ti]
-                )
+        for ti, tt in enumerate(tgt_type):
+            # tt is the first index in the Pandas DataFrame
+            order = self.order[src_type, tt]
+            coeff_a = self.coeff_a[src_type, tt]
+            p_mat[:, ti] = coeff_a
+
+            # override higher order values that are more expensive to calculate
+            sel = order == 2
+            if np.any(sel):
+                coeff_a = coeff_a[sel]
+                coeff_b = self.coeff_b[src_type, tt][sel]
+                distance = np.sqrt(np.sum((src_pos[sel] - tgt_pos[ti]) ** 2, axis=1))
+                p_mat[:, ti][sel] = coeff_a * np.exp(-coeff_b * distance)
         return p_mat
 
 

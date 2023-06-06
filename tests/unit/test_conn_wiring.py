@@ -366,14 +366,15 @@ def test_apply(manipulation):
     # Case 6: Check delays (from PRE neuron (soma) to POST synapse position)
     def check_delay(nodes, delay_model, res):
         for i in range(res.shape[0]):
-            delay_offset, delay_scale = delay_model.get_param_dict()["delay_mean_coefs"]
+            delay_offset = delay_model.get_param_dict()["delay_mean_coeff_a"]
+            delay_scale = delay_model.get_param_dict()["delay_mean_coeff_b"]
             src_pos = nodes[0].positions(res.iloc[i]["@source_node"]).to_numpy()
             syn_pos = res.iloc[i][
                 ["afferent_center_x", "afferent_center_y", "afferent_center_z"]
             ].to_numpy()
             dist = np.sqrt(np.sum((src_pos - syn_pos) ** 2))
             delay = delay_scale * dist + delay_offset
-            assert np.isclose(res.iloc[i]["delay"], delay), "ERROR: Delay mismatch!"
+            assert np.all(np.isclose(res.iloc[i]["delay"], delay)), "ERROR: Delay mismatch!"
 
     ## (a) Integrated wiring
     res = manipulation(nodes).apply(

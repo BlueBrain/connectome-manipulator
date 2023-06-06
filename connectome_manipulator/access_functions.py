@@ -7,6 +7,28 @@ import libsonata
 from connectome_manipulator import log
 
 
+def get_enumeration_map(pop, column):
+    """Takes a node population and column name and returns a dictionary that maps values to indices."""
+    raw_pop = pop._population  # pylint: disable=protected-access
+    if column in raw_pop.enumeration_names:
+        return {key: idx for idx, key in enumerate(raw_pop.enumeration_values(column))}
+    return {
+        key: idx
+        for idx, key in enumerate(
+            sorted(np.unique(raw_pop.get_attribute(column, raw_pop.select_all())))
+        )
+    }
+
+
+def get_enumeration(pop, column, ids):
+    """Get the raw enumeration values for `column` from population `pop` for node IDs `ids`."""
+    raw_pop = pop._population  # pylint: disable=protected-access
+    if column in raw_pop.enumeration_names:
+        return raw_pop.get_enumeration(column, libsonata.Selection(ids))
+    mapping = get_enumeration_map(pop, column)
+    return np.array([mapping[v] for v in raw_pop.get_attribute(column, libsonata.Selection(ids))])
+
+
 def get_node_ids(nodes, sel_spec, split_ids=None):
     """Returns list of selected node IDs of given nodes population.
 

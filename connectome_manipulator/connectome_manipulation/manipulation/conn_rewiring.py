@@ -29,7 +29,10 @@ import numpy as np
 import pandas as pd
 
 from connectome_manipulator import log, profiler
-from connectome_manipulator.access_functions import get_node_ids
+from connectome_manipulator.access_functions import (
+    get_node_ids,
+    get_enumeration,
+)
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 from connectome_manipulator.model_building import model_types, conn_prob
 
@@ -73,6 +76,7 @@ class ConnectomeRewiring(Manipulation):
         estimation_run=False,
         p_scale=1.0,
         opt_nconn=False,
+        pathway_specs=None,
     ):
         """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
 
@@ -125,6 +129,11 @@ class ConnectomeRewiring(Manipulation):
             log.warning(
                 f'"{gen_method}" method samples only from synapses within same data split! Reduce number of splits to 1 to sample from all synapses!'
             )
+
+        if "file" not in prob_model_spec:
+            prob_model_spec["src_type_map"] = self.src_type_map
+            prob_model_spec["tgt_type_map"] = self.tgt_type_map
+            prob_model_spec["pathway_specs"] = pathway_specs
 
         # Load connection probability model
         p_model = model_types.AbstractModel.init_model(prob_model_spec)
@@ -276,7 +285,15 @@ class ConnectomeRewiring(Manipulation):
             )[
                 0
             ]  # Get neuron positions (incl. position mapping, if provided)
-            p_src = p_model.apply(src_pos=src_pos, tgt_pos=tgt_pos).flatten() * p_scale
+            p_src = (
+                p_model.apply(
+                    src_pos=src_pos,
+                    src_type=get_enumeration(self.nodes[0], "mtype", src_node_ids),
+                    tgt_pos=tgt_pos,
+                    tgt_type=get_enumeration(self.nodes[1], "mtype", [tgt]),
+                ).flatten()
+                * p_scale
+            )
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
             p_src[
                 src_node_ids == tgt

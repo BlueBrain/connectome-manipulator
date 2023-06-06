@@ -1,8 +1,6 @@
 {
-  "delay_mean_coefs": [
-    0.7,
-    0.003
-  ],
+  "delay_mean_coeff_a": 0.7,
+  "delay_mean_coeff_b": 0.003,
   "delay_std": 0.0,
   "delay_min": 0.0,
   "data_keys": [],

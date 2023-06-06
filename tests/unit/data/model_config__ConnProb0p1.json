@@ -1,5 +1,5 @@
 {
   "model": "ConnProbModel",
   "order": 1,
-  "coeffs": [0.1]
+  "coeff_a": 0.1
 }

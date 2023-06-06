@@ -113,7 +113,8 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
     X = np.array(dist_bins[:-1][np.isfinite(dist_delays_mean)] + bin_offset, ndmin=2).T
     y = dist_delays_mean[np.isfinite(dist_delays_mean)]
     dist_delays_mean_fit = LinearRegression().fit(X, y)
-    delay_mean_coefs = [dist_delays_mean_fit.intercept_, dist_delays_mean_fit.coef_[0]]
+    delay_mean_coeff_a = dist_delays_mean_fit.intercept_
+    delay_mean_coeff_b = dist_delays_mean_fit.coef_[0]
 
     # Std delay model (const)
     delay_std = np.nanmean(dist_delays_std)
@@ -123,7 +124,10 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
 
     # Create model
     model = model_types.LinDelayModel(
-        delay_mean_coefs=delay_mean_coefs, delay_std=delay_std, delay_min=delay_min
+        delay_mean_coeff_a=delay_mean_coeff_a,
+        delay_mean_coeff_b=delay_mean_coeff_b,
+        delay_std=delay_std,
+        delay_min=delay_min,
     )
     log.debug("Model description:\n%s", model)
 
@@ -137,7 +141,7 @@ def plot(
     bin_width = np.diff(dist_bins[:2])[0]
 
     model_params = model.get_param_dict()
-    mean_model_str = f'f(x) = {model_params["delay_mean_coefs"][1]:.3f} * x + {model_params["delay_mean_coefs"][0]:.3f}'
+    mean_model_str = f'f(x) = {model_params["delay_mean_coeff_b"]:.3f} * x + {model_params["delay_mean_coeff_a"]:.3f}'
     std_model_str = f'f(x) = {model_params["delay_std"]:.3f}'
     min_model_str = f'f(x) = {model_params["delay_min"]:.3f}'
 

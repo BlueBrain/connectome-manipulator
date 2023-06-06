@@ -9,8 +9,9 @@
     "fcts": [
       {
         "source": "conn_wiring",
-        "kwargs": {
-          "amount_pct": 100.0,
+        "amount_pct": 100.0,
+        "morph_ext": "swc",
+        "model_config": {
           "prob_model_spec": {
             "model": "ConnProb2ndOrderExpModel",
             "scale": 0.1488091516112886,
@@ -23,14 +24,11 @@
           },
           "delay_model_spec": {
             "model": "LinDelayModel",
-            "delay_mean_coefs": [
-              0.75,
-              0.003
-            ],
+            "delay_mean_coeff_a": 0.75,
+            "delay_mean_coeff_b": 0.003,
             "delay_std": 0.5,
             "delay_min": 0.2
-          },
-          "morph_ext": "swc"
+          }
         }
       }
     ]

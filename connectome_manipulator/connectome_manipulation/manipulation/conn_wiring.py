@@ -17,7 +17,10 @@ import tqdm
 
 from bluepysnap.morph import MorphHelper
 from connectome_manipulator import log, profiler
-from connectome_manipulator.access_functions import get_node_ids
+from connectome_manipulator.access_functions import (
+    get_node_ids,
+    get_enumeration,
+)
 from connectome_manipulator.connectome_manipulation.manipulation import (
     MorphologyCachingManipulation,
 )
@@ -84,20 +87,42 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         edges_table,
         split_ids,
         aux_dict,
-        prob_model_spec={"model": "ConnProb1stOrderModel"},  # Default 1st-oder model
-        nsynconn_model_spec={"model": "NSynConnModel"},  # Default #syn/conn model
         sel_src=None,
         sel_dest=None,
-        delay_model_spec={"model": "LinDelayModel"},  # Default linear delay model
         pos_map_file=None,
         amount_pct=100.0,
         morph_ext="swc",
+        prob_model_spec=None,
+        nsynconn_model_spec=None,
+        delay_model_spec=None,
+        pathway_specs=None,
+        **kwargs,
     ):
         """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
 
         => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
         => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
         """
+        # pylint did not accept to drop kwargs, forced to add this
+        assert len(kwargs) == 0
+        if not prob_model_spec:
+            prob_model_spec = {
+                "model": "ConnProb1stOrderModel",
+            }  # Default 1st-oder model
+        if not nsynconn_model_spec:
+            nsynconn_model_spec = {
+                "model": "NSynConnModel",
+            }  # Default #syn/conn model
+        if not delay_model_spec:
+            delay_model_spec = {
+                "model": "LinDelayModel",
+            }  # Default linear delay model
+        for spec in (prob_model_spec, nsynconn_model_spec, delay_model_spec):
+            # AbstractModel insists that "file" is the only key if present
+            if "file" not in spec:
+                spec["src_type_map"] = self.src_type_map
+                spec["tgt_type_map"] = self.tgt_type_map
+                spec["pathway_specs"] = pathway_specs
         # pylint: disable=arguments-differ, arguments-renamed
         log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
         if edges_table is None:
@@ -161,8 +186,16 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
             log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
 
+            # Determine source/target nodes for wiring
+            src_node_ids = get_node_ids(self.nodes[0], sel_src)
+            src_class = self.nodes[0]._population.get_attribute(  # pylint: disable=protected-access
+                "synapse_class", libsonata.Selection(src_node_ids)
+            )
+            src_mtypes = get_enumeration(self.nodes[0], "mtype", src_node_ids)
+            log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
+
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
-            tgt_mtypes = self.nodes[1].get(tgt_node_ids, properties="mtype").to_numpy()
+            tgt_mtypes = get_enumeration(self.nodes[1], "mtype", tgt_node_ids)
 
             if pos_acc:
                 # FIXME: this is going to be VERY SLOW!
@@ -312,7 +345,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 src_pos=src_positions,
                 tgt_pos=tgt_pos,
                 src_type=src_mtypes,
-                tgt_type=tgt_mtypes[tidx],
+                tgt_type=[tgt_mtypes[tidx]],
             ).flatten()
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
             p_src[
@@ -402,10 +435,11 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 syn_dist = np.sqrt(
                     np.sum((pos_sel - src_new_pos[syn_conn_idx, :]) ** 2, 1)
                 )  # Distance from source neurons (soma) to synapse positions on target neuron
-                new_edges["delay"] = [
-                    delay_model.apply(distance=[d], src_type=s, tgt_type=tgt_mtypes[tidx])
-                    for s, d in zip(src_mtypes[src_new_sel][syn_conn_idx], syn_dist)
-                ]
+                new_edges["delay"] = delay_model.apply(
+                    distance=syn_dist,
+                    src_type=src_mtypes[src_new_sel][syn_conn_idx],
+                    tgt_type=tgt_mtypes[tidx],
+                )
 
             # Add new_edges to edges table
             #         all_new_edges = all_new_edges.append(new_edges)
@@ -437,13 +471,13 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             # Select source/target nodes
             src_node_ids = nodes.ids({"mtype": pre_type})
             src_class = nodes.get(src_node_ids, properties="synapse_class").to_numpy()
-            src_mtypes = nodes.get(src_node_ids, properties="mtype").to_numpy()
+            src_mtypes = get_enumeration(nodes, "mtype", src_node_ids)
             src_positions = nodes.positions(
                 src_node_ids
             ).to_numpy()  # OPTIONAL: Coordinate system transformation may be added here
 
             tgt_node_ids = nodes.ids({"mtype": post_type})
-            tgt_mtypes = nodes.get(tgt_node_ids, properties="mtype").to_numpy()
+            tgt_mtypes = get_enumeration(nodes, "mtype", tgt_node_ids)
             tgt_positions = nodes.positions(
                 tgt_node_ids
             ).to_numpy()  # OPTIONAL: Coordinate system transformation may be added here

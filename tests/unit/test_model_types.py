@@ -8,6 +8,70 @@ from utils import setup_tempdir, TEST_DATA_DIR
 import connectome_manipulator.model_building.model_types as test_module
 
 
+def test_PathwayModel():
+    model_dict = {"model": "ConnProbModel", "order": 1, "coeff_a": 3.14}
+
+    pos = [0.0, 1.0, 2.0]
+    spos = np.array([pos, pos, pos])
+    tpos = np.array([pos])
+
+    expected_default = np.array([[3.14], [3.14], [3.14]])
+
+    with pytest.raises(ValueError):
+        # Not specifying any mapping: can't specify pathway_specs
+        new_dict = model_dict | {"pathway_specs": pd.DataFrame({})}
+        test_module.AbstractModel.model_from_dict(new_dict)
+
+    # Passing types with a default-only model
+    default_model = test_module.AbstractModel.model_from_dict(model_dict)
+    assert np.all(
+        default_model.apply(src_type=[0, 1, 2], src_pos=spos, tgt_type=[34], tgt_pos=tpos) == 3.14
+    )
+
+    # Passing types
+    better_model = test_module.AbstractModel.model_from_dict(
+        model_dict
+        | {
+            "pathway_specs": pd.DataFrame(
+                {"src_type": ["A"], "tgt_type": ["A"], "connprob_coeff_a": [2.72]}
+            ).set_index(["src_type", "tgt_type"]),
+            "src_type_map": {"A": 0, "B": 1},
+            "tgt_type_map": {"A": 0, "B": 1},
+        }
+    )
+    assert np.all(
+        better_model.apply(src_type=["A", "A", "A"], src_pos=spos, tgt_type=["A"], tgt_pos=tpos)
+        == 2.72
+    )
+    assert np.all(
+        better_model.apply(src_type=[0, 0, 0], src_pos=spos, tgt_type=[0], tgt_pos=tpos) == 2.72
+    )
+
+    assert_array_equal(
+        better_model.apply(src_type=["A", "A", "A"], src_pos=spos, tgt_type=["B"], tgt_pos=tpos),
+        expected_default,
+    )
+    assert_array_equal(
+        better_model.apply(src_type="A", src_pos=spos, tgt_type=["B"], tgt_pos=tpos),
+        expected_default,
+    )
+    assert_array_equal(
+        better_model.apply(src_type=[1, 1, 1], src_pos=spos, tgt_type=[0], tgt_pos=tpos),
+        expected_default,
+    )
+    assert_array_equal(
+        better_model.apply(src_type=1, src_pos=spos, tgt_type=["B"], tgt_pos=tpos), expected_default
+    )
+    assert_array_equal(better_model.apply(src_pos=spos, tgt_pos=tpos), expected_default)
+
+    with pytest.raises(KeyError):
+        better_model.apply(src_type=["A", "B", "C"], src_pos=spos, tgt_pos=tpos, tgt_type=["D"])
+    with pytest.raises(IndexError):
+        better_model.apply(src_type=[123, 456, 789], src_pos=spos, tgt_pos=tpos, tgt_type=[-666])
+    with pytest.raises(ValueError):
+        better_model.apply(src_type=[1.0, 2.0, 3.0], src_pos=spos, tgt_pos=tpos, tgt_type=[-6.66])
+
+
 def test_LinDelayModel():
     np.random.seed(0)
     with setup_tempdir(__name__) as tempdir:
@@ -16,7 +80,8 @@ def test_LinDelayModel():
         d_min = 0.2
         model_dict = {
             "model": "LinDelayModel",
-            "delay_mean_coefs": d_coef,
+            "delay_mean_coeff_a": d_coef[0],
+            "delay_mean_coeff_b": d_coef[1],
             "delay_std": 0.0,
             "delay_min": d_min,
         }
@@ -29,7 +94,8 @@ def test_LinDelayModel():
         d_std = 0.5
         model_dict = {
             "model": "LinDelayModel",
-            "delay_mean_coefs": d_coef,
+            "delay_mean_coeff_a": d_coef[0],
+            "delay_mean_coeff_b": d_coef[1],
             "delay_std": d_std,
             "delay_min": d_min,
         }

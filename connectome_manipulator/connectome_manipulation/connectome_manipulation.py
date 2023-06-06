@@ -15,7 +15,7 @@ import logging
 
 import libsonata
 import numpy as np
-
+import pandas as pd
 from bluepysnap.circuit import Circuit
 
 from .. import log, utils, profiler
@@ -86,16 +86,46 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     return c.config, nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
 
 
-def apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict):
+def apply_manipulation(edges_table, nodes, split_ids, manip, aux_dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
-    log.info(f'APPLYING MANIPULATION "{manip_config["manip"]["name"]}"')
-    n_fcts = len(manip_config["manip"]["fcts"])
-    for m_step, m_config in enumerate(manip_config["manip"]["fcts"]):
-        manip_source = m_config["source"]
-        manip_kwargs = m_config["kwargs"]
-        log.info(f">>Step {m_step + 1} of {n_fcts}: source={manip_source}")
-        m = Manipulation.get(manip_source)(nodes)
-        edges_table = m.apply(edges_table, split_ids, aux_dict, **manip_kwargs)
+    log.info(f'APPLYING MANIPULATION "{manip["name"]}"')
+
+    for fun, cfg in enumerate(manip["fcts"]):
+        source = cfg.pop("source")
+        models = cfg.pop("model_config")
+
+        log.info(f">>Function {fun + 1} of {len(manip['fcts'])}: source={source}")
+
+        if filename := cfg.pop("model_pathways", None):
+            filename = os.path.join(os.path.dirname(aux_dict["config_path"]), filename)
+            pathways = pd.read_parquet(filename)
+        else:
+            pathways = None
+
+        m = Manipulation.get(source)(nodes)
+
+        if pathways is not None:
+            grouped = pathways.groupby(
+                ["src_hemisphere", "src_region", "dst_hemisphere", "dst_region"], observed=True
+            )
+            for n, ((src_hemi, src_region, dst_hemi, dst_region), group) in enumerate(grouped):
+                log.info(f">>Step {n + 1} of {grouped.ngroups}: source={source}")
+
+                # Reset index to match expectations
+                group = group.set_index(["src_type", "dst_type"])
+
+                edges_table = m.apply(
+                    edges_table,
+                    split_ids,
+                    aux_dict,
+                    sel_src={"hemisphere": src_hemi, "region": src_region},
+                    sel_dest={"hemisphere": dst_hemi, "region": dst_region},
+                    pathway_specs=group,
+                    **cfg,
+                    **models,
+                )
+        else:
+            edges_table = m.apply(edges_table, split_ids, aux_dict, **cfg, **models)
     return edges_table
 
 
@@ -329,6 +359,7 @@ def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
         "i_split": job.i_split,
         "id_selection": job.selection,
         "split_ids": split_ids,
+        "config_path": options.config_path,
     }
 
     with profiler.profileit(name="processing"):
@@ -336,7 +367,7 @@ def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
             nodes=jobs_common.nodes,
             split_ids=split_ids,
             edges_table=edges_table,
-            manip_config=config,
+            manip_config=config["manip"],
             aux_dict=aux_dict,
         )
 

@@ -40,7 +40,6 @@ setup(
         "scikit-learn",
         "voxcell",
         "pyarrow",
-        "jsonpickle",
         "scikit-learn",
         "tables",
         "distributed",  # Dask

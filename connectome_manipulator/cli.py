@@ -1,7 +1,6 @@
 """Main CLI entry point"""
 
 
-import sys
 from pathlib import Path
 import logging
 
@@ -104,4 +103,4 @@ def manipulate_connectome(
 
 
 if __name__ == "__main__":
-    click.get_current_context().invoke(app, sys.argv[1:])
+    app()  # pylint: disable=no-value-for-parameter

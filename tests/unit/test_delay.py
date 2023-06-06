@@ -58,6 +58,8 @@ def test_build():
     model = test_module.build(bins, d_mean, d_std, d_min, bin_size_um)
     model_dict = model.get_param_dict()
 
-    assert_array_almost_equal(model_dict["delay_mean_coefs"], d_coef)
+    assert_array_almost_equal(
+        (model_dict["delay_mean_coeff_a"], model_dict["delay_mean_coeff_b"]), d_coef
+    )
     assert np.isclose(model_dict["delay_std"], np.mean(d_std))
     assert model_dict["delay_min"] == d_min

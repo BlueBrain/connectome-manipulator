@@ -61,14 +61,15 @@ def test_apply(manipulation):
         for idx in res[
             np.isin(res["@source_node"], nodes[0].ids({"synapse_class": syn_class}))
         ].index:
-            delay_offset, delay_scale = delay_model.get_param_dict()["delay_mean_coefs"]
+            delay_offset = delay_model.get_param_dict()["delay_mean_coeff_a"]
+            delay_scale = delay_model.get_param_dict()["delay_mean_coeff_b"]
             src_pos = nodes[0].positions(res.loc[idx]["@source_node"]).to_numpy()
             syn_pos = res.loc[idx][
                 ["afferent_center_x", "afferent_center_y", "afferent_center_z"]
             ].to_numpy()
             dist = np.sqrt(np.sum((src_pos - syn_pos) ** 2))
             delay = delay_scale * dist + delay_offset
-            assert np.isclose(res.loc[idx]["delay"], delay), "ERROR: Delay mismatch!"
+            assert np.all(np.isclose(res.loc[idx]["delay"], delay)), "ERROR: Delay mismatch!"
 
     def check_nsyn(ref, res):
         """Check number of synapses per connection"""
