@@ -59,13 +59,8 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
 
     nodes = (src_nodes, tgt_nodes)
 
-    src_file_idx = np.where(np.array(c.nodes.population_names) == src_nodes.name)[0]
-    log.log_assert(len(src_file_idx) == 1, "Source nodes population file index error!")
-    tgt_file_idx = np.where(np.array(c.nodes.population_names) == tgt_nodes.name)[0]
-    log.log_assert(len(tgt_file_idx) == 1, "Target nodes population file index error!")
-
-    src_nodes_file = c.config["networks"]["nodes"][src_file_idx[0]]["nodes_file"]
-    tgt_nodes_file = c.config["networks"]["nodes"][tgt_file_idx[0]]["nodes_file"]
+    src_nodes_file = c.to_libsonata.node_population_properties(src_nodes.name).elements_path
+    tgt_nodes_file = c.to_libsonata.node_population_properties(tgt_nodes.name).elements_path
     nodes_files = [src_nodes_file, tgt_nodes_file]
 
     if edges is None:
