@@ -112,38 +112,24 @@ def apply(
         edges_table.loc[syn_sel_idx, syn_prop] = edges_table.loc[syn_sel_idx, syn_prop].values[
             np.random.permutation(np.sum(syn_sel_idx))
         ]
-    elif new_value["mode"] == "randval":  # Set random values from given distribution
+    elif new_value["mode"] in ["randval", "randscale", "randadd"]:
+        transform = {
+            "randval": lambda _, y: y,
+            "randscale": np.multiply,
+            "randadd": np.add,
+        }[new_value["mode"]]
+
         rng = getattr(np.random, new_value["rng"])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
-            np.minimum(
-                np.maximum(rng(**new_value["kwargs"], size=np.sum(syn_sel_idx)), val_range[0]),
-                val_range[1],
-            )
+        random_values = rng(**new_value["kwargs"], size=np.sum(syn_sel_idx))
+        new_values = np.clip(
+            transform(edges_table.loc[syn_sel_idx, syn_prop], random_values),
+            val_range[0],
+            val_range[1],
         )
-    elif new_value["mode"] == "randscale":  # Scale by random factors from given distribution
+
+        # Set random values from given distribution
         rng = getattr(np.random, new_value["rng"])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
-            np.minimum(
-                np.maximum(
-                    edges_table.loc[syn_sel_idx, syn_prop]
-                    * rng(**new_value["kwargs"], size=np.sum(syn_sel_idx)),
-                    val_range[0],
-                ),
-                val_range[1],
-            )
-        )
-    elif new_value["mode"] == "randadd":  # Add random values from given distribution
-        rng = getattr(np.random, new_value["rng"])
-        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
-            np.minimum(
-                np.maximum(
-                    edges_table.loc[syn_sel_idx, syn_prop]
-                    + rng(**new_value["kwargs"], size=np.sum(syn_sel_idx)),
-                    val_range[0],
-                ),
-                val_range[1],
-            )
-        )
+        edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(new_values)
     else:
         log.log_assert(False, f'Value mode "{new_value["mode"]}" not implemented!')
 
