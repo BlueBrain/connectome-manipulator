@@ -385,14 +385,15 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             # [TODO: Add model for synapse placement??]
             morph = self._get_tgt_morph(self.tgt_morph, morph_ext, tgt)
 
+            # Soma/dendrite section indices; soma...-1
             sec_ind = np.hstack(
                 [
                     [-1],
-                    np.where(np.isin(morph.section_types, [nm.BASAL_DENDRITE, nm.APICAL_DENDRITE]))[
-                        0
-                    ],
+                    np.flatnonzero(
+                        np.isin(morph.section_types, [nm.BASAL_DENDRITE, nm.APICAL_DENDRITE])
+                    ),
                 ]
-            )  # Soma/dendrite section indices; soma...-1
+            )
 
             # Randomly choose section indices
             sec_sel = np.random.choice(sec_ind, len(syn_conn_idx))

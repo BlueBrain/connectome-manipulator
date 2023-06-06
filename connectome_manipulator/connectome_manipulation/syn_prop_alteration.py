@@ -97,10 +97,9 @@ def apply(
     elif new_value["mode"] == "scale":
         # Scale by a given factor
         edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
-            np.minimum(
-                np.maximum(
-                    edges_table.loc[syn_sel_idx, syn_prop] * new_value["factor"], val_range[0]
-                ),
+            np.clip(
+                edges_table.loc[syn_sel_idx, syn_prop] * new_value["factor"],
+                val_range[0],
                 val_range[1],
             )
         )

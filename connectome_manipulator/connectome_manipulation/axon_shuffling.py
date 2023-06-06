@@ -63,7 +63,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
                 len(pair_samples) == target_count
             ):  # Target count reached...FINISHING [Note: due to random sampling, it is possible that target count won't be reached exactly]
                 break
-            n2_all = np.nonzero(dist_mat_R_choices[n1, :])[0]
+            n2_all = np.flatnonzero(dist_mat_R_choices[n1, :])
             if len(n2_all) == 0:  # No choices available for n1...SKIPPING
                 continue
             n2 = np.random.choice(n2_all)  # Randomly select one of the choices...

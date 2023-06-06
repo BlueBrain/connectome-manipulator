@@ -750,9 +750,8 @@ class ConnPropsModel(AbstractModel):
                     scale=distr_std,
                 ).rvs(size=size)
             else:
-                drawn_values = np.minimum(
-                    np.maximum(np.full(size, distr_mean), distr_min), distr_max
-                )
+                drawn_values = np.clip(np.full(size, distr_mean), distr_min, distr_max)
+
         elif distr_type == "gamma":
             log.log_assert(
                 distr_mean is not None and distr_std is not None,
