@@ -739,7 +739,7 @@ class ConnPropsModel(AbstractModel):
                 and distr_std is not None
                 and distr_min is not None
                 and distr_max is not None,
-                "Distribution missing (required: mean/std/min/max)!",
+                "Distribution parameters missing (required: mean/std/min/max)!",
             )
             log.log_assert(distr_min <= distr_max, "Range error (truncnorm)!")
             if distr_std > 0.0:

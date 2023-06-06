@@ -348,9 +348,9 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 tgt_type=[tgt_mtypes[tidx]],
             ).flatten()
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
-            p_src[
-                src_node_ids == tgt
-            ] = 0.0  # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
+            # Exclude autapses [ASSUMING node IDs are unique across src/tgt
+            # node populations!]
+            p_src[src_node_ids == tgt] = 0.0
 
             # Sample new presynaptic neurons from list of source nodes according to conn. prob.
             src_new_sel = np.random.rand(len(src_node_ids)) < p_src
@@ -376,9 +376,9 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                     for cname in all_new_edges.columns
                 }
             )
-            new_edges["@source_node"] = src_new[
-                syn_conn_idx
-            ]  # Source node IDs per connection expanded to synapses
+
+            # Source node IDs per connection expanded to synapses
+            new_edges["@source_node"] = src_new[syn_conn_idx]
             new_edges["@target_node"] = tgt
 
             # Place synapses randomly on soma/dendrite sections
@@ -394,13 +394,13 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 ]
             )  # Soma/dendrite section indices; soma...-1
 
-            sec_sel = np.random.choice(
-                sec_ind, len(syn_conn_idx)
-            )  # Randomly choose section indices
-            off_sel = np.random.rand(
-                len(syn_conn_idx)
-            )  # Randomly choose fractional offset within each section
+            # Randomly choose section indices
+            sec_sel = np.random.choice(sec_ind, len(syn_conn_idx))
+
+            # Randomly choose fractional offset within each section
+            off_sel = np.random.rand(len(syn_conn_idx))
             off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
+
             type_sel = [
                 int(morph.section(sec).type) if sec >= 0 else 0 for sec in sec_sel
             ]  # Type 0: Soma (1: Axon, 2: Basal, 3: Apical)

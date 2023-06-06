@@ -84,16 +84,18 @@ def apply(
 
     val_range = new_value.get("range", [-np.inf, np.inf])
 
-    prop_dtype = edges_table.dtypes[
-        syn_prop
-    ].type  # Property data type to cast new values to, so that data type is not changed!!
-    if new_value["mode"] == "setval":  # Set to a fixed given value
+    # Property data type to cast new values to, so that data type is not changed!!
+    prop_dtype = edges_table.dtypes[syn_prop].type
+
+    if new_value["mode"] == "setval":
+        # Set to a fixed given value
         log.log_assert(
             new_value["value"] >= val_range[0] and new_value["value"] <= val_range[1],
             "Property value out of range!",
         )
         edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(new_value["value"])
-    elif new_value["mode"] == "scale":  # Scale by a given factor
+    elif new_value["mode"] == "scale":
+        # Scale by a given factor
         edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
             np.minimum(
                 np.maximum(
@@ -102,7 +104,8 @@ def apply(
                 val_range[1],
             )
         )
-    elif new_value["mode"] == "shuffle":  # Shuffle across synapses
+    elif new_value["mode"] == "shuffle":
+        # Shuffle across synapses
         log.log_assert(
             aux_dict["N_split"] == 1,
             f'"{new_value["mode"]}" mode not supported in block-based processing! Reduce number of splits to 1!',

@@ -225,29 +225,34 @@ def apply(
             # Determine connection strength (sum of g_syns per connection) BEFORE adding synapses
             gsyn_table = get_gsyn_sum_per_conn(edges_table, gids_src, gids_dest)
 
-        if method in (
-            "duplicate",
-            "derive",
-        ):  # Duplicate or derive from existing synapses
-            if np.isscalar(num_add):  # Overall number of synapses to add
-                sel_dupl = np.random.choice(
-                    np.where(syn_sel_idx)[0], num_add
-                )  # Random sampling from existing synapses with replacement
-            else:  # Number of synapses per connection to add [requires syn_conn_idx for mapping between connections and synapses]
+        # Duplicate or derive from existing synapses
+        if method in ("duplicate", "derive"):
+            # Overall number of synapses to add
+            if np.isscalar(num_add):
+                # Random sampling from existing synapses with replacement
+                sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_add)
+            else:
+                # Number of synapses per connection to add [requires
+                # syn_conn_idx for mapping between connections and synapses]
                 sel_dupl = np.full(np.sum(num_add), -1)  # Empty selection
-                dupl_idx = np.hstack(
-                    (0, np.cumsum(num_add))
-                )  # Index vector where to save selected indices
+
+                # Index vector where to save selected indices
+                dupl_idx = np.hstack((0, np.cumsum(num_add)))
                 for cidx, num in enumerate(num_add):
                     if num == 0:  # Nothing to add for this connection
                         continue
-                    conn_sel = np.zeros_like(syn_sel_idx, dtype=bool)  # Empty selection mask
-                    conn_sel[syn_sel_idx] = (
-                        syn_conn_idx == cidx
-                    )  # Sub-select (mask) synapses belonging to given connection from all selected synapses
+                    # Empty selection mask
+                    conn_sel = np.zeros_like(syn_sel_idx, dtype=bool)
+
+                    # Sub-select (mask) synapses belonging to given connection
+                    # from all selected synapses
+                    conn_sel[syn_sel_idx] = syn_conn_idx == cidx
+
+                    # Random sampling from existing synapses per connection
+                    # with replacement
                     sel_dupl[dupl_idx[cidx] : dupl_idx[cidx + 1]] = np.random.choice(
                         np.where(conn_sel)[0], num
-                    )  # Random sampling from existing synapses per connection with replacement
+                    )
             new_edges = edges_table.iloc[sel_dupl].copy()
 
             if (
