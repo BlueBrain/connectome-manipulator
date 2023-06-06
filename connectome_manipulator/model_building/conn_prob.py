@@ -1206,7 +1206,6 @@ def plot_4th_order(
     # Model probability at sample positions
     dxv, dyv, dzv = np.meshgrid(dx_pos_model, dy_pos_model, dz_pos_model, indexing="ij")
     model_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T  # Regular grid
-    # model_pos = np.random.uniform(low=[dx_bins[0], dy_bins[0], dz_bins[0]], high=[dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
     model_val = model.get_conn_prob(model_pos[:, 0], model_pos[:, 1], model_pos[:, 2])
     model_val_xyz = model_val.reshape([len(dx_pos_model), len(dy_pos_model), len(dz_pos_model)])
 
@@ -1935,7 +1934,6 @@ def plot_5th_order(
     model_pos = np.array(
         [xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]
     ).T  # Regular grid
-    # model_pos = np.random.uniform(low=[x_bins[0], y_bins[0], z_bins[0], dx_bins[0], dy_bins[0], dz_bins[0]], high=[x_bins[-1], y_bins[-1], z_bins[-1], dx_bins[-1], dy_bins[-1], dz_bins[-1]], size=[model_ovsampl**3 * len(x_bins) * len(y_bins) * len(z_bins), len(dx_bins) * len(dy_bins) * len(dz_bins), 3]) # Random sampling
     model_val = model.get_conn_prob(
         model_pos[:, 0],
         model_pos[:, 1],

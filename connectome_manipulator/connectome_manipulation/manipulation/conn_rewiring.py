@@ -639,13 +639,6 @@ class ConnectomeRewiring(Manipulation):
 
         ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
         """
-        #     # => Duplicated synapses may belong to same connection!!
-        #     num_sel = np.sum(syn_sel_idx)
-        #     if num_sel > 0: # Duplicate only synapses of syn_class type
-        #         sel_dupl = np.random.choice(np.where(syn_sel_idx)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-        #     else: # Include all synapses, if no synapses of syn_class type are available
-        #         sel_dupl = np.random.choice(np.where(syn_sel_idx_tgt)[0], num_gen_syn) # Random sampling from existing synapses with replacement
-
         # => Unique per connection, so that no duplicated synapses belong to same connection (if possible)!!
         unique_per_conn_warning = False
         num_sel = np.sum(syn_sel_idx)
