@@ -29,22 +29,6 @@ from connectome_manipulator.access_functions import get_node_ids, get_edges_popu
 
 logger = logging.getLogger(__name__)
 
-# NOT USED ANY MORE
-# def get_model(model, model_inputs, model_params):
-#     """Returns model function from string representation [so any model function can be saved to file]."""
-#     input_str = ','.join(model_inputs + ['model_params=model_params']) # String representation of input variables
-#     input_param_str = ','.join(model_inputs + list(model_params.keys())) # String representation of input variables and model parameters
-#     model_param_str = ','.join(model_inputs + ['**model_params']) # String representation propagating model parameters
-
-#     inner_model_str = f'lambda {input_param_str}: {model}'
-#     full_model_str = f'lambda {input_str}: ({inner_model_str})({model_param_str})' # Use nested lambdas to bind local variables
-
-#     model_fct = eval(full_model_str) # Build function
-
-#     # print(f'INFO: Model function: {inner_model_str}')
-
-#     return model_fct
-
 
 def create_model_config_per_pathway(
     model_config,
