@@ -195,41 +195,6 @@ def get_neuron_positions(pos_fct, node_ids_list):
     return nrn_pos
 
 
-# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
-# def compute_dist_matrix(src_nrn_pos, tgt_nrn_pos):
-#     """Computes distance matrix between pairs of neurons."""
-#     dist_mat = distance_matrix(src_nrn_pos, tgt_nrn_pos)
-#     dist_mat[dist_mat == 0.0] = np.nan # Exclude autaptic connections
-
-#     return dist_mat
-
-
-# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
-# def compute_bip_matrix(src_nrn_pos, tgt_nrn_pos):
-#     """Computes bipolar matrix between pairs of neurons (along z-axis; POST-synaptic neuron below (delta_z < 0) or above (delta_z > 0) PRE-synaptic neuron)."""
-#     bip_mat = np.sign(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)[0, :, :]) # Bipolar distinction based on difference in z coordinate
-
-#     return bip_mat
-
-
-# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
-# def compute_offset_matrices(src_nrn_pos, tgt_nrn_pos):
-#     """Computes dx/dy/dz offset matrices between pairs of neurons (POST minus PRE position)."""
-#     dx_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 0], tgt_nrn_pos[:, 0], indexing='ij'), axis=0)) # Relative difference in x coordinate
-#     dy_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 1], tgt_nrn_pos[:, 1], indexing='ij'), axis=0)) # Relative difference in y coordinate
-#     dz_mat = np.squeeze(np.diff(np.meshgrid(src_nrn_pos[:, 2], tgt_nrn_pos[:, 2], indexing='ij'), axis=0)) # Relative difference in z coordinate
-
-#     return dx_mat, dy_mat, dz_mat
-
-
-# NOT USED ANY MORE (model-specific implementation to be used instead for better consistency)
-# def compute_position_matrices(src_nrn_pos, tgt_nrn_pos):
-#     """Computes x/y/z position matrices (PRE neuron positions repeated over POST neuron number)."""
-#     x_mat, y_mat, z_mat = [np.tile(src_nrn_pos[:, i:i + 1], [1, tgt_nrn_pos.shape[0]]) for i in range(src_nrn_pos.shape[1])]
-
-#     return x_mat, y_mat, z_mat
-
-
 def extract_dependent_p_conn(
     src_node_ids, tgt_node_ids, edges, dep_matrices, dep_bins, min_count_per_bin=None
 ):
