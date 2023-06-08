@@ -1,8 +1,42 @@
-"""Utils."""
+"""Various utility functions"""
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict
+
+import numpy as np
+
+
+def _apply_recursively(func, obj, origin=(0, 0, 0)):
+    origin = np.array(origin)
+
+    if hasattr(obj, "soma"):
+        obj.soma.points = origin + func(obj.soma.points - origin)
+    for s in obj.iter():
+        s.points = origin + func(s.points - origin)
+
+
+def transform(obj, A):
+    """Apply transformation matrix `A` to a given morphology object.
+
+    Note:
+        This comes out of bluepysnap
+
+    Args:
+        obj: Morphology / Section
+        A: rotation matrix (4 x 4 NumPy array)
+    """
+    if A is None:
+        return
+    A = np.asarray(A)
+    if A.shape != (4, 4):
+        raise ValueError(f"`A` should be 4 x 4 matrix (got: {A.shape})")
+    A = A.transpose()
+
+    def func(p):
+        return np.dot(np.column_stack((p, np.ones(len(p)))), A)[:, :3]
+
+    _apply_recursively(func, obj)
 
 
 def create_dir(path: os.PathLike) -> Path:

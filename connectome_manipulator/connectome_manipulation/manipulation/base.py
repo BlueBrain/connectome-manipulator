@@ -7,7 +7,14 @@ from abc import ABCMeta, abstractmethod
 import inspect
 import os.path
 
+from bluepysnap.morph import MorphHelper
+from bluepysnap.sonata_constants import Node
+from morphio.mut import Morphology
+import numpy as np
+
+from connectome_manipulator import access_functions
 from connectome_manipulator import log
+from connectome_manipulator import utils
 from connectome_manipulator.access_functions import get_enumeration_map
 
 
@@ -82,15 +89,35 @@ class MorphologyCachingManipulation(Manipulation):
     # pylint: disable=abstract-method
 
     def __init__(self, nodes):
-        """Setup a morphologies cache when initializing"""
-        self.morphologies = {}
+        """Initialize the MorphHelper object needed later."""
         super().__init__(nodes)
+        morph_dir = self.nodes[1].config["morphologies_dir"]
+        self.morpho_helper = MorphHelper(
+            morph_dir,
+            self.nodes[1],
+            {
+                "h5v1": os.path.join(morph_dir, "h5v1"),
+                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
+            },
+        )
 
-    def _get_tgt_morph(self, tgt_morph, morph_ext, node_id):
+    def _get_tgt_morphs(self, morph_ext, tgt_node_sel):
         """Access function (incl. transformation!), using specified format (swc/h5/...)"""
-        if node_id in self.morphologies:
-            return self.morphologies[node_id]
-        else:
-            morph = tgt_morph.get(node_id, transform=True, extension=morph_ext)
-            self.morphologies[node_id] = morph
-            return morph
+        morphology_paths = access_functions.get_morphology_paths(
+            self.nodes[1], tgt_node_sel, self.morpho_helper, morph_ext
+        )
+        morphologies = []
+        for mp in morphology_paths:
+            morphologies.append(Morphology(mp))
+        return self._transform(morphologies, tgt_node_sel)
+
+    def _transform(self, morphs, node_sel):
+        rotations = access_functions.orientations(self.nodes[1], node_sel)
+        positions = access_functions.get_nodes(self.nodes[1], node_sel)
+        positions = positions[[Node.X, Node.Y, Node.Z]].to_numpy()
+        for m, r, p in zip(morphs, rotations, positions):
+            T = np.eye(4)
+            T[:3, :3] = r
+            T[:3, 3] = p
+            utils.transform(m, T)
+            yield m.as_immutable()

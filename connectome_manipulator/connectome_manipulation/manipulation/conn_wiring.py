@@ -6,7 +6,6 @@ Only specific properties like source/target node, afferent synapse positions, sy
 (INH: 0, EXC: 100), and delay (optional) will be generated.
 """
 
-import os
 from datetime import datetime, timedelta
 
 import libsonata
@@ -15,7 +14,6 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-from bluepysnap.morph import MorphHelper
 from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import (
     get_node_ids,
@@ -62,24 +60,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         "syn_type_id": "int16",
         "delay": "float32",
     }
-
-    def __init__(self, nodes):
-        """Initialize a ConnectomeWiring manipulator with a node set.
-
-        The initialization will itself initialize the MorphHelper object. Split indices are passed
-        via the apply function.
-        """
-        super().__init__(nodes)
-        # Prepare to load target (dendritic) morphologies
-        morph_dir = self.nodes[1].config["morphologies_dir"]
-        self.tgt_morph = MorphHelper(
-            morph_dir,
-            self.nodes[1],
-            {
-                "h5v1": os.path.join(morph_dir, "h5v1"),
-                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
-            },
-        )
 
     @profiler.profileit(name="conn_wiring")
     def apply(
@@ -327,9 +307,17 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         new_edges_list = [all_new_edges]
         # Run connection wiring
         # progress_pct = np.maximum(0, np.round(100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)).astype(int))
+        new_edges_tpl = pd.DataFrame(
+            {
+                cname: pd.Series([], dtype=all_new_edges[cname].dtype)
+                for cname in all_new_edges.columns
+            }
+        )
+        # get morphologies for this selection
+        tgt_morphs = self._get_tgt_morphs(morph_ext, libsonata.Selection(tgt_node_ids))
 
         log_time = datetime.now()
-        for tidx, tgt in enumerate(tgt_node_ids):
+        for tidx, (tgt, morph) in enumerate(zip(tgt_node_ids, tgt_morphs)):
             new_time = datetime.now()
             if (new_time - log_time) / timedelta(minutes=1) > 1:
                 log.info("Processing target node %d out of %d", tidx, len(tgt_node_ids))
@@ -360,32 +348,24 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 continue  # Nothing to wire
 
             # Sample number of synapses per connection (mtype-specific)
-            num_syn_per_conn = [
-                nsynconn_model.apply(src_type=s, tgt_type=tgt_mtypes[tidx])
-                for s in src_mtypes[src_new_sel]
-            ]
+            num_syn_per_conn = nsynconn_model.apply(
+                src_type=src_mtypes[src_new_sel], tgt_type=tgt_mtypes[tidx]
+            )
             syn_conn_idx = np.concatenate(
                 [[i] * n for i, n in enumerate(num_syn_per_conn)]
             )  # Create mapping from synapses to connections
             num_gen_syn = len(syn_conn_idx)  # Number of synapses to generate
 
             # Create new synapses
-            new_edges = pd.DataFrame(
-                {
-                    cname: pd.Series([], dtype=all_new_edges[cname].dtype)
-                    for cname in all_new_edges.columns
-                }
-            )
+            new_edges = new_edges_tpl.copy()
 
-            # Source node IDs per connection expanded to synapses
-            new_edges["@source_node"] = src_new[syn_conn_idx]
+            new_edges["@source_node"] = src_new[
+                syn_conn_idx
+            ]  # Source node IDs per connection expanded to synapses
             new_edges["@target_node"] = tgt
 
             # Place synapses randomly on soma/dendrite sections
             # [TODO: Add model for synapse placement??]
-            morph = self._get_tgt_morph(self.tgt_morph, morph_ext, tgt)
-
-            # Soma/dendrite section indices; soma...-1
             sec_ind = np.hstack(
                 [
                     [-1],

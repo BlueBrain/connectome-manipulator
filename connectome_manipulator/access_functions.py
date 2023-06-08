@@ -1,10 +1,111 @@
 """Collection of function for flexible nodes/edges access, to be used by model building and manipulation operations"""
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 import libsonata
+from bluepysnap.sonata_constants import Node, DYNAMICS_PREFIX
+from bluepysnap.utils import add_dynamic_prefix
+from bluepysnap.utils import euler2mat, quaternion2mat
 
 from connectome_manipulator import log
+
+
+def property_names(nodes):
+    """Get all property names for a population"""
+    population = nodes._population  # pylint: disable=protected-access
+    return set(population.attribute_names) | set(
+        add_dynamic_prefix(population.dynamics_attribute_names)
+    )
+
+
+def get_nodes(nodes, selection=None):
+    """Get a pandas table of all nodes and their properties, optionally narrowed by a selection"""
+    population = nodes._population  # pylint: disable=protected-access
+    categoricals = population.enumeration_names
+
+    if selection is None:
+        selection = nodes.select_all()
+    result = pd.DataFrame(index=selection.flatten())
+
+    for attr in sorted(population.attribute_names):
+        if attr in categoricals:
+            enumeration = np.asarray(population.get_enumeration(attr, selection))
+            values = np.asarray(population.enumeration_values(attr))
+            # if the size of `values` is large enough compared to `enumeration`, not using
+            # categorical reduces the memory usage.
+            if values.shape[0] < 0.5 * enumeration.shape[0]:
+                result[attr] = pd.Categorical.from_codes(enumeration, categories=values)
+            else:
+                result[attr] = values[enumeration]
+        else:
+            result[attr] = population.get_attribute(attr, selection)
+    for attr in sorted(add_dynamic_prefix(population.dynamics_attribute_names)):
+        result[attr] = population.get_dynamics_attribute(attr.split(DYNAMICS_PREFIX)[1], selection)
+    return result
+
+
+def get_morphology_paths(nodes, selection, morpho_helper, extension="swc"):
+    """Return paths to morphology files corresponding to `selection`.
+
+    Args:
+        nodes: a bluepysnap node set
+        selection (libsonata.Selection): a selection of nodes
+        morpho_helper: a bluepysnap MorphoHelper instance
+        extension (str): expected filetype extension of the morph file.
+    """
+    morpho_dir = morpho_helper._get_morph_dir(extension)  # pylint: disable=protected-access
+    result = get_nodes(nodes, selection)
+    return [Path(morpho_dir, f"{name}.{extension}") for name in result[Node.MORPHOLOGY]]
+
+
+def orientations(nodes, node_sel=None):
+    """Node orientation(s) as a list of numpy arrays.
+
+    Args:
+        nodes: the node set for which we want to get the rotation matrices
+        node_sel: (optional) a libsonata Selection to narrow our selection
+
+    Returns:
+        numpy.ndarray:
+            A list of 3x3 rotation matrices for the given node set and selection.
+    """
+    # need to keep this quaternion ordering for quaternion2mat (expects w, x, y , z)
+    props = np.array(
+        [Node.ORIENTATION_W, Node.ORIENTATION_X, Node.ORIENTATION_Y, Node.ORIENTATION_Z]
+    )
+    props_mask = np.isin(props, list(property_names(nodes)))
+    orientation_count = np.count_nonzero(props_mask)
+    if orientation_count == 4:
+        trans = quaternion2mat
+    elif orientation_count in [1, 2, 3]:
+        raise ValueError(
+            "Missing orientation fields. Should be 4 quaternions or euler angles or nothing"
+        )
+    else:
+        # need to keep this rotation_angle ordering for euler2mat (expects z, y, x)
+        props = np.array(
+            [
+                Node.ROTATION_ANGLE_Z,
+                Node.ROTATION_ANGLE_Y,
+                Node.ROTATION_ANGLE_X,
+            ]
+        )
+        props_mask = np.isin(props, list(property_names(nodes)))
+        trans = euler2mat
+    result = get_nodes(nodes, node_sel)
+    if props[props_mask].size:
+        result = result[props[props_mask]]
+
+    def _get_values(prop):
+        """Retrieve prop from the result Dataframe/Series."""
+        if isinstance(result, pd.Series):
+            return [result.get(prop, 0)]
+        return result.get(prop, np.zeros((result.shape[0],)))
+
+    args = [_get_values(prop) for prop in props]
+    return trans(*args)
 
 
 def get_enumeration_map(pop, column):
@@ -39,8 +140,7 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
     split_ids ... Node IDs to filter the selection by, either as an array or a
                   libsonata.Selection
     """
-    # pylint: disable=protected-access
-    pop = nodes._population
+    pop = nodes._population  # pylint: disable=protected-access
     enumeration_names = pop.enumeration_names
     if split_ids is None:
         sel_ids = pop.select_all()

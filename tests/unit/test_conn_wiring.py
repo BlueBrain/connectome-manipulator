@@ -113,7 +113,9 @@ def test_apply(manipulation):
                     "delay_model": None,
                 }
             )
-    res = manipulation.connectome_wiring_per_pathway(pathway_nodes, pathway_models, seed=0)
+    res = manipulation.connectome_wiring_per_pathway(
+        pathway_nodes, pathway_models, seed=0, morph_ext="swc"
+    )
     assert res.size == 0, "ERROR: Connectome should be empty!"
     assert np.all(np.isin(required_properties, res.columns)), "ERROR: Synapse properties missing!"
 

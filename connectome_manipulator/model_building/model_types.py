@@ -371,18 +371,16 @@ class NSynConnModel(PathwayModel):
         distr_mean = self.mean[src_type, tgt_type]
         distr_std = self.std[src_type, tgt_type]
 
+        nsyn = distr_mean
         # Draw number of synapses
-        if distr_std > 0.0:
-            nsyn = np.random.gamma(
-                shape=distr_mean**2 / distr_std**2,
-                scale=distr_std**2 / distr_mean,
-                size=1,
+        if np.any(sel := distr_std > 0.0):
+            nsyn[sel] = np.random.gamma(
+                shape=distr_mean[sel] ** 2 / distr_std[sel] ** 2,
+                scale=distr_std[sel] ** 2 / distr_mean[sel],
             )
-        else:
-            nsyn = distr_mean
 
         # Convert type
-        nsyn = int(np.round(np.maximum(1, nsyn)))
+        nsyn = np.round(np.maximum(1, nsyn)).astype(int)
 
         return nsyn
 
