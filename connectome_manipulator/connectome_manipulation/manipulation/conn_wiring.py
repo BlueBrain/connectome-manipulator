@@ -382,17 +382,15 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             off_sel = np.random.rand(len(syn_conn_idx))
             off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
 
-            type_sel = [
-                int(morph.section(sec).type) if sec >= 0 else 0 for sec in sec_sel
-            ]  # Type 0: Soma (1: Axon, 2: Basal, 3: Apical)
-            pos_sel = np.array(
-                [
-                    nm.morphmath.path_fraction_point(morph.section(sec).points, off)
-                    if sec >= 0
-                    else morph.soma.center.astype(float)
-                    for sec, off in zip(sec_sel, off_sel)
-                ]
-            )  # Synapse positions, computed from section & offset
+            # Type 0: Soma (1: Axon, 2: Basal, 3: Apical)
+            type_sel = np.full_like(sec_sel, 0)
+            # Synapse positions, computed from section & offset
+            pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
+            for idx in np.flatnonzero(sec_sel >= 0):
+                type_sel[idx] = morph.section(sec_sel[idx]).type
+                pos_sel[idx] = nm.morphmath.path_fraction_point(
+                    morph.section(sec_sel[idx]).points, off_sel[idx]
+                )
             # syn_type = np.select([src_class[new_edges['@source_node']].to_numpy() == 'INH', src_class[new_edges['@source_node']].to_numpy() == 'EXC'], [np.full(num_gen_syn, 0), np.full(num_gen_syn, 100)]) # INH: 0-99 (Using 0); EXC: >=100 (Using 100)
             syn_type = np.select(
                 [
