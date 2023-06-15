@@ -16,6 +16,7 @@ import tqdm
 
 from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import (
+    get_attribute,
     get_node_ids,
     get_enumeration,
 )
@@ -162,15 +163,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
             # Determine source/target nodes for wiring
             src_node_ids = get_node_ids(self.nodes[0], sel_src)
-            src_class = self.nodes[0].get(src_node_ids, properties="synapse_class").to_numpy()
-            src_mtypes = self.nodes[0].get(src_node_ids, properties="mtype").to_numpy()
-            log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
-
-            # Determine source/target nodes for wiring
-            src_node_ids = get_node_ids(self.nodes[0], sel_src)
-            src_class = self.nodes[0]._population.get_attribute(  # pylint: disable=protected-access
-                "synapse_class", libsonata.Selection(src_node_ids)
-            )
+            src_class = get_attribute(self.nodes[0], "synapse_class", src_node_ids)
             src_mtypes = get_enumeration(self.nodes[0], "mtype", src_node_ids)
             log.log_assert(len(src_node_ids) > 0, "No source nodes selected!")
 
@@ -449,7 +442,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
             # Select source/target nodes
             src_node_ids = nodes.ids({"mtype": pre_type})
-            src_class = nodes.get(src_node_ids, properties="synapse_class").to_numpy()
+            src_class = get_attribute(nodes, "synapse_class", src_node_ids)
             src_mtypes = get_enumeration(nodes, "mtype", src_node_ids)
             src_positions = nodes.positions(
                 src_node_ids

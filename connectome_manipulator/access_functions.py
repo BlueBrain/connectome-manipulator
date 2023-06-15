@@ -121,6 +121,12 @@ def get_enumeration_map(pop, column):
     }
 
 
+def get_attribute(pop, column, ids):
+    """Get the attribute values for `column` from population `pop` for node IDs `ids`."""
+    raw_pop = pop._population  # pylint: disable=protected-access
+    return raw_pop.get_attribute(column, libsonata.Selection(ids))
+
+
 def get_enumeration(pop, column, ids):
     """Get the raw enumeration values for `column` from population `pop` for node IDs `ids`."""
     raw_pop = pop._population  # pylint: disable=protected-access
