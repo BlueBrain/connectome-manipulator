@@ -5,7 +5,6 @@
 - Writes back the manipulated connectome to a SONATA edges file, together with a new circuit config
 """
 import copy
-import glob
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,6 +20,7 @@ from bluepysnap.circuit import Circuit
 from .. import log, utils, profiler
 from ..access_functions import get_edges_population, get_nodes_population
 from . import executors
+from .tracker import JobTracker
 from .converters import create_parquet_metadata, edges_to_parquet, parquet_to_sonata
 from .manipulation import Manipulation
 
@@ -206,98 +206,6 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
     )
 
 
-def prepare_parquet_dir(parquet_path, edges_fn, N_split, do_resume):
-    """Setup and check of output parquet directory and preparation of .parquet file list.
-
-    In addition, sets up a completed file list to resume from.
-    """
-    parquet_path = utils.create_dir(parquet_path)
-
-    # File to keep track of parquet files already completed (to resume from with do_resume option)
-    done_file = os.path.join(parquet_path, "parquet.DONE")
-
-    # Potential list of .parquet file names [NOTE: Empty files won't actually exist!!]
-    if N_split == 1:
-        split_ext = [""]
-    else:
-        ext_len = len(str(N_split))
-        split_ext = [f".{N_split}-{i_split:0{ext_len}d}" for i_split in range(N_split)]
-    parquet_file_list = [
-        os.path.join(parquet_path, os.path.splitext(edges_fn)[0]) + split_ext[i_split] + ".parquet"
-        for i_split in range(N_split)
-    ]
-
-    # Check if parquet folder is clean
-    existing_parquet_files = glob.glob(os.path.join(parquet_path, "*.parquet"))
-    if (
-        do_resume
-    ):  # Resume from an existing run: Done file must be compatible with current run, and all existing .parquet files in the parquet folder must be from the list of expected (done) files (these files will be skipped over and merged later)
-        if not os.path.exists(done_file):
-            # Initialize empty list
-            done_list = []
-            utils.write_json(data=done_list, filepath=done_file)
-        else:
-            # Load completed files from existing list [can be in arbitrary order!!]
-            done_list = utils.load_json(done_file)
-            log.log_assert(
-                all(
-                    os.path.join(parquet_path, f) + ".parquet" in parquet_file_list
-                    for f in done_list
-                ),
-                f'Unable to resume! "{os.path.split(done_file)[-1]}" contains unexpected entries!',
-            )
-        parquet_file_list_done = list(
-            filter(
-                lambda f: os.path.splitext(os.path.split(f)[-1])[0] in done_list, parquet_file_list
-            )
-        )
-        log.log_assert(
-            np.all([f in parquet_file_list_done for f in existing_parquet_files]),
-            "Unable to resume! Parquet output directory contains unexpected .parquet files, please clean your output dir!",
-        )
-        # [NOTE: Empty files don't exist but may be marked as done!]
-    else:  # Running from scratch: Parquet folder must not contain any .parquet files (so not to mix up existing and new files!!)
-        log.log_assert(
-            len(existing_parquet_files) == 0,
-            'Parquet output directory contains .parquet files, please clean your output dir or use "do_resume" to resume from an existing run!',
-        )
-        utils.write_json(data=[], filepath=done_file)
-
-    return parquet_file_list, done_file
-
-
-def mark_as_done(parquet_file, done_file):
-    """Marks the given parquet file as "done" in the done file
-
-    (i.e., adding the file name to the list of done files).
-    """
-    log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
-
-    # Load list of completed files [can be in arbitrary order!!]
-    done_list = utils.load_json(done_file)
-
-    # Update list and write back
-    done_list.append(os.path.splitext(os.path.split(parquet_file)[-1])[0])
-
-    utils.write_json(data=done_list, filepath=done_file)
-
-
-def check_if_done(parquet_file, done_file):
-    """Checks if given parquet file is done already
-
-    (i.e., file name existing in the list of done files).
-    """
-    log.log_assert(os.path.exists(done_file), f'"{done_file}" does not exist!')
-
-    # Load list of completed files [can be in arbitrary order!!]
-    done_list = utils.load_json(done_file)
-
-    # Check if done
-    is_done = os.path.splitext(os.path.split(parquet_file)[-1])[0] in done_list
-
-    return is_done
-
-
 @dataclass
 class Options:
     """CLI Options which have defaults"""
@@ -320,7 +228,6 @@ class JobsCommonInfo:
 
     nodes: libsonata.NodePopulation
     edges: libsonata.EdgePopulation
-    done_file: str
 
 
 @dataclass
@@ -416,54 +323,31 @@ def main(options, log_file, executor_args=()):
         f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!',
     )
 
-    parquet_dir = options.output_path / "parquet"
-    parquet_file_list, done_file = prepare_parquet_dir(
-        parquet_dir, edges_file.name, N_split, options.do_resume
-    )
-
     # Follow SONATA convention for edge population naming
     edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
 
-    # Prepare global result variables
-    # Provide a result hook so that we automatically block for results
-    syn_count_in = 0
-    syn_count_out = 0
-    jobs_done = 0
-
-    def result_hook(result, info):
-        nonlocal syn_count_in, syn_count_out, jobs_done
-        syn_count_in += result[0]
-        syn_count_out += result[1]
-        mark_as_done(info["out_parquet_file"], done_file)
-        resource_manager = result[2]
-        profiler.ProfilerManager.merge(resource_manager)
-        jobs_done += 1
-        done_percent = jobs_done * 100 // N_split
-        log.info(f"[{done_percent:3d}%] Finished {jobs_done} (out of {N_split}) splits")
-
     # Prepare params to the executor. Slurm executor will add the prefix itself
     executor_params = dict(x.split("=", 1) for x in executor_args)
+    tracker = JobTracker(options.output_path, N_split)
 
-    with executors.in_context(options, executor_params, result_hook=result_hook) as executor:
-        log.info("Start job submission")
-        jobs_common_info = JobsCommonInfo(nodes, edges, done_file)
+    with tracker.follow_jobs() as result_hook:
+        with executors.in_context(options, executor_params, result_hook=result_hook) as executor:
+            log.info("Start job submission")
+            jobs_common_info = JobsCommonInfo(nodes, edges)
 
-        for i_split, split_ids in enumerate(node_ids_split):
-            sonata_selection = libsonata.Selection(split_ids)
-            job_info = JobInfo(i_split, N_split, sonata_selection, parquet_file_list[i_split])
-            _submit_part(executor, jobs_common_info, job_info, options)
-
-    sdiff = syn_count_out - syn_count_in
-    log.info("Done processing")
-    log.info(f"  Total input/output synapse counts: {syn_count_in}/{syn_count_out} (Diff: {sdiff})")
+            for i_split, parquet_file in tracker.prepare_parquet_dir(options.do_resume):
+                split_ids = node_ids_split[i_split]
+                sonata_selection = libsonata.Selection(split_ids)
+                job_info = JobInfo(i_split, N_split, sonata_selection, parquet_file)
+                _submit_part(executor, jobs_common_info, job_info, options)
 
     if options.convert_to_sonata:
         # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
         parquet_to_sonata(
-            parquet_dir,
+            tracker.parquet_dir,
             edges_file,
             nodes,
-            done_file,
+            tracker.parquet_done_file,
             population_name=edge_population_name,
             keep_parquet=options.keep_parquet,
         )
@@ -481,18 +365,12 @@ def main(options, log_file, executor_args=()):
             log.warning(
                 "--keep-parquet and --convert-to-sonata are set to false. I will keep the parquet files anyway"
             )
-        create_parquet_metadata(parquet_dir, nodes)
+        create_parquet_metadata(tracker.parquet_dir, nodes)
 
 
 def _submit_part(executor, jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     # Resume option: Don't recompute, if .parquet file of current split already exists
     split_id = job.i_split + 1
-    if options.do_resume and check_if_done(job.out_parquet_file, jobs_common.done_file):
-        log.debug(
-            f"Split {split_id}/{job.N_split}: Parquet file already exists - SKIPPING (do_resume={options.do_resume})"
-        )
-        return
-
     n_neurons = job.selection.flat_size
     log.info(f"Split {split_id}/{job.N_split}: Wiring connectome targeting {n_neurons} neurons")
 
