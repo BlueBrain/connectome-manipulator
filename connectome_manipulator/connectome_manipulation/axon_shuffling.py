@@ -38,8 +38,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         )
 
         # Thresholded distance matrix
-        dist_mat_R = np.ones_like(dist_mat).astype(bool)
-        dist_mat_R[dist_mat > R] = False
+        dist_mat_R = dist_mat <= R
         np.fill_diagonal(dist_mat_R, False)
         del dist_mat
 

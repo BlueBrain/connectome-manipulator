@@ -48,8 +48,7 @@ def apply(edges_table, nodes, aux_dict, sel_grp1, sel_grp2, R, amount_pct=100.0)
         )
 
         # Thresholded distance matrix
-        dist_mat_R = np.ones_like(dist_mat).astype(bool)
-        dist_mat_R[dist_mat > R] = False
+        dist_mat_R = dist_mat <= R
         del dist_mat
 
         # Remove cells that cannot be rewired (no potential neighbors in vicinity)
