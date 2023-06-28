@@ -19,9 +19,8 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
     log.log_assert(R > 0.0, "R must be larger than 0um!")
     log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
 
-    pair_gids = aux_dict.get(
-        "pair_gids", None
-    )  # Load GID mapping from earlier split iteration, if existing
+    # Load GID mapping from earlier split iteration, if existing
+    pair_gids = aux_dict.get("pair_gids", None)
     if pair_gids is None:
         log.info("Sampling pairs of neurons for axon shuffling...")
 
@@ -59,10 +58,11 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         target_count = np.round(0.5 * dist_mat_R.shape[0] * amount_pct / 100).astype(int)
         pair_samples = []
         for n1 in np.random.permutation(dist_mat_R.shape[0]):
-            if (
-                len(pair_samples) == target_count
-            ):  # Target count reached...FINISHING [Note: due to random sampling, it is possible that target count won't be reached exactly]
+            # Target count reached...FINISHING [Note: due to random sampling,
+            # it is possible that target count won't be reached exactly]
+            if len(pair_samples) == target_count:
                 break
+
             n2_all = np.flatnonzero(dist_mat_R_choices[n1, :])
             if len(n2_all) == 0:  # No choices available for n1...SKIPPING
                 continue
@@ -80,9 +80,8 @@ def apply(edges_table, nodes, aux_dict, sel_grp, R, amount_pct=100.0):
         log.log_assert(
             len(np.unique(pair_gids)) == pair_gids.size, "Duplicates in gid pairs found!"
         )
-        aux_dict.update(
-            {"pair_gids": pair_gids}
-        )  # Save GID mapping, to be reused in subsequent split iterations
+        # Save GID mapping, to be reused in subsequent split iterations
+        aux_dict.update({"pair_gids": pair_gids})
 
         log.info(f"Actually selected GID pairs: {pair_gids.shape[0]} (amount={amount_pct}%)")
 

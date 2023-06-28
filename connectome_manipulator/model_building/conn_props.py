@@ -165,11 +165,14 @@ def extract(
                 min_sample_size_per_group is not None
                 and min_sample_size_per_group > 0
                 and len(conn_sel) < min_sample_size_per_group
-            ):  # Not enough connections available
+            ):
+                # Not enough connections available
                 continue
+
             if max_sample_size_per_group is not None and 0 < max_sample_size_per_group < len(
                 conn_sel
-            ):  # Subsample connections
+            ):
+                # Subsample connections
                 conn_sel = sorted(
                     np.random.choice(conn_sel, max_sample_size_per_group, replace=False)
                 )

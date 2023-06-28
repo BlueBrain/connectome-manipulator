@@ -172,12 +172,11 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
             if pos_acc:
                 # FIXME: this is going to be VERY SLOW!
-                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[
-                    0
-                ]  # Get neuron positions (incl. position mapping, if provided)
-                tgt_pos = conn_prob.get_neuron_positions(pos_acc, [tgt_node_ids])[
-                    0
-                ]  # Get neuron positions (incl. position mapping, if provided)
+                # Get neuron positions (incl. position mapping, if provided)
+                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[0]
+
+                # Get neuron positions (incl. position mapping, if provided)
+                tgt_pos = conn_prob.get_neuron_positions(pos_acc, [tgt_node_ids])[0]
             else:
                 _src_pop = self.nodes[0]._population  # pylint: disable=protected-access
                 _src_sel = libsonata.Selection(src_node_ids)

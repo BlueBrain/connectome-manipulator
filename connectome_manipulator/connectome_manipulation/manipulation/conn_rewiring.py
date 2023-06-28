@@ -280,11 +280,11 @@ class ConnectomeRewiring(Manipulation):
                 continue  # Nothing to rewire (no synapses on target node)
 
             # Determine conn. prob. of all source nodes to be connected with target node
+
+            # Get neuron positions (incl. position mapping, if provided)
             tgt_pos = conn_prob.get_neuron_positions(
                 self.nodes[1].positions if pos_acc is None else pos_acc, [[tgt]]
-            )[
-                0
-            ]  # Get neuron positions (incl. position mapping, if provided)
+            )[0]
             p_src = (
                 p_model.apply(
                     src_pos=src_pos,
@@ -867,16 +867,16 @@ class ConnectomeRewiring(Manipulation):
         if syn_sel_idx is None:
             syn_sel_idx = np.full(edges_table.shape[0], True)
 
-        if (
-            len(src_new) == 0 or len(src_syn_idx) == 0 or np.sum(syn_sel_idx) == 0
-        ):  # No synapses specified
+        if len(src_new) == 0 or len(src_syn_idx) == 0 or np.sum(syn_sel_idx) == 0:
+            # No synapses specified
             return
 
         # Determine distance from source neuron (soma) to synapse on target neuron
         src_new_pos = self.nodes[0].positions(src_new).to_numpy()
+        # Synapse position on post-synaptic dendrite
         syn_pos = edges_table.loc[
             syn_sel_idx, ["afferent_center_x", "afferent_center_y", "afferent_center_z"]
-        ].to_numpy()  # Synapse position on post-synaptic dendrite
+        ].to_numpy()
         syn_dist = np.sqrt(np.sum((syn_pos - src_new_pos[src_syn_idx, :]) ** 2, 1))
 
         # Obtain delay values from (generative) model
