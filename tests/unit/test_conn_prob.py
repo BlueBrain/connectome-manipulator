@@ -554,7 +554,11 @@ def test_build_3rd_order():
         exp_data = np.array([exp_model(d, *exp_coefs[:2]), exp_model(d, *exp_coefs[2:])]).T
 
         model = test_module.build_3rd_order(
-            exp_data, dist_bins, np.zeros_like(exp_data), model_specs={"type": "SimpleExponential"}
+            exp_data,
+            dist_bins,
+            np.zeros_like(exp_data),
+            bip_coord_data=0,
+            model_specs={"type": "SimpleExponential"},
         )
         model_coefs = [
             model.get_param_dict()[k] for k in ["scale_N", "exponent_N", "scale_P", "exponent_P"]
@@ -580,7 +584,11 @@ def test_build_3rd_order():
     exp_data = np.array([exp_model(d, *exp_coefs[:5]), exp_model(d, *exp_coefs[5:])]).T
 
     model = test_module.build_3rd_order(
-        exp_data, dist_bins, np.zeros_like(exp_data), model_specs={"type": "ComplexExponential"}
+        exp_data,
+        dist_bins,
+        np.zeros_like(exp_data),
+        bip_coord_data=0,
+        model_specs={"type": "ComplexExponential"},
     )
     model_coefs = [
         model.get_param_dict()[k]
@@ -732,9 +740,7 @@ def test_build_4th_order():
     assert np.allclose(p_filt, p_model)
 
     # Check random forest regressor model building [Not yet implemented]
-    with pytest.raises(
-        AssertionError, match=f"ERROR: No model class implemented for RandomForestRegressor!"
-    ):
+    with pytest.raises(AssertionError, match='ERROR: Model type "RandomForestRegressor" unknown!'):
         model = test_module.build_4th_order(
             p,
             dx_bins,
@@ -836,7 +842,12 @@ def test_build_4th_order_reduced():
 
     # Check linear interpolation model building
     model = test_module.build_4th_order_reduced(
-        p, dr_bins, dz_bins, np.zeros_like(p), model_specs={"type": "LinearInterpolation"}
+        p,
+        dr_bins,
+        dz_bins,
+        np.zeros_like(p),
+        axial_coord_data=0,
+        model_specs={"type": "LinearInterpolation"},
     )
     p_model = np.array([[model.get_conn_prob(dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr])
     assert np.allclose(p, p_model)
@@ -854,6 +865,7 @@ def test_build_4th_order_reduced():
         dr_bins,
         dz_bins,
         np.zeros_like(p),
+        axial_coord_data=0,
         model_specs={"type": "LinearInterpolation"},
         smoothing_sigma_um=smoothing_sigma_um,
     )
@@ -861,11 +873,14 @@ def test_build_4th_order_reduced():
     assert np.allclose(p_filt, p_model)
 
     # Check random forest regressor model building [Not yet implemented]
-    with pytest.raises(
-        AssertionError, match=f"ERROR: No model class implemented for RandomForestRegressor!"
-    ):
+    with pytest.raises(AssertionError, match='ERROR: Model type "RandomForestRegressor" unknown!'):
         model = test_module.build_4th_order_reduced(
-            p, dr_bins, dz_bins, np.zeros_like(p), model_specs={"type": "RandomForestRegressor"}
+            p,
+            dr_bins,
+            dz_bins,
+            np.zeros_like(p),
+            axial_coord_data=0,
+            model_specs={"type": "RandomForestRegressor"},
         )
 
 
@@ -1109,9 +1124,7 @@ def test_build_5th_order():
     assert np.allclose(p_filt, p_model)
 
     # Check random forest regressor model building [Not yet implemented]
-    with pytest.raises(
-        AssertionError, match=f"ERROR: No model class implemented for RandomForestRegressor!"
-    ):
+    with pytest.raises(AssertionError, match='ERROR: Model type "RandomForestRegressor" unknown!'):
         model = test_module.build_5th_order(
             p,
             x_bins,
@@ -1238,7 +1251,13 @@ def test_build_5th_order_reduced():
 
     # Check linear interpolation model building
     model = test_module.build_5th_order_reduced(
-        p, z_bins, dr_bins, dz_bins, np.zeros_like(p), model_specs={"type": "LinearInterpolation"}
+        p,
+        z_bins,
+        dr_bins,
+        dz_bins,
+        np.zeros_like(p),
+        axial_coord_data=0,
+        model_specs={"type": "LinearInterpolation"},
     )
     p_model = np.array(
         [[[model.get_conn_prob(z=_z, dr=_dr, dz=_dz)[0] for _dz in dz] for _dr in dr] for _z in z]
@@ -1259,6 +1278,7 @@ def test_build_5th_order_reduced():
         dr_bins,
         dz_bins,
         np.zeros_like(p),
+        axial_coord_data=0,
         model_specs={"type": "LinearInterpolation"},
         smoothing_sigma_um=smoothing_sigma_um,
     )
@@ -1268,14 +1288,13 @@ def test_build_5th_order_reduced():
     assert np.allclose(p_filt, p_model)
 
     # Check random forest regressor model building [Not yet implemented]
-    with pytest.raises(
-        AssertionError, match=f"ERROR: No model class implemented for RandomForestRegressor!"
-    ):
+    with pytest.raises(AssertionError, match='ERROR: Model type "RandomForestRegressor" unknown!'):
         model = test_module.build_5th_order_reduced(
             p,
             z_bins,
             dr_bins,
             dz_bins,
             np.zeros_like(p),
+            axial_coord_data=0,
             model_specs={"type": "RandomForestRegressor"},
         )

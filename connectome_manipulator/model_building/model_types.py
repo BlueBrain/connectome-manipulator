@@ -414,19 +414,30 @@ class LinDelayModel(PathwayModel):
         log.log_assert(np.all(self.delay_std >= 0.0), "Delay std cannot be negative!")
         log.log_assert(np.all(self.delay_min >= 0.0), "Delay min cannot be negative!")
 
-    def get_model_output(self, src_type, tgt_type, distance):  # pylint: disable=arguments-differ
-        """Draw distance-dependent delay values from truncated normal distribution [seeded through numpy]."""
-        d_mean = (
+    def get_mean(self, src_type, tgt_type, distance):
+        """Returns mean delay as function of distance."""
+        return (
             self.delay_mean_coeff_b[src_type, tgt_type] * np.array(distance)
             + self.delay_mean_coeff_a[src_type, tgt_type]
         )
-        d_std = np.full_like(
+
+    def get_std(self, src_type, tgt_type, distance):
+        """Returns delay std as function of distance."""
+        return np.full_like(
             distance, self.delay_std[src_type, tgt_type], dtype=self.delay_std.dtype
         )
-        d_min = np.full_like(
+
+    def get_min(self, src_type, tgt_type, distance):
+        """Returns min delay as function of distance."""
+        return np.full_like(
             distance, self.delay_min[src_type, tgt_type], dtype=self.delay_min.dtype
         )
 
+    def get_model_output(self, src_type, tgt_type, distance):  # pylint: disable=arguments-differ
+        """Draw distance-dependent delay values from truncated normal distribution [seeded through numpy]."""
+        d_mean = self.get_mean(src_type, tgt_type, distance)
+        d_std = self.get_std(src_type, tgt_type, distance)
+        d_min = self.get_min(src_type, tgt_type, distance)
         if all(d_std > 0.0):
             return truncnorm.rvs(a=(d_min - d_mean) / d_std, b=np.inf, loc=d_mean, scale=d_std)
         else:
@@ -1091,8 +1102,8 @@ class ConnProb3rdOrderExpModel(AbstractModel):
                 '"Exponent" must be non-negative!',
             )
             log.log_assert(
-                isinstance(self.bip_coord, int) and self.bip_coord >= 0,
-                'Bipolar coordinate "bip_coord" must be a non-negative integer!',
+                isinstance(self.bip_coord, int) and 0 <= self.bip_coord <= 2,
+                'Bipolar coordinate "bip_coord" out of range!',
             )
 
     @staticmethod
@@ -1119,7 +1130,7 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         return dist_mat
 
     @staticmethod
-    def compute_bip_matrix(src_pos, tgt_pos, bip_coord=2):
+    def compute_bip_matrix(src_pos, tgt_pos, bip_coord):
         """Computes bipolar matrix between pairs of neurons along specified coordinate axis (default: 2..z-axis),
 
         defined as sign of target (POST-synaptic) minus source (PRE-synaptic) coordinate value
@@ -1147,8 +1158,6 @@ class ConnProb3rdOrderExpModel(AbstractModel):
 
     def __str__(self):
         """Return model string describing the model."""
-        coord_nr = self.bip_coord + 1
-        coord_str = f'{coord_nr}{"st" if coord_nr == 1 else "nd" if coord_nr == 2 else "rd" if coord_nr == 3 else "th"}'
         model_str = f"{self.__class__.__name__}\n"
         model_str = (
             model_str
@@ -1161,7 +1170,7 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         model_str = model_str + "                     AVERAGE OF BOTH MODELS  if delta == 0\n"
         model_str = (
             model_str
-            + f"  d...distance, delta...difference (tgt minus src) in {coord_str} coordinate"
+            + f"  d...distance, delta...difference (tgt minus src) in coordinate {self.bip_coord}"
         )
         return model_str
 
@@ -1222,8 +1231,8 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
                 '"dist_exp_P/N" must be non-negative!',
             )
             log.log_assert(
-                isinstance(self.bip_coord, int) and self.bip_coord >= 0,
-                'Bipolar coordinate "bip_coord" must be a non-negative integer!',
+                isinstance(self.bip_coord, int) and 0 <= self.bip_coord <= 2,
+                'Bipolar coordinate "bip_coord" out of range!',
             )
             test_distance = 1000.0
             log.log_assert(
@@ -1265,7 +1274,7 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
         return dist_mat
 
     @staticmethod
-    def compute_bip_matrix(src_pos, tgt_pos, bip_coord=2):
+    def compute_bip_matrix(src_pos, tgt_pos, bip_coord):
         """Computes bipolar matrix between pairs of neurons along specified coordinate axis (default: 2..z-axis),
 
         defined as sign of target (POST-synaptic) minus source (PRE-synaptic) coordinate value
@@ -1293,9 +1302,6 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
 
     def __str__(self):
         """Return model string describing the model."""
-        coord_nr = self.bip_coord + 1
-        # pylint: disable=unused-variable
-        coord_str = f'{coord_nr}{"st" if coord_nr == 1 else "nd" if coord_nr == 2 else "rd" if coord_nr == 3 else "th"}'
         model_str = f"{self.__class__.__name__}\n"
         model_str = (
             model_str
@@ -1308,7 +1314,7 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
         model_str = model_str + "                     AVERAGE OF BOTH MODELS  if delta == 0\n"
         model_str = (
             model_str
-            + "  d...distance, delta...difference (tgt minus src) in {coord_str} coordinate"
+            + f"  d...distance, delta...difference (tgt minus src) in coordinate {self.bip_coord}"
         )
         return model_str
 
@@ -1454,7 +1460,7 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
-    param_names = []
+    param_names = ["axial_coord"]
     param_defaults = {}
     data_names = ["p_conn_table"]
     input_names = ["src_pos", "tgt_pos"]
@@ -1464,6 +1470,10 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
+        log.log_assert(
+            isinstance(self.axial_coord, int) and 0 <= self.axial_coord <= 2,
+            'Axial coordinate "axial_coord" out of range!',
+        )
         log.log_assert(
             len(self.p_conn_table.index.levels) == 2,
             "Data frame with 2 index levels (dr, dz) required!",
@@ -1537,20 +1547,19 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         return p_conn
 
     @staticmethod
-    def compute_offset_matrices(src_pos, tgt_pos):
-        """Computes dr/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
-        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in x coordinate
-        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in y coordinate
+    def compute_offset_matrices(src_pos, tgt_pos, axial_coord):
+        """Computes radial/axial offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        d_matrices = [
+            np.diff(np.meshgrid(src_pos[:, i], tgt_pos[:, i], indexing="ij"), axis=0)[0, :, :]
+            for i in range(3)
+        ]  # Relative differences in x/y/z coordinates
+
+        radial_coords = list(set(range(3)) - {axial_coord})  # Radial coordinates
         dr_mat = np.sqrt(
-            dx_mat**2 + dy_mat**2
-        )  # Relative offset in x/y plane (Euclidean distance)
-        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in z coordinate
+            d_matrices[radial_coords[0]] ** 2 + d_matrices[radial_coords[1]] ** 2
+        )  # Relative offset in radial plane (Euclidean distance)
+        dz_mat = d_matrices[axial_coord]  # Axial offset
+
         return dr_mat, dz_mat
 
     def get_model_output(self, **kwargs):
@@ -1564,7 +1573,7 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
         #         log.log_assert(
         #             src_pos.shape[1] == 3, "Wrong number of input dimensions (3 required)!"
         #         )
-        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos, self.axial_coord)
         return self.get_conn_prob(dr_mat, dz_mat)
 
     def __str__(self):
@@ -1583,7 +1592,10 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
             model_str
             + f"  p_conn({inp_str}) = LINEAR INTERPOLATION FROM DATA TABLE ({self.p_conn_table.shape[0]} entries; {range_str})\n"
         )
-        model_str = model_str + "  dr/dz...radial/axial position offset (tgt minus src)"
+        model_str = (
+            model_str
+            + f"  dr/dz...radial/axial position offset (tgt minus src), with axial coordinate {self.axial_coord}"
+        )
         return model_str
 
 
@@ -1742,7 +1754,7 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
-    param_names = []
+    param_names = ["axial_coord"]
     param_defaults = {}
     data_names = ["p_conn_table"]
     input_names = ["src_pos", "tgt_pos"]
@@ -1752,6 +1764,10 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         super().__init__(**kwargs)
 
         # Check parameters
+        log.log_assert(
+            isinstance(self.axial_coord, int) and 0 <= self.axial_coord <= 2,
+            'Axial coordinate "axial_coord" out of range!',
+        )
         log.log_assert(
             len(self.p_conn_table.index.levels) == 3,
             "Data frame with 3 index levels (z, dr, dz) required!",
@@ -1827,26 +1843,25 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         return p_conn
 
     @staticmethod
-    def compute_position_matrix(src_pos, tgt_pos):
-        """Computes z position matrix of src/PRE neurons (src/PRE neuron positions repeated over tgt/POST neuron number)."""
-        z_mat = np.tile(src_pos[:, 2:3], [1, tgt_pos.shape[0]])
+    def compute_position_matrix(src_pos, tgt_pos, axial_coord):
+        """Computes axial position matrix of src/PRE neurons (src/PRE neuron positions repeated over tgt/POST neuron number)."""
+        z_mat = np.tile(src_pos[:, [axial_coord]], [1, tgt_pos.shape[0]])  # Axial position
         return z_mat
 
     @staticmethod
-    def compute_offset_matrices(src_pos, tgt_pos):
-        """Computes dr/dz offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
-        dx_mat = np.diff(np.meshgrid(src_pos[:, 0], tgt_pos[:, 0], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in x coordinate
-        dy_mat = np.diff(np.meshgrid(src_pos[:, 1], tgt_pos[:, 1], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in y coordinate
+    def compute_offset_matrices(src_pos, tgt_pos, axial_coord):
+        """Computes radial/axial offset matrices between pairs of neurons (tgt/POST minus src/PRE position)."""
+        d_matrices = [
+            np.diff(np.meshgrid(src_pos[:, i], tgt_pos[:, i], indexing="ij"), axis=0)[0, :, :]
+            for i in range(3)
+        ]  # Relative differences in x/y/z coordinates
+
+        radial_coords = list(set(range(3)) - {axial_coord})  # Radial coordinates
         dr_mat = np.sqrt(
-            dx_mat**2 + dy_mat**2
-        )  # Relative offset in x/y plane (Euclidean distance)
-        dz_mat = np.diff(np.meshgrid(src_pos[:, 2], tgt_pos[:, 2], indexing="ij"), axis=0)[
-            0, :, :
-        ]  # Relative difference in z coordinate
+            d_matrices[radial_coords[0]] ** 2 + d_matrices[radial_coords[1]] ** 2
+        )  # Relative offset in radial plane (Euclidean distance)
+        dz_mat = d_matrices[axial_coord]  # Axial offset
+
         return dr_mat, dz_mat
 
     def get_model_output(self, **kwargs):
@@ -1860,8 +1875,8 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         #         log.log_assert(
         #             src_pos.shape[1] == 3, "Wrong number of input dimensions (3 required)!"
         #         )
-        z_mat = self.compute_position_matrix(src_pos, tgt_pos)
-        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos)
+        z_mat = self.compute_position_matrix(src_pos, tgt_pos, self.axial_coord)
+        dr_mat, dz_mat = self.compute_offset_matrices(src_pos, tgt_pos, self.axial_coord)
         return self.get_conn_prob(z_mat, dr_mat, dz_mat)
 
     def __str__(self):
@@ -1882,6 +1897,6 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         )
         model_str = (
             model_str
-            + "  z...axial src position, dr/dz...radial/axial position offset (tgt minus src)"
+            + f"  z...axial src position, dr/dz...radial/axial position offset (tgt minus src), with axial coordinate {self.axial_coord}"
         )
         return model_str

@@ -391,7 +391,8 @@ def test_ConnProb4thOrderLinInterpnReducedModel():
             columns=["p"],
         )
         model = test_module.AbstractModel.model_from_dict(
-            {"model": "ConnProb4thOrderLinInterpnReducedModel"}, {"p_conn_table": p_table}
+            {"model": "ConnProb4thOrderLinInterpnReducedModel", "axial_coord": 2},
+            {"p_conn_table": p_table},
         )
 
         # Check prob model access (at center positions)
@@ -462,7 +463,8 @@ def test_ConnProb5thOrderLinInterpnReducedModel():
             columns=["p"],
         )
         model = test_module.AbstractModel.model_from_dict(
-            {"model": "ConnProb5thOrderLinInterpnReducedModel"}, {"p_conn_table": p_table}
+            {"model": "ConnProb5thOrderLinInterpnReducedModel", "axial_coord": 2},
+            {"p_conn_table": p_table},
         )
 
         # Check prob model access (at center positions)

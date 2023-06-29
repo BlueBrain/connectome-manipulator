@@ -433,6 +433,41 @@ def build(
     return model
 
 
+def compute_AUC(distr_A, distr_B, bins_A, bins_B, dth=0.05, dx=0.01):
+    """Computes area under the ROC curve for comparing two distributions."""
+    pos_A = np.array(
+        [np.mean(bins_A[i : i + 2]) for i in range(len(bins_A) - 1)]
+    )  # Bin center positions
+    pos_B = np.array(
+        [np.mean(bins_B[i : i + 2]) for i in range(len(bins_B) - 1)]
+    )  # Bin center positions
+
+    min_range = np.minimum(pos_A[0], pos_B[0])
+    max_range = np.maximum(pos_A[-1], pos_B[-1])
+    pos_norm_A = (pos_A - min_range) / (max_range - min_range)  # Normalized positions
+    pos_norm_B = (pos_B - min_range) / (max_range - min_range)  # Normalized positions
+
+    bin_size_A = np.mean(np.diff(bins_A))
+    bin_size_B = np.mean(np.diff(bins_B))
+    distr_norm_A = distr_A / (np.sum(distr_A) * bin_size_A)
+    distr_norm_B = distr_B / (np.sum(distr_B) * bin_size_B)
+
+    ths = np.arange(0, 1.0 + dth, dth)  # Thresholds
+    TPR = np.array([np.sum(distr_norm_A[pos_norm_A >= th] * bin_size_A) for th in ths])
+    FPR = np.array([np.sum(distr_norm_B[pos_norm_B >= th] * bin_size_B) for th in ths])
+
+    sort_idx = np.argsort(FPR)
+    xp = FPR[sort_idx]
+    yp = TPR[sort_idx]
+
+    x = np.arange(0.0, 1.0 + dx, dx)
+    y = np.interp(x, xp, yp)
+    AUC = np.trapz(y, x, dx) - 0.5
+    ERR = np.trapz(np.abs(y - x), x, dx)  # Error: Area of abs. differences
+
+    return AUC, ERR, FPR, TPR, distr_norm_A, distr_norm_B, pos_norm_A, pos_norm_B, xp, yp, x, y
+
+
 def plot(
     out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, **_
 ):  # pragma: no cover
@@ -498,7 +533,7 @@ def plot(
             log.info(f"Saving {out_fn}...")
             plt.savefig(out_fn)
 
-    # Plot data vs. model: Distribution histogram examples (generative model)
+    # Plot data vs. model: Distribution histogram examples (generative model) + AUC
     N = 1000  # Number of samples
     conn_counts = [
         [
@@ -519,21 +554,25 @@ def plot(
         max_pathways[i][0] for i in range(len(max_pathways))
     ]  # Select first of these pathways for plotting
     src, tgt = [m_types[0][sidx], m_types[1][tidx]]
+    full_model_data = [model.apply(src_type=src, tgt_type=tgt) for n in range(N)]
     for pidx, p in enumerate(prop_names):
         plt.figure(figsize=(5, 3), dpi=300)
         if pidx < len(syn_props):
             data_hist = conn_prop_data["hist"][sidx, tidx, pidx]
+            model_data = np.array(
+                [_d[p].mean() for _d in full_model_data]
+            )  # Within-connection property means for plotting
         else:
             data_hist = syns_per_conn_data["hist"][sidx, tidx]
+            model_data = np.array(
+                [_d.shape[0] for _d in full_model_data]
+            )  # Number of synapses per connection
         plt.bar(
             data_hist[1][:-1],
             data_hist[0] / np.sum(data_hist[0]),
             align="edge",
             width=np.min(np.diff(data_hist[1])),
             label=f"Data (N={np.max(conn_counts)})",
-        )
-        model_data = np.hstack(
-            [model.draw(prop_name=p, src_type=src, tgt_type=tgt) for n in range(N)]
         )
         hist_bins = data_hist[1]  # Use same model distribution binning as for data
         bin_size = np.min(np.diff(hist_bins))
@@ -565,5 +604,36 @@ def plot(
         plt.tight_layout()
 
         out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_hist__{p}.png"))
+        log.info(f"Saving {out_fn}...")
+        plt.savefig(out_fn)
+
+        # AUC/ROC plot
+        (
+            AUC,
+            ERR,
+            _FPR,
+            _TPR,
+            _distr_norm_A,
+            _distr_norm_B,
+            _pos_norm_A,
+            _pos_norm_B,
+            xp,
+            yp,
+            x,
+            y,
+        ) = compute_AUC(data_hist[0], model_hist[0], data_hist[1], model_hist[1])
+
+        plt.figure()
+        plt.plot([0.0, 1.0], [0.0, 1.0], "--k")
+        plt.plot(xp, yp, ".-")
+        plt.plot(x, y, ".--")
+        plt.grid()
+        plt.gca().set_axisbelow(True)
+        plt.title(f"{src} to {tgt}: {p} (AUC={AUC:.2f}, ERR={ERR:.2f})", fontweight="bold")
+        plt.xlabel("FPR")
+        plt.ylabel("TPR")
+        plt.tight_layout()
+
+        out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_AUC__{p}.png"))
         log.info(f"Saving {out_fn}...")
         plt.savefig(out_fn)

@@ -21,7 +21,6 @@ from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
-
 JET = plt.cm.get_cmap("jet")
 HOT = plt.cm.get_cmap("hot")
 
@@ -341,7 +340,7 @@ def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, min_count_per_b
 def build_1st_order(p_conn, **_):
     """Build 1st order model (Erdos-Renyi, capturing average conn. prob.)."""
     # Create model
-    model = model_types.ConnProb1stOrderModel(p_conn=p_conn)
+    model = model_types.ConnProb1stOrderModel(p_conn=float(p_conn))
     log.debug("Model description:\n%s", model)
 
     return model
@@ -450,32 +449,46 @@ def build_2nd_order(
         if np.sum(y) == 0.0:  # Special case: No connections at all, skipping model fit
             a_opt = b_opt = 0.0
         else:
+            p0 = model_specs.get("p0", [0.0, 0.0])
+            bounds = model_specs.get("bounds", [0.0, np.inf])
+            invalid_model = False
             try:
-                p0 = model_specs.get("p0", [0.0, 0.0])
-                bounds = model_specs.get("bounds", [0.0, np.inf])
-                # pylint: disable=W0632
-                (a_opt, b_opt), pcov = curve_fit(exp_model, X, y, p0=p0, bounds=bounds)
-                assert 0.0 <= a_opt <= 1.0, '"Scale" must be between 0 and 1!'
+                (a_opt, b_opt), pcov, *_ = curve_fit(exp_model, X, y, p0=p0, bounds=bounds)
+            except (
+                ValueError,
+                RuntimeError,
+            ) as e:  # Raised if input data invalid or optimization fails
+                log.error(e)
+                invalid_model = True
+
+            if not invalid_model and not 0.0 <= a_opt <= 1.0:
+                log.error('"Scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model:
                 rel_err = np.sqrt(np.diag(pcov)) / np.array(
                     [a_opt, b_opt]
                 )  # Rel. standard error of the coefficients
                 log.debug(f"Rel. error of simple 2nd-order model fit: {rel_err}")
-                if rel_fit_err_th is not None:
-                    assert (
-                        max(rel_err) <= rel_fit_err_th
-                    ), f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!"
-                if (
-                    strict_fit
-                ):  # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                    assert np.isfinite(
-                        p_conn_dist[0]
-                    ), "Strict fit violation: Lowest-distance bin empty!"
-            except Exception as e:
-                log.error(e)
-                (a_opt, b_opt) = (np.nan, np.nan)
+                if rel_fit_err_th is not None and (
+                    not all(np.isfinite(rel_err)) or max(rel_err) > rel_fit_err_th
+                ):
+                    log.error(
+                        f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th} (or could not be determined)!"
+                    )
+                    invalid_model = True
+
+            if not invalid_model and strict_fit:
+                if not np.isfinite(p_conn_dist[0]):
+                    # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    log.error("Strict fit violation: Lowest-distance bin empty!")
+                    invalid_model = True
+
+            if invalid_model:
+                a_opt = b_opt = np.nan
 
         # Create simple model
-        model = model_types.ConnProb2ndOrderExpModel(scale=a_opt, exponent=b_opt)
+        model = model_types.ConnProb2ndOrderExpModel(scale=float(a_opt), exponent=float(b_opt))
 
     elif (
         model_specs.get("type") == "ComplexExponential"
@@ -485,40 +498,61 @@ def build_2nd_order(
             return a * np.exp(-b * np.array(x) ** c) + d * np.exp(-e * np.array(x))
 
         if np.sum(y) == 0.0:  # Special case: No connections at all, skipping model fit
-            a_opt = b_opt = 0.0
+            a_opt = b_opt = c_opt = d_opt = e_opt = 0.0
         else:
+            p0 = model_specs.get("p0", [0.0, 0.0, 1.0, 0.0, 0.0])
+            bounds = model_specs.get(
+                "bounds", [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]]
+            )
+            invalid_model = False
             try:
-                p0 = model_specs.get("p0", [0.0, 0.0, 1.0, 0.0, 0.0])
-                bounds = model_specs.get(
-                    "bounds", [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]]
-                )
-                # pylint: disable=W0632
-                (a_opt, b_opt, c_opt, d_opt, e_opt), pcov = curve_fit(
+                (a_opt, b_opt, c_opt, d_opt, e_opt), pcov, *_ = curve_fit(
                     exp_model, X, y, p0=p0, bounds=bounds
                 )
-                assert 0.0 <= a_opt <= 1.0, 'Proximal "scale" must be between 0 and 1!'
-                assert 0.0 <= d_opt <= 1.0, 'Distal "scale" must be between 0 and 1!'
+            except (
+                ValueError,
+                RuntimeError,
+            ) as e:  # Raised if input data invalid or optimization fails
+                log.error(e)
+                invalid_model = True
+
+            if not invalid_model and not 0.0 <= a_opt <= 1.0:
+                log.error('Proximal "scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model and not 0.0 <= d_opt <= 1.0:
+                log.error('Distal "scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model:
                 rel_err = np.sqrt(np.diag(pcov)) / np.array(
                     [a_opt, b_opt, c_opt, d_opt, e_opt]
                 )  # Rel. standard error of the coefficients
                 log.debug(f"Rel. error of complex 2nd-order model fit: {rel_err}")
-                if rel_fit_err_th is not None:
-                    assert (
-                        max(rel_err) <= rel_fit_err_th
-                    ), f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!"
-                if (
-                    strict_fit
-                ):  # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                    assert np.isfinite(
-                        p_conn_dist[0]
-                    ), "Strict fit violation: Lowest-distance bin empty!"
-            except Exception as e:
-                log.error(e)
-                (a_opt, b_opt, c_opt, d_opt, e_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
+                if rel_fit_err_th is not None and (
+                    not all(np.isfinite(rel_err)) or max(rel_err) > rel_fit_err_th
+                ):
+                    log.error(
+                        f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th} (or could not be determined)!"
+                    )
+                    invalid_model = True
+
+            if not invalid_model and strict_fit:
+                if not np.isfinite(p_conn_dist[0]):
+                    # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    log.error("Strict fit violation: Lowest-distance bin empty!")
+                    invalid_model = True
+
+            if invalid_model:
+                a_opt = b_opt = c_opt = d_opt = e_opt = np.nan
 
         # Create complex model
         model = model_types.ConnProb2ndOrderComplexExpModel(
-            prox_scale=a_opt, prox_exp=b_opt, prox_exp_pow=c_opt, dist_scale=d_opt, dist_exp=e_opt
+            prox_scale=float(a_opt),
+            prox_exp=float(b_opt),
+            prox_exp_pow=float(c_opt),
+            dist_scale=float(d_opt),
+            dist_exp=float(e_opt),
         )
 
     else:
@@ -642,6 +676,7 @@ def extract_3rd_order(
     pos_map_file=None,
     no_dist_mapping=False,
     min_count_per_bin=10,
+    bip_coord=2,
     **_,
 ):
     """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
@@ -666,8 +701,10 @@ def extract_3rd_order(
             src_nrn_pos, tgt_nrn_pos
         )
 
-    # Compute bipolar matrix (always using position mapping, if provided; along z-axis; post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
-    bip_mat = model_types.ConnProb3rdOrderExpModel.compute_bip_matrix(src_nrn_pos, tgt_nrn_pos)
+    # Compute bipolar matrix (always using position mapping, if provided; along z-axis (by default); post-synaptic neuron below (delta_z < 0) or above (delta_z > 0) pre-synaptic neuron)
+    bip_mat = model_types.ConnProb3rdOrderExpModel.compute_bip_matrix(
+        src_nrn_pos, tgt_nrn_pos, bip_coord
+    )
 
     # Extract bipolar distance-dependent connection probabilities
     if max_range_um is None:
@@ -695,6 +732,7 @@ def extract_3rd_order(
         "count_all": count_all,
         "dist_bins": dist_bins,
         "bip_bins": bip_bins,
+        "bip_coord_data": bip_coord,
         "src_cell_count": len(src_node_ids),
         "tgt_cell_count": len(tgt_node_ids),
     }
@@ -704,6 +742,7 @@ def build_3rd_order(
     p_conn_dist_bip,
     dist_bins,
     count_all,
+    bip_coord_data,
     model_specs=None,
     rel_fit_err_th=None,
     strict_fit=False,
@@ -726,38 +765,54 @@ def build_3rd_order(
             aN_opt = bN_opt = 0.0
             aP_opt = bP_opt = 0.0
         else:
+            p0 = model_specs.get("p0", [0.0, 0.0])
+            bounds = model_specs.get("bounds", [0.0, np.inf])
+            invalid_model = False
             try:
-                p0 = model_specs.get("p0", [0.0, 0.0])
-                bounds = model_specs.get("bounds", [0.0, np.inf])
-                # pylint: disable=W0632
-                (aN_opt, bN_opt), pcovN = curve_fit(exp_model, X, y[:, 0], p0=p0, bounds=bounds)
-                (aP_opt, bP_opt), pcovP = curve_fit(exp_model, X, y[:, 1], p0=p0, bounds=bounds)
-                assert (
-                    0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0
-                ), '"Scale" must be between 0 and 1!'
+                (aN_opt, bN_opt), pcovN, *_ = curve_fit(exp_model, X, y[:, 0], p0=p0, bounds=bounds)
+                (aP_opt, bP_opt), pcovP, *_ = curve_fit(exp_model, X, y[:, 1], p0=p0, bounds=bounds)
+            except (
+                ValueError,
+                RuntimeError,
+            ) as e:  # Raised if input data invalid or optimization fails
+                log.error(e)
+                invalid_model = True
+
+            if not invalid_model and (not 0.0 <= aN_opt <= 1.0 or not 0.0 <= aP_opt <= 1.0):
+                log.error('"Scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model:
                 rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array(
                     [aN_opt, bN_opt, aP_opt, bP_opt]
                 )  # Rel. standard error of the coefficients
                 log.debug(f"Rel. error of simple 3rd-order model fit: {rel_err}")
-                if rel_fit_err_th is not None:
-                    assert (
-                        max(rel_err) <= rel_fit_err_th
-                    ), f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!"
-                if (
-                    strict_fit
-                ):  # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                    assert np.all(
-                        np.isfinite(p_conn_dist_bip[0, :])
-                    ), "Strict fit violation: Lowest-distance bin empty!"
-            except Exception as e:
-                log.error(e)
-                (aN_opt, bN_opt) = (np.nan, np.nan)
-                (aP_opt, bP_opt) = (np.nan, np.nan)
+                if rel_fit_err_th is not None and (
+                    not all(np.isfinite(rel_err)) or max(rel_err) > rel_fit_err_th
+                ):
+                    log.error(
+                        f"Rel. error of model exceeds error threshold of {rel_fit_err_th} (or could not be determined)!"
+                    )
+                    invalid_model = True
+
+            if not invalid_model and strict_fit:
+                if not all(np.isfinite(p_conn_dist_bip[0, :])):
+                    # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
+                    log.error("Strict fit violation: Lowest-distance bin empty!")
+                    invalid_model = True
+
+            if invalid_model:
+                aN_opt = bN_opt = np.nan
+                aP_opt = bP_opt = np.nan
 
         # Create simple model
         model = model_types.ConnProb3rdOrderExpModel(
-            scale_N=aN_opt, exponent_N=bN_opt, scale_P=aP_opt, exponent_P=bP_opt, bip_coord=2
-        )  # [bip_coord=2 ... bipolar along z-axis]
+            scale_N=float(aN_opt),
+            exponent_N=float(bN_opt),
+            scale_P=float(aP_opt),
+            exponent_P=float(bP_opt),
+            bip_coord=int(bip_coord_data),
+        )
 
     elif (
         model_specs.get("type") == "ComplexExponential"
@@ -770,56 +825,70 @@ def build_3rd_order(
             aN_opt = bN_opt = cN_opt = dN_opt = eN_opt = 0.0
             aP_opt = bP_opt = cP_opt = dP_opt = eP_opt = 0.0
         else:
+            p0 = model_specs.get("p0", [0.0, 0.0, 1.0, 0.0, 0.0])
+            bounds = model_specs.get(
+                "bounds", [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]]
+            )
+            invalid_model = False
             try:
-                p0 = model_specs.get("p0", [0.0, 0.0, 1.0, 0.0, 0.0])
-                bounds = model_specs.get(
-                    "bounds", [[0.0, 0.0, 1.0, 0.0, 0.0], [np.inf, np.inf, 2.0, np.inf, np.inf]]
-                )
-                # pylint: disable=W0632
-                (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt), pcovN = curve_fit(
+                (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt), pcovN, *_ = curve_fit(
                     exp_model, X, y[:, 0], p0=p0, bounds=bounds
                 )
-                (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt), pcovP = curve_fit(
+                (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt), pcovP, *_ = curve_fit(
                     exp_model, X, y[:, 1], p0=p0, bounds=bounds
                 )
-                assert (
-                    0.0 <= aN_opt <= 1.0 and 0.0 <= aP_opt <= 1.0
-                ), 'Proximal "scale" must be between 0 and 1!'
-                assert (
-                    0.0 <= dN_opt <= 1.0 and 0.0 <= dP_opt <= 1.0
-                ), 'Distal "scale" must be between 0 and 1!'
+            except (
+                ValueError,
+                RuntimeError,
+            ) as e:  # Raised if input data invalid or optimization fails
+                log.error(e)
+                invalid_model = True
+
+            if not invalid_model and (not 0.0 <= aN_opt <= 1.0 or not 0.0 <= aP_opt <= 1.0):
+                log.error('Proximal "scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model and (not 0.0 <= dN_opt <= 1.0 or not 0.0 <= dP_opt <= 1.0):
+                log.error('Distal "scale" must be between 0 and 1!')
+                invalid_model = True
+
+            if not invalid_model:
                 rel_err = np.hstack([np.sqrt(np.diag(pcovN)), np.sqrt(np.diag(pcovP))]) / np.array(
                     [aN_opt, bN_opt, cN_opt, dN_opt, eN_opt, aP_opt, bP_opt, cP_opt, dP_opt, eP_opt]
                 )  # Rel. standard error of the coefficients
                 log.debug(f"Rel. error of complex 3rd-order model fit: {rel_err}")
-                if rel_fit_err_th is not None:
-                    assert (
-                        max(rel_err) <= rel_fit_err_th
-                    ), f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th}!"
-                if strict_fit:
+                if rel_fit_err_th is not None and (
+                    not all(np.isfinite(rel_err)) or max(rel_err) > rel_fit_err_th
+                ):
+                    log.error(
+                        f"Rel. error of model fit exceeds error threshold of {rel_fit_err_th} (or could not be determined)!"
+                    )
+                    invalid_model = True
+
+            if not invalid_model and strict_fit:
+                if not all(np.isfinite(p_conn_dist_bip[0, :])):
                     # Strict fit: Must contain data in the first bin (otherwise, resulting in potentially bad extrapolation at low distances)
-                    assert np.isfinite(
-                        p_conn_dist_bip[0]
-                    ), "Strict fit violation: Lowest-distance bin empty!"
-            except Exception as e:
-                log.error(e)
-                (aN_opt, bN_opt, cN_opt, dN_opt, eN_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
-                (aP_opt, bP_opt, cP_opt, dP_opt, eP_opt) = (np.nan, np.nan, np.nan, np.nan, np.nan)
+                    log.error("Strict fit violation: Lowest-distance bin empty!")
+                    invalid_model = True
+
+            if invalid_model:
+                aN_opt = bN_opt = cN_opt = dN_opt = eN_opt = np.nan
+                aP_opt = bP_opt = cP_opt = dP_opt = eP_opt = np.nan
 
         # Create complex model
         model = model_types.ConnProb3rdOrderComplexExpModel(
-            prox_scale_N=aN_opt,
-            prox_exp_N=bN_opt,
-            prox_exp_pow_N=cN_opt,
-            dist_scale_N=dN_opt,
-            dist_exp_N=eN_opt,
-            prox_scale_P=aP_opt,
-            prox_exp_P=bP_opt,
-            prox_exp_pow_P=cP_opt,
-            dist_scale_P=dP_opt,
-            dist_exp_P=eP_opt,
-            bip_coord=2,
-        )  # [bip_coord=2 ... bipolar along z-axis]
+            prox_scale_N=float(aN_opt),
+            prox_exp_N=float(bN_opt),
+            prox_exp_pow_N=float(cN_opt),
+            dist_scale_N=float(dN_opt),
+            dist_exp_N=float(eN_opt),
+            prox_scale_P=float(aP_opt),
+            prox_exp_P=float(bP_opt),
+            prox_exp_pow_P=float(cP_opt),
+            dist_scale_P=float(dP_opt),
+            dist_exp_P=float(eP_opt),
+            bip_coord=int(bip_coord_data),
+        )
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
@@ -847,6 +916,7 @@ def plot_3rd_order(
     src_cell_count,
     tgt_cell_count,
     model,
+    bip_coord_data,
     pos_map_file=None,
     **_,
 ):  # pragma: no cover
@@ -856,6 +926,12 @@ def plot_3rd_order(
 
     model_strN = str(model).split("\n")[1].split("=")[-1].strip()
     model_strP = str(model).split("\n")[2].split("=")[-1].strip()
+
+    coord_names = ["x", "y", "z"]
+    a0_name = coord_names[bip_coord_data]  # Bipolar coordinate name for plotting on bipolar axis
+    a1_name = [c for c in coord_names if c != a0_name][
+        0
+    ]  # Other (arbitrary) coordinate name for plotting on perpendicular axis
 
     plt.figure(figsize=(12, 4), dpi=300)
 
@@ -879,7 +955,7 @@ def plot_3rd_order(
         label="Model: " + model_strP,
     )
     plt.grid()
-    plt.xlabel("sign($\\Delta$z) * Distance [$\\mu$m]")
+    plt.xlabel(f"sign($\\Delta${a0_name}) * Distance [$\\mu$m]")
     plt.ylabel("Conn. prob.")
     plt.title("Data vs. model fit")
     plt.legend(loc="upper left", fontsize=6)
@@ -906,8 +982,8 @@ def plot_3rd_order(
         plt.text(0, r, f"{r} $\\mu$m", color="w", ha="center", va="bottom")
     plt.xticks([])
     plt.yticks([])
-    plt.xlabel("$\\Delta$x")
-    plt.ylabel("$\\Delta$z")
+    plt.xlabel(f"$\\Delta${a1_name}")
+    plt.ylabel(f"$\\Delta${a0_name}")
     plt.title("2D model")
     plt.colorbar(label="Conn. prob.")
 
@@ -930,7 +1006,7 @@ def plot_3rd_order(
     plt.bar(bip_dist, bip_count_conn, width=1.0 * bin_offset, label="Connection count")
     plt.gca().set_yscale("log")
     plt.grid()
-    plt.xlabel("sign($\\Delta$z) * Distance [$\\mu$m]")
+    plt.xlabel(f"sign($\\Delta${a0_name}) * Distance [$\\mu$m]")
     plt.ylabel("Count")
     plt.title(
         f"Bipolar distance-dependent connection counts (N = {src_cell_count}x{tgt_cell_count} cells)\n<Position mapping: {pos_map_file}>"
@@ -946,7 +1022,7 @@ def plot_3rd_order(
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   4th order (offset-dependent)
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (such as 'LinearInterpolation')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -1035,7 +1111,7 @@ def build_4th_order(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
+    """Build 4th order model (linear interpolation model for offset-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1085,19 +1161,6 @@ def build_4th_order(
         df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=["p"])
         model = model_types.ConnProb4thOrderLinInterpnModel(p_conn_table=df)
 
-    elif model_specs.get("type") == "RandomForestRegressor":  # Random Forest Regressor model
-        log.log_assert(False, "ERROR: No model class implemented for RandomForestRegressor!")
-
-    #         dxv, dyv, dzv = np.meshgrid(dx_pos, dy_pos, dz_pos, indexing='ij')
-    #         data_pos = np.array([dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
-    #         data_val = p_conn_offset.flatten()
-
-    #         offset_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
-    #         offset_regr_model.fit(data_pos, data_val)
-
-    #         # Create model
-    #         model = model_types...
-
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
@@ -1123,7 +1186,6 @@ def plot_4th_order(
     dz_bins,
     src_cell_count,
     tgt_cell_count,
-    model_specs,
     model,
     pos_map_file=None,
     plot_model_ovsampl=3,
@@ -1229,7 +1291,7 @@ def plot_4th_order(
     ax.set_ylabel("$\\Delta$y [$\\mu$m]")
     ax.set_zlabel("$\\Delta$z [$\\mu$m]")
     plt.colorbar(p_color_map, label="Conn. prob.")
-    plt.title(f'Model: {model_specs.get("type")}')
+    plt.title(f"Model: {model.__class__.__name__}")
 
     plt.suptitle(
         f"Offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>"
@@ -1349,7 +1411,7 @@ def plot_4th_order(
 #   Reduced 4th order (offset-dependent), modified from [Gal et al. 2020]
 #     => Radial/axial offsets only
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (such as 'LinearInterpolation')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -1363,6 +1425,7 @@ def extract_4th_order_reduced(
     max_range_um=None,
     pos_map_file=None,
     min_count_per_bin=10,
+    axial_coord=2,
     **_,
 ):
     """Extract offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons."""
@@ -1374,7 +1437,7 @@ def extract_4th_order_reduced(
 
     # Compute dr/dz offset matrices
     dr_mat, dz_mat = model_types.ConnProb4thOrderLinInterpnReducedModel.compute_offset_matrices(
-        src_nrn_pos, tgt_nrn_pos
+        src_nrn_pos, tgt_nrn_pos, axial_coord
     )
 
     # Extract offset-dependent connection probabilities
@@ -1410,15 +1473,23 @@ def extract_4th_order_reduced(
         "count_all": count_all,
         "dr_bins": dr_bins,
         "dz_bins": dz_bins,
+        "axial_coord_data": axial_coord,
         "src_cell_count": len(src_node_ids),
         "tgt_cell_count": len(tgt_node_ids),
     }
 
 
 def build_4th_order_reduced(
-    p_conn_offset, dr_bins, dz_bins, count_all, model_specs=None, smoothing_sigma_um=None, **_
+    p_conn_offset,
+    dr_bins,
+    dz_bins,
+    count_all,
+    axial_coord_data,
+    model_specs=None,
+    smoothing_sigma_um=None,
+    **_,
 ):
-    """Build reduced 4th order model (linear interpolation or random forest regression model for offset-dependent conn. prob.)."""
+    """Build reduced 4th order model (linear interpolation model for offset-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1468,10 +1539,9 @@ def build_4th_order_reduced(
         # Create model
         index = pd.MultiIndex.from_product([dr_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_offset.flatten(), index=index, columns=["p"])
-        model = model_types.ConnProb4thOrderLinInterpnReducedModel(p_conn_table=df)
-
-    elif model_specs.get("type") == "RandomForestRegressor":  # Random Forest Regressor model
-        log.log_assert(False, "ERROR: No model class implemented for RandomForestRegressor!")
+        model = model_types.ConnProb4thOrderLinInterpnReducedModel(
+            p_conn_table=df, axial_coord=int(axial_coord_data)
+        )
 
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
@@ -1497,8 +1567,8 @@ def plot_4th_order_reduced(
     dz_bins,
     src_cell_count,
     tgt_cell_count,
-    model_specs,
     model,
+    axial_coord_data,
     pos_map_file=None,
     plot_model_ovsampl=3,
     plot_model_extsn=0,
@@ -1538,7 +1608,12 @@ def plot_4th_order_reduced(
     model_val = model_val.reshape([len(dr_pos_model), len(dz_pos_model)])
 
     # Connection probability (data vs. model)
+    coord_names = ["x", "y", "z"]
+    az_name = coord_names[axial_coord_data]  # Axial axis name
+    ar_name = "r"  # Radial axis name
+
     plt.figure(figsize=(12, 4), dpi=300)
+
     # (Data)
     log.log_assert(dr_bins[0] == 0, "ERROR: Radial bin range error!")
     plt.subplot(1, 2, 1)
@@ -1551,8 +1626,8 @@ def plot_4th_order_reduced(
     )
     plt.plot(np.zeros(2), plt.ylim(), color="lightgrey", linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel("$\\Delta$r [$\\mu$m]")
-    plt.ylabel("$\\Delta$z [$\\mu$m]")
+    plt.xlabel(f"$\\Delta${ar_name} [$\\mu$m]")
+    plt.ylabel(f"$\\Delta${az_name} [$\\mu$m]")
     plt.colorbar(label="Conn. prob.")
     plt.title(f"Data: N = {src_cell_count}x{tgt_cell_count} cells")
 
@@ -1567,10 +1642,10 @@ def plot_4th_order_reduced(
     )
     plt.plot(np.zeros(2), plt.ylim(), color="lightgrey", linewidth=0.5)
     plt.gca().invert_yaxis()
-    plt.xlabel("$\\Delta$r [$\\mu$m]")
-    plt.ylabel("$\\Delta$z [$\\mu$m]")
+    plt.xlabel(f"$\\Delta${ar_name} [$\\mu$m]")
+    plt.ylabel(f"$\\Delta${az_name} [$\\mu$m]")
     plt.colorbar(label="Conn. prob.")
-    plt.title(f'Model: {model_specs.get("type")}')
+    plt.title(f"Model: {model.__class__.__name__}")
 
     plt.suptitle(
         f"Reduced offset-dependent connection probability model (4th order)\n<Position mapping: {pos_map_file}>"
@@ -1585,7 +1660,7 @@ def plot_4th_order_reduced(
 # Generative models for circuit connectivity from [Gal et al. 2020]:
 #   5th order (position-dependent)
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (such as 'LinearInterpolation')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -1716,7 +1791,7 @@ def build_5th_order(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
+    """Build 5th order model (linear interpolation model for position-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1790,19 +1865,6 @@ def build_5th_order(
         df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=["p"])
         model = model_types.ConnProb5thOrderLinInterpnModel(p_conn_table=df)
 
-    elif model_specs.get("type") == "RandomForestRegressor":  # Random Forest Regressor model
-        log.log_assert(False, "ERROR: No model class implemented for RandomForestRegressor!")
-
-    #         xv, yv, zv, dxv, dyv, dzv = np.meshgrid(x_pos, y_pos, z_pos, dx_pos, dy_pos, dz_pos, indexing='ij')
-    #         data_pos = np.array([xv.flatten(), yv.flatten(), zv.flatten(), dxv.flatten(), dyv.flatten(), dzv.flatten()]).T
-    #         data_val = p_conn_position.flatten()
-
-    #         position_regr_model = RandomForestRegressor(random_state=0, **model_specs.get('kwargs', {}))
-    #         position_regr_model.fit(data_pos, data_val)
-
-    #         # Create model
-    #         model = model_types...
-
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
@@ -1833,7 +1895,6 @@ def plot_5th_order(
     dz_bins,
     src_cell_count,
     tgt_cell_count,
-    model_specs,
     model,
     pos_map_file=None,
     plot_model_ovsampl=3,
@@ -1983,7 +2044,7 @@ def plot_5th_order(
                 ax.set_ylabel("$\\Delta$y [$\\mu$m]")
                 ax.set_zlabel("$\\Delta$z [$\\mu$m]")
                 plt.colorbar(p_color_map, label="Conn. prob.")
-                plt.title(f'Model: {model_specs.get("type")}')
+                plt.title(f"Model: {model.__class__.__name__}")
 
                 plt.suptitle(
                     f"Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={xpm:.0f}$\\mu$m, Y={ypm:.0f}$\\mu$m, Z={zpm:.0f}$\\mu$m"
@@ -2119,7 +2180,7 @@ def plot_5th_order(
                 plt.colorbar(label="Max. conn. prob.")
 
                 plt.suptitle(
-                    f"Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={xpm:.0f}$\\mu$m, Y={ypm[iy]:.0f}$\\mu$m, Z={zpm[iz]:.0f}$\\mu$m"
+                    f"Position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>\nX={xpm:.0f}$\\mu$m, Y={ypm:.0f}$\\mu$m, Z={zpm:.0f}$\\mu$m"
                 )
                 plt.tight_layout()
                 out_fn = os.path.abspath(
@@ -2135,7 +2196,7 @@ def plot_5th_order(
 #     => Axial position only
 #     => Radial/axial offsets only
 #     => Position mapping model (flatmap) supported
-#     => model_specs with 'type' (e.g., 'LinearInterpolation', 'RandomForestRegressor')
+#     => model_specs with 'type' (such as 'LinearInterpolation')
 #                    and optionally, 'kwargs' may be provided
 ###################################################################################################
 
@@ -2153,6 +2214,7 @@ def extract_5th_order_reduced(
     plot_model_ovsampl=3,
     plot_model_extsn=0,
     min_count_per_bin=10,
+    axial_coord=2,
     **_,
 ):
     """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
@@ -2165,17 +2227,21 @@ def extract_5th_order_reduced(
 
     # Compute PRE position & POST-PRE offset matrices
     z_mat = model_types.ConnProb5thOrderLinInterpnReducedModel.compute_position_matrix(
-        src_nrn_pos, tgt_nrn_pos
+        src_nrn_pos, tgt_nrn_pos, axial_coord
     )
     dr_mat, dz_mat = model_types.ConnProb5thOrderLinInterpnReducedModel.compute_offset_matrices(
-        src_nrn_pos, tgt_nrn_pos
+        src_nrn_pos, tgt_nrn_pos, axial_coord
     )
 
     # Extract position- & offset-dependent connection probabilities
     if position_max_range_um is None:
         z_range = [
-            np.minimum(np.nanmin(src_nrn_pos[:, 2]), np.nanmin(tgt_nrn_pos[:, 2])),
-            np.maximum(np.nanmax(src_nrn_pos[:, 2]), np.nanmax(tgt_nrn_pos[:, 2])),
+            np.minimum(
+                np.nanmin(src_nrn_pos[:, axial_coord]), np.nanmin(tgt_nrn_pos[:, axial_coord])
+            ),
+            np.maximum(
+                np.nanmax(src_nrn_pos[:, axial_coord]), np.nanmax(tgt_nrn_pos[:, axial_coord])
+            ),
         ]
     else:
         z_range = get_value_ranges(position_max_range_um, 1, pos_range=False)
@@ -2228,6 +2294,7 @@ def extract_5th_order_reduced(
         "z_bins": z_bins,
         "dr_bins": dr_bins,
         "dz_bins": dz_bins,
+        "axial_coord_data": axial_coord,
         "src_cell_count": len(src_node_ids),
         "tgt_cell_count": len(tgt_node_ids),
     }
@@ -2239,11 +2306,12 @@ def build_5th_order_reduced(
     dr_bins,
     dz_bins,
     count_all,
+    axial_coord_data,
     model_specs=None,
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build reduced 5th order model (linear interpolation or random forest regression model for position-dependent conn. prob.)."""
+    """Build reduced 5th order model (linear interpolation model for position-dependent conn. prob.)."""
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -2298,10 +2366,9 @@ def build_5th_order_reduced(
         # Create model
         index = pd.MultiIndex.from_product([z_pos, dr_pos, dz_pos], names=model_inputs)
         df = pd.DataFrame(p_conn_position.flatten(), index=index, columns=["p"])
-        model = model_types.ConnProb5thOrderLinInterpnReducedModel(p_conn_table=df)
-
-    elif model_specs.get("type") == "RandomForestRegressor":  # Random Forest Regressor model
-        log.log_assert(False, "ERROR: No model class implemented for RandomForestRegressor!")
+        model = model_types.ConnProb5thOrderLinInterpnReducedModel(
+            p_conn_table=df, axial_coord=int(axial_coord_data)
+        )
 
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
@@ -2328,8 +2395,8 @@ def plot_5th_order_reduced(
     dz_bins,
     src_cell_count,
     tgt_cell_count,
-    model_specs,
     model,
+    axial_coord_data,
     pos_map_file=None,
     plot_model_ovsampl=4,
     plot_model_extsn=0,
@@ -2372,6 +2439,10 @@ def plot_5th_order_reduced(
     model_val = model_val.reshape([len(z_pos_model), len(dr_pos_model), len(dz_pos_model)])
 
     # Connection probability (data vs. model)
+    coord_names = ["x", "y", "z"]
+    az_name = coord_names[axial_coord_data]  # Axial axis name
+    ar_name = "r"  # Radial axis name
+
     p_max = np.nanmax(p_conn_position)
     p_max_model = np.nanmax(model_val)
     plt.figure(figsize=(12, 4 * len(z_pos_model)), dpi=300)
@@ -2396,14 +2467,14 @@ def plot_5th_order_reduced(
         plt.text(
             np.min(plt.xlim()),
             np.max(plt.ylim()),
-            f"z={zval}um",
+            f"{az_name}={zval}um",
             color="lightgrey",
             ha="left",
             va="top",
         )
         plt.gca().invert_yaxis()
-        plt.xlabel("$\\Delta$r [$\\mu$m]")
-        plt.ylabel("$\\Delta$z [$\\mu$m]")
+        plt.xlabel(f"$\\Delta${ar_name} [$\\mu$m]")
+        plt.ylabel(f"$\\Delta${az_name} [$\\mu$m]")
         plt.colorbar(label="Conn. prob.")
         if zidx == 0:
             plt.title(f"Data: N = {src_cell_count}x{tgt_cell_count} cells")
@@ -2424,17 +2495,17 @@ def plot_5th_order_reduced(
         plt.text(
             np.min(plt.xlim()),
             np.max(plt.ylim()),
-            f"z={zval}um",
+            f"{az_name}={zval}um",
             color="lightgrey",
             ha="left",
             va="top",
         )
         plt.gca().invert_yaxis()
-        plt.xlabel("$\\Delta$r [$\\mu$m]")
-        plt.ylabel("$\\Delta$z [$\\mu$m]")
+        plt.xlabel(f"$\\Delta${ar_name} [$\\mu$m]")
+        plt.ylabel(f"$\\Delta${az_name} [$\\mu$m]")
         plt.colorbar(label="Conn. prob.")
         if zidx == 0:
-            plt.title(f'Model: {model_specs.get("type")}')
+            plt.title(f"Model: {model.__class__.__name__}")
 
     plt.suptitle(
         f"Reduced position-dependent connection probability model (5th order)\n<Position mapping: {pos_map_file}>"

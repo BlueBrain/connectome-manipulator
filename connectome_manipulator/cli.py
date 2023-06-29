@@ -3,11 +3,12 @@
 
 from pathlib import Path
 import logging
-
+import json
 import click
 
 from . import utils, log, profiler
 from .connectome_manipulation import connectome_manipulation
+from .model_building import model_building
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,30 @@ def manipulate_connectome(
 
     connectome_manipulation.main(options, log_file, executor_args=parallel_arg)
     profiler.ProfilerManager.show_stats()
+
+
+@app.command()
+@click.argument("config", required=True, type=Path)
+@click.option(
+    "--force-reextract",
+    required=False,
+    is_flag=True,
+    type=bool,
+    help="Force re-extraction of data, in case already existing.",
+)
+@click.option(
+    "--force-rebuild",
+    required=False,
+    is_flag=True,
+    type=bool,
+    help="Force model re-building, in case already existing.",
+)
+def build_model(config, force_reextract, force_rebuild):
+    """Extract and build models from existing connectomes."""
+    with open(config, "r") as f:
+        config_dict = json.load(f)
+
+    model_building.main(config_dict, show_fig=False, force_recomp=[force_reextract, force_rebuild])
 
 
 if __name__ == "__main__":

@@ -124,10 +124,10 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
 
     # Create model
     model = model_types.LinDelayModel(
-        delay_mean_coeff_a=delay_mean_coeff_a,
-        delay_mean_coeff_b=delay_mean_coeff_b,
-        delay_std=delay_std,
-        delay_min=delay_min,
+        delay_mean_coeff_a=float(delay_mean_coeff_a),
+        delay_mean_coeff_b=float(delay_mean_coeff_b),
+        delay_std=float(delay_std),
+        delay_min=float(delay_min),
     )
     log.debug("Model description:\n%s", model)
 
@@ -146,6 +146,9 @@ def plot(
     min_model_str = f'f(x) = {model_params["delay_min"]:.3f}'
 
     # Draw figure
+    model_kwargs = dict(zip(("src_type", "tgt_type"), model.default_types)) | {
+        "distance": dist_bins
+    }
     plt.figure(figsize=(8, 4), dpi=300)
     plt.bar(
         dist_bins[:-1] + 0.5 * bin_width,
@@ -163,21 +166,21 @@ def plot(
     )
     plt.plot(
         dist_bins,
-        model.get_mean(dist_bins),
+        model.get_mean(**model_kwargs),
         "--",
         color="tab:brown",
         label="Model mean: " + mean_model_str,
     )
     plt.plot(
         dist_bins,
-        model.get_std(dist_bins),
+        model.get_std(**model_kwargs),
         "--",
         color="tab:olive",
         label="Model std: " + std_model_str,
     )
     plt.plot(
         dist_bins,
-        model.get_min(dist_bins),
+        model.get_min(**model_kwargs),
         "--",
         color="tab:gray",
         label="Model min: " + min_model_str,

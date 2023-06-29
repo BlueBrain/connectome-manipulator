@@ -15,7 +15,6 @@ import json
 import logging
 import os.path
 import pickle
-import sys
 import time
 
 from bluepysnap.circuit import Circuit
@@ -28,6 +27,7 @@ from connectome_manipulator.model_building import model_types
 from connectome_manipulator.access_functions import get_node_ids, get_edges_population
 
 logger = logging.getLogger(__name__)
+plt.set_loglevel("info")  # To get rid of a huge list of Matplotlib's DEBUG output
 
 
 def create_model_config_per_pathway(
@@ -361,41 +361,3 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
             plt.show()
         else:
             plt.close("all")
-
-
-def main_wrapper():
-    """Main function wrapper when called from command line.
-
-    Command line arguments:
-      model_config: Config file (.json), specifying the model building settings
-      force_reextract (optional): Disable (0; default) or enable (1) forced re-extraction of data, in case already existing
-      force_rebuild (optional): Disable (0) or enable (1) forced model re-building, in case model already exists (default: force_reextract)
-    """
-    # Parse inputs
-    args = sys.argv[1:]
-    if len(args) < 1:
-        print(f"Usage: {__file__} <model_config.json> [force_reextract] [force_rebuild]")
-        sys.exit(2)
-
-    # Load config dict
-    with open(args[0], "r") as f:
-        config_dict = json.load(f)
-
-    # Read force_reextract flag
-    if len(args) > 1:
-        force_reextract = bool(int(args[1]))
-    else:
-        force_reextract = False
-
-    # Read force_rebuild flag
-    if len(args) > 2:
-        force_rebuild = bool(int(args[2]))
-    else:
-        force_rebuild = force_reextract
-
-    # Call main function
-    main(config_dict, show_fig=False, force_recomp=[force_reextract, force_rebuild])
-
-
-if __name__ == "__main__":
-    main_wrapper()
