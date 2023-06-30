@@ -34,14 +34,14 @@ def test_apply(manipulation):
     # Check that only given ids are considered
     src_id = 0
     res = manipulation(nodes).apply(
-        edges_table, None, None, sel_src={*node_ids} - {src_id}, amount_pct=100
+        edges_table, None, sel_src={*node_ids} - {src_id}, amount_pct=100
     )
 
     assert np.all(res["@source_node"] == src_id)
 
     tgt_id = 9
     res = manipulation(nodes).apply(
-        edges_table, None, None, sel_dest={*node_ids} - {tgt_id}, amount_pct=100
+        edges_table, None, sel_dest={*node_ids} - {tgt_id}, amount_pct=100
     )
 
     assert np.all(res["@target_node"] == tgt_id)
@@ -49,7 +49,6 @@ def test_apply(manipulation):
     # Check when both sel_src and sel_dest are given
     res = manipulation(nodes).apply(
         edges_table,
-        None,
         None,
         sel_src={*node_ids} - {src_id},
         sel_dest={*node_ids} - {tgt_id},
@@ -59,25 +58,23 @@ def test_apply(manipulation):
     assert np.all(np.logical_or(res["@source_node"] == src_id, res["@target_node"] == tgt_id))
 
     # Check that connection size filtering works for minimum connection size
-    res = manipulation(nodes).apply(edges_table, None, None, min_syn_per_conn=2, amount_pct=100)
+    res = manipulation(nodes).apply(edges_table, None, min_syn_per_conn=2, amount_pct=100)
     _, n_syn_conn = np.unique(res[["@source_node", "@target_node"]], axis=0, return_counts=True)
     assert np.all(n_syn_conn < 2)
 
     # Check that connection size filtering works for maximum connection size
-    res = manipulation(nodes).apply(edges_table, None, None, max_syn_per_conn=2, amount_pct=100)
+    res = manipulation(nodes).apply(edges_table, None, max_syn_per_conn=2, amount_pct=100)
     _, n_syn_conn = np.unique(res[["@source_node", "@target_node"]], axis=0, return_counts=True)
     assert np.all(n_syn_conn > 2)
 
     # Check that connection size filtering works when both are enabled
     res = manipulation(nodes).apply(
-        edges_table, None, None, min_syn_per_conn=2, max_syn_per_conn=2, amount_pct=100
+        edges_table, None, min_syn_per_conn=2, max_syn_per_conn=2, amount_pct=100
     )
     _, n_syn_conn = np.unique(res[["@source_node", "@target_node"]], axis=0, return_counts=True)
     assert np.all(n_syn_conn != 2)
 
     # Check with empty selection, i.e. nothing to be removed
-    res = manipulation(nodes).apply(
-        edges_table, None, None, min_syn_per_conn=np.inf, amount_pct=100
-    )
+    res = manipulation(nodes).apply(edges_table, None, min_syn_per_conn=np.inf, amount_pct=100)
     _, n_syn_conn = np.unique(res[["@source_node", "@target_node"]], axis=0, return_counts=True)
     assert res.equals(edges_table)

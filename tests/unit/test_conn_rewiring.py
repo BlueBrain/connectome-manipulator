@@ -27,7 +27,6 @@ def test_apply(manipulation):
     tgt_ids = nodes[1].ids()
     edges_table = edges.afferent_edges(tgt_ids, properties=edges.property_names)
 
-    aux_dict = {"i_split": 0, "N_split": 1, "split_ids": tgt_ids}
     delay_model_file = os.path.join(
         TEST_DATA_DIR, f"model_config__DistDepDelay.json"
     )  # Deterministic delay model w/o variation
@@ -47,7 +46,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class="EXC",
             prob_model_spec=None,
             delay_model_spec={"file": delay_model_file},
@@ -174,7 +172,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -201,7 +198,6 @@ def test_apply(manipulation):
             res = manipulation(nodes).apply(
                 edges_table.copy(),
                 tgt_ids,
-                aux_dict,
                 syn_class=syn_class,
                 prob_model_spec={"file": prob_model_file},
                 delay_model_spec={"file": delay_model_file},
@@ -219,7 +215,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -248,7 +243,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -276,7 +270,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -301,7 +294,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -329,17 +321,11 @@ def test_apply(manipulation):
         split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
         res_list = []
         for i_split, split_ids in enumerate(split_ids_list):
-            aux_dict_split = {
-                "N_split": len(split_ids_list),
-                "i_split": i_split,
-                "split_ids": split_ids,
-            }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                manipulation(nodes).apply(
+                manipulation(nodes, i_split, len(split_ids_list)).apply(
                     edges_table_split,
                     split_ids,
-                    aux_dict_split,
                     syn_class=syn_class,
                     prob_model_spec={"file": prob_model_file},
                     delay_model_spec={"file": delay_model_file},
@@ -369,7 +355,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table.copy(),
             tgt_ids,
-            aux_dict,
             syn_class=syn_class,
             prob_model_spec={"file": prob_model_file},
             delay_model_spec={"file": delay_model_file},
@@ -397,17 +382,11 @@ def test_apply(manipulation):
         split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
         res_list = []
         for i_split, split_ids in enumerate(split_ids_list):
-            aux_dict_split = {
-                "N_split": len(split_ids_list),
-                "i_split": i_split,
-                "split_ids": split_ids,
-            }
             edges_table_split = edges_table[np.isin(edges_table["@target_node"], split_ids)].copy()
             res_list.append(
-                manipulation(nodes).apply(
+                manipulation(nodes, i_split, len(split_ids_list)).apply(
                     edges_table_split,
                     split_ids,
-                    aux_dict_split,
                     syn_class=syn_class,
                     prob_model_spec={"file": prob_model_file},
                     delay_model_spec={"file": delay_model_file},

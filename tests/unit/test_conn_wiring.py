@@ -57,8 +57,6 @@ def test_apply(manipulation):
         node_id, transform=True, extension="swc"
     )  # Access function (incl. transformation!), using specified format (swc/h5/...)
 
-    id_selection = Selection(tgt_ids).ranges
-    aux_dict = {"split_ids": tgt_ids, "id_selection": id_selection}
     n_syn_conn = 2
     nsynconn_model_file = os.path.join(
         TEST_DATA_DIR, f"model_config__NSynPerConn{n_syn_conn}.json"
@@ -78,7 +76,6 @@ def test_apply(manipulation):
     res = manipulation(nodes).apply(
         edges_table_empty,
         tgt_ids,
-        aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
@@ -91,7 +88,6 @@ def test_apply(manipulation):
     res = manipulation(nodes).apply(
         edges_table,
         tgt_ids,
-        aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
@@ -127,7 +123,6 @@ def test_apply(manipulation):
     res = manipulation(nodes).apply(
         edges_table_empty,
         tgt_ids,
-        aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
@@ -180,7 +175,6 @@ def test_apply(manipulation):
     res = manipulation(nodes).apply(
         edges_table,
         tgt_ids,
-        aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
@@ -230,7 +224,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table_empty,
             tgt_ids,
-            aux_dict,
             amount_pct=pct.tolist(),
             prob_model_spec={"file": prob_model_file},
             nsynconn_model_spec={"file": nsynconn_model_file},
@@ -255,7 +248,6 @@ def test_apply(manipulation):
             res = manipulation(nodes).apply(
                 edges_table_empty,
                 tgt_ids,
-                aux_dict,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
                 amount_pct=pct,
@@ -287,7 +279,6 @@ def test_apply(manipulation):
             res = manipulation(nodes).apply(
                 edges_table_empty,
                 tgt_ids,
-                aux_dict,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
                 amount_pct=pct,
@@ -341,19 +332,11 @@ def test_apply(manipulation):
     split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
     res_list = []
     for i_split, split_ids in enumerate(split_ids_list):
-        id_selection = Selection(split_ids).ranges
-        aux_dict_split = {
-            "N_split": len(split_ids_list),
-            "i_split": i_split,
-            "split_ids": split_ids,
-            "id_selection": id_selection,
-        }
         print(split_ids)
         res_list.append(
-            manipulation(nodes).apply(
+            manipulation(nodes, i_split, len(split_ids_list)).apply(
                 edges_table_empty,
                 split_ids,
-                aux_dict_split,
                 amount_pct=pct,
                 prob_model_spec={"file": prob_model_file},
                 nsynconn_model_spec={"file": nsynconn_model_file},
@@ -382,7 +365,6 @@ def test_apply(manipulation):
     res = manipulation(nodes).apply(
         edges_table_empty,
         tgt_ids,
-        aux_dict,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
@@ -421,7 +403,6 @@ def test_apply(manipulation):
         res = manipulation(nodes).apply(
             edges_table_empty,
             tgt_ids,
-            aux_dict,
             amount_pct=pct,
             prob_model_spec={"file": prob_model_file},
             nsynconn_model_spec={"file": nsynconn_model_file},

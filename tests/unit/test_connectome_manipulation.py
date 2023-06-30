@@ -101,7 +101,7 @@ def test_null_manipulation():
     manip_config = {"manip": {"name": "test", "fcts": [{"source": module_name, "kwargs": {}}]}}
 
     m = Manipulation.get(module_name)
-    out_edges_table = m(None).apply(None, None, None, **manip_config)
+    out_edges_table = m(None).apply(None, None, **manip_config)
 
     assert out_edges_table is None
 

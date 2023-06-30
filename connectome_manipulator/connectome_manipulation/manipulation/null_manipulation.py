@@ -11,7 +11,7 @@ class NullManipulation(Manipulation):
     without actually manipulating the connectome.
     """
 
-    def apply(self, edges_table, split_ids, aux_dict, **kwargs):
+    def apply(self, edges_table, split_ids, **kwargs):
         """No manipulation (control condition)."""
         log.info("Nothing to do")
 

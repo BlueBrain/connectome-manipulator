@@ -61,7 +61,6 @@ class ConnectomeRewiring(Manipulation):
         self,
         edges_table,
         split_ids,
-        aux_dict,
         syn_class,
         prob_model_spec,
         delay_model_spec,
@@ -125,7 +124,7 @@ class ConnectomeRewiring(Manipulation):
                 'Valid generation method required (must be "duplicate_sample" or "duplicate_randomize")!',
             )
 
-        if gen_method == "duplicate_sample" and aux_dict["N_split"] > 1:
+        if gen_method == "duplicate_sample" and self.split_total > 1:
             log.warning(
                 f'"{gen_method}" method samples only from synapses within same data split! Reduce number of splits to 1 to sample from all synapses!'
             )
@@ -202,9 +201,9 @@ class ConnectomeRewiring(Manipulation):
         if np.sum(tgt_sel) == 0:  # Nothing to rewire
             log.debug("No target nodes selected, nothing to rewire")
             log.data(
-                f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
-                i_split=aux_dict["i_split"],
-                N_split=aux_dict["N_split"],
+                f"RewiringIndices_{self.split_index + 1}_{self.split_total}",
+                i_split=self.split_index,
+                N_split=self.split_total,
                 split_ids=split_ids,
                 tgt_node_ids=tgt_node_ids,
                 tgt_sel=tgt_sel,
@@ -460,7 +459,7 @@ class ConnectomeRewiring(Manipulation):
             ]
             log.debug("CONNECTIVITY ESTIMATION:\n%s", "\n".join(stat_str))
             log.data(
-                f'EstimationStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
+                f"EstimationStats_{self.split_index + 1}_{self.split_total}",
                 **{k: v for k, v in stats_dict.items() if k in stat_sel},
             )
             return edges_table.iloc[[]].copy()
@@ -544,7 +543,7 @@ class ConnectomeRewiring(Manipulation):
             - np.sum(stats_dict["num_syn_rewired"]),
             "ERROR: Unchanged synapse count mismtach!",
         )  # Consistency check
-        log.data(f'RewiringStats_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}', **stats_dict)
+        log.data(f"RewiringStats_{self.split_index + 1}_{self.split_total}", **stats_dict)
 
         # Write index data log [book-keeping for validation purposes]
         inp_syn_unch_idx = np.zeros_like(
@@ -581,7 +580,7 @@ class ConnectomeRewiring(Manipulation):
         )
 
         log.data(
-            f'RewiringIndices_{aux_dict["i_split"] + 1}_{aux_dict["N_split"]}',
+            f"RewiringIndices_{self.split_index + 1}_{self.split_total}",
             inp_syn_del_idx=syn_del_idx,
             inp_syn_rew_idx=syn_rewire_idx,
             inp_syn_unch_idx=inp_syn_unch_idx,
@@ -595,8 +594,8 @@ class ConnectomeRewiring(Manipulation):
             out_conns=out_conns,
             out_syn_conn_idx=out_syn_conn_idx,
             out_syn_per_conn=out_syn_per_conn,
-            i_split=aux_dict["i_split"],
-            N_split=aux_dict["N_split"],
+            i_split=self.split_index,
+            N_split=self.split_total,
             split_ids=split_ids,
             src_node_ids=src_node_ids,
             tgt_node_ids=tgt_node_ids,

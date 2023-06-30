@@ -35,7 +35,6 @@ class ConnectomeRemoval(Manipulation):
         self,
         edges_table,
         split_ids,
-        _aux_dict,
         sel_src=None,
         sel_dest=None,
         amount_pct=100.0,

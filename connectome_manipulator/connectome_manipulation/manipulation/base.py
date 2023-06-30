@@ -63,15 +63,17 @@ class Manipulation(metaclass=MetaManipulation):
     The abstract base class of which all manipulation classes must inherit and implement its methods.
     """
 
-    def __init__(self, nodes):
+    def __init__(self, nodes, split_index=0, split_total=1):
         """Initialize with the nodes and split_ids"""
+        self.split_index = split_index
+        self.split_total = split_total
         self.nodes = nodes
         if self.nodes:
             self.src_type_map = get_enumeration_map(self.nodes[0], "mtype")
             self.tgt_type_map = get_enumeration_map(self.nodes[1], "mtype")
 
     @abstractmethod
-    def apply(self, edges_table, split_ids, aux_dict, **kwargs):
+    def apply(self, edges_table, split_ids, **kwargs):
         """An abstract method for the actual application of the algorithm
 
         This funciton is to be implemented by concrete Manipulation subclasses.
@@ -88,9 +90,9 @@ class MorphologyCachingManipulation(Manipulation):
 
     # pylint: disable=abstract-method
 
-    def __init__(self, nodes):
+    def __init__(self, nodes, split_index=0, split_total=1):
         """Initialize the MorphHelper object needed later."""
-        super().__init__(nodes)
+        super().__init__(nodes, split_index, split_total)
         morph_dir = self.nodes[1].config["morphologies_dir"]
         self.morpho_helper = MorphHelper(
             morph_dir,

@@ -67,7 +67,6 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         self,
         edges_table,
         split_ids,
-        aux_dict,
         sel_src=None,
         sel_dest=None,
         pos_map_file=None,
@@ -84,7 +83,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
         => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
         """
-        # pylint did not accept to drop kwargs, forced to add this
+        # pylint: disable=arguments-differ
         assert len(kwargs) == 0
         if not prob_model_spec:
             prob_model_spec = {
@@ -120,7 +119,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             )
         with profiler.profileit(name="conn_wiring/setup"):
             # Intersect target nodes with split IDs and return if intersection is empty
-            tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, aux_dict["id_selection"])
+            tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, split_ids)
             num_tgt_total = len(tgt_node_ids)
             if num_tgt_total == 0:  # Nothing to wire
                 log.info("No target nodes selected, nothing to wire")

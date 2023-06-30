@@ -27,6 +27,40 @@ from .manipulation import Manipulation
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class Options:
+    """CLI Options which have defaults"""
+
+    output_path: Path
+    config_path: Path
+    logging_path: Path
+    do_profiling: bool = False
+    do_resume: bool = False
+    keep_parquet: bool = False
+    convert_to_sonata: bool = False
+    overwrite_edges: bool = False
+    splits: int = 0  # sentinel value to use config value
+    parallel: bool = False
+
+
+@dataclass
+class JobsCommonInfo:
+    """Information shared across all jobs"""
+
+    nodes: libsonata.NodePopulation
+    edges: libsonata.EdgePopulation
+
+
+@dataclass
+class JobInfo:
+    """An abstraction for a chunk of work, defined by its index and total"""
+
+    split_index: int
+    split_total: int
+    selection: Union[libsonata.Selection, List]
+    out_parquet_file: str
+
+
 def load_circuit(sonata_config, N_split=1, popul_name=None):
     """Load given edges population of a SONATA circuit using SNAP."""
     # Load circuit
@@ -81,9 +115,11 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
     return c.config, nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
 
 
-def apply_manipulation(edges_table, nodes, split_ids, manip, aux_dict):
+def apply_manipulation(edges_table, nodes, job: JobInfo, manip):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip["name"]}"')
+
+    split_ids = libsonata.Selection(job.selection).flatten().astype(np.int64)
 
     for fun, cfg in enumerate(manip["fcts"]):
         source = cfg.pop("source")
@@ -92,12 +128,11 @@ def apply_manipulation(edges_table, nodes, split_ids, manip, aux_dict):
         log.info(f">>Function {fun + 1} of {len(manip['fcts'])}: source={source}")
 
         if filename := cfg.pop("model_pathways", None):
-            filename = os.path.join(os.path.dirname(aux_dict["config_path"]), filename)
             pathways = pd.read_parquet(filename)
         else:
             pathways = None
 
-        m = Manipulation.get(source)(nodes)
+        m = Manipulation.get(source)(nodes, job.split_index, job.split_total)
 
         if pathways is not None:
             grouped = pathways.groupby(
@@ -112,7 +147,6 @@ def apply_manipulation(edges_table, nodes, split_ids, manip, aux_dict):
                 edges_table = m.apply(
                     edges_table,
                     split_ids,
-                    aux_dict,
                     sel_src={"hemisphere": src_hemi, "region": src_region},
                     sel_dest={"hemisphere": dst_hemi, "region": dst_region},
                     pathway_specs=group,
@@ -120,7 +154,7 @@ def apply_manipulation(edges_table, nodes, split_ids, manip, aux_dict):
                     **models,
                 )
         else:
-            edges_table = m.apply(edges_table, split_ids, aux_dict, **cfg, **models)
+            edges_table = m.apply(edges_table, split_ids, **cfg, **models)
     return edges_table
 
 
@@ -206,71 +240,33 @@ def create_workflow_config(circuit_path, blue_config, manip_name, output_path, t
     )
 
 
-@dataclass
-class Options:
-    """CLI Options which have defaults"""
-
-    output_path: Path
-    config_path: Path
-    logging_path: Path
-    do_profiling: bool = False
-    do_resume: bool = False
-    keep_parquet: bool = False
-    convert_to_sonata: bool = False
-    overwrite_edges: bool = False
-    splits: int = 0  # sentinel value to use config value
-    parallel: bool = False
-
-
-@dataclass
-class JobsCommonInfo:
-    """Information shared across all jobs"""
-
-    nodes: libsonata.NodePopulation
-    edges: libsonata.EdgePopulation
-
-
-@dataclass
-class JobInfo:
-    """An abstraction for a chunk of work, defined by its index and total"""
-
-    i_split: int
-    N_split: int
-    selection: Union[libsonata.Selection, List]
-    out_parquet_file: str
-
-
 def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     """Wrapper function (remote) that can be optionally executed by a Dask worker"""
     if options.parallel:
         import socket
 
         path = os.path.join(options.logging_path, socket.getfqdn())
-        log.create_log_file(path, f"connectome_manipulation.task-{job.i_split}")
+        log.create_log_file(path, f"connectome_manipulation.task-{job.split_index}")
 
     log.info("Processing job %s (common: %s)", job, jobs_common)
     profiler.ProfilerManager.set_enabled(options.do_profiling)
     config = utils.load_json(options.config_path)
-    np.random.seed(config.get("seed", 123456) * (job.i_split + 1))
+    np.random.seed(config.get("seed", 123456) * (job.split_index + 1))
     split_ids = libsonata.Selection(job.selection).flatten().astype(np.int64)
 
     # Apply connectome wiring
     edges_table = _get_afferent_edges_table(split_ids, jobs_common.edges)
-    aux_dict = {
-        "N_split": job.N_split,
-        "i_split": job.i_split,
-        "id_selection": job.selection,
-        "split_ids": split_ids,
-        "config_path": options.config_path,
-    }
+
+    for idx in range(len(config["manip"]["fcts"])):
+        if filename := config["manip"]["fcts"][idx].get("model_pathways"):
+            config["manip"]["fcts"][idx]["model_pathways"] = options.config_path.parent / filename
 
     with profiler.profileit(name="processing"):
         new_edges_table = _generate_partition_edges(
-            nodes=jobs_common.nodes,
-            split_ids=split_ids,
-            edges_table=edges_table,
-            manip_config=config["manip"],
-            aux_dict=aux_dict,
+            edges_table,
+            jobs_common.nodes,
+            job,
+            config["manip"],
         )
 
     # [TESTING/DEBUGGING]
@@ -370,9 +366,9 @@ def main(options, log_file, executor_args=()):
 
 def _submit_part(executor, jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     # Resume option: Don't recompute, if .parquet file of current split already exists
-    split_id = job.i_split + 1
+    split_id = job.split_index + 1
     n_neurons = job.selection.flat_size
-    log.info(f"Split {split_id}/{job.N_split}: Wiring connectome targeting {n_neurons} neurons")
+    log.info(f"Split {split_id}/{job.split_total}: Wiring connectome targeting {n_neurons} neurons")
 
     job.selection = job.selection.ranges  # ! transform because selection is not serializable
     manip_params = (jobs_common, job, options)
@@ -385,13 +381,13 @@ def _get_afferent_edges_table(node_ids, edges):
     return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
 
 
-def _generate_partition_edges(nodes, split_ids, edges_table, manip_config, aux_dict):
+def _generate_partition_edges(edges_table, *args, **kwargs):
     if edges_table is None:
-        new_edges_table = apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict)
+        new_edges_table = apply_manipulation(edges_table, *args, **kwargs)
     else:
         column_types = {col: edges_table[col].dtype for col in edges_table.columns}
 
-        new_edges_table = apply_manipulation(edges_table, nodes, split_ids, manip_config, aux_dict)
+        new_edges_table = apply_manipulation(edges_table, *args, **kwargs)
         # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
         column_types = {col: column_types[col] for col in new_edges_table.columns}
         new_edges_table = new_edges_table.astype(column_types)
