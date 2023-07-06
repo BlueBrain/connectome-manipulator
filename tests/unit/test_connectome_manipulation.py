@@ -43,7 +43,7 @@ def test_load_circuit():
         assert all(r == os.path.join(TEST_DATA_DIR, "nodes.h5") for r in res[1])
 
         # Check that edges-related values are None
-        assert res[3] is res[4] is res[5] is None
+        assert res[3] is res[4] is None
 
     # Check error handling if more than one non-default populations exist and no population name is specified
     with patch(
@@ -55,8 +55,7 @@ def test_load_circuit():
         with pytest.raises(AssertionError, match=expected_error):
             test_module.load_circuit("fake_config")
 
-    n_split = 2
-    res = test_module.load_circuit(config_path, N_split=n_split)
+    res = test_module.load_circuit(config_path)
 
     # Check valid config
     config = res[0]
@@ -76,15 +75,11 @@ def test_load_circuit():
     assert len(res[2]) == 2
     assert all(r == os.path.join(TEST_DATA_DIR, "nodes.h5") for r in res[2])
 
-    # Check that number of splits is correct
-    # Just a thought, but maybe N_split should be restricted with min(N_split, len(tgt_node_ids))
-    assert len(res[3]) == n_split
-
     # Check that last edge population is returned
-    assert isinstance(res[4], EdgePopulation)
+    assert isinstance(res[3], EdgePopulation)
 
     # Check that a correct edge path is returned
-    assert res[5] == os.path.join(TEST_DATA_DIR, "edges.h5")
+    assert res[4] == os.path.join(TEST_DATA_DIR, "edges.h5")
 
 
 def test_manipulation_registration():
@@ -112,7 +107,8 @@ def test_edges_to_parquet():
 
     with setup_tempdir(__name__) as tempdir:
         outfile = os.path.join(tempdir, "test.parquet")
-        test_module.edges_to_parquet(edges_table, outfile)
+        with test_module.process_edges(True, outfile) as writer:
+            writer.write(edges_table)
         assert os.path.isfile(outfile)
 
 

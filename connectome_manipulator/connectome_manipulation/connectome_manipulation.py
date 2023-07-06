@@ -8,20 +8,20 @@ import copy
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Union, List
 from pathlib import Path
 import logging
 
-import libsonata
 import numpy as np
 import pandas as pd
+import bluepysnap
 from bluepysnap.circuit import Circuit
 
 from .. import log, utils, profiler
 from ..access_functions import get_edges_population, get_nodes_population
+from ..processing import BatchInfo, get_node_splits
 from . import executors
 from .tracker import JobTracker
-from .converters import create_parquet_metadata, edges_to_parquet, parquet_to_sonata
+from .converters import create_parquet_metadata, parquet_to_sonata, process_edges
 from .manipulation import Manipulation
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,8 @@ class Options:
     keep_parquet: bool = False
     convert_to_sonata: bool = False
     overwrite_edges: bool = False
-    splits: int = 0  # sentinel value to use config value
+    splits: int = 0
+    target_payload: int = 20_000_000_000
     parallel: bool = False
 
 
@@ -47,8 +48,8 @@ class Options:
 class JobsCommonInfo:
     """Information shared across all jobs"""
 
-    nodes: libsonata.NodePopulation
-    edges: libsonata.EdgePopulation
+    nodes: [bluepysnap.nodes.Nodes]
+    edges: [bluepysnap.edges.Edges]
 
 
 @dataclass
@@ -57,14 +58,23 @@ class JobInfo:
 
     split_index: int
     split_total: int
-    selection: Union[libsonata.Selection, List]
+    batches: [BatchInfo]
     out_parquet_file: str
 
+    @property
+    def flat_size(self):
+        """The total number of node ids this job is supposed to process"""
+        return sum(len(b.node_ids) for b in self.batches)
 
-def load_circuit(sonata_config, N_split=1, popul_name=None):
+    def flatten(self):
+        """Retuns a flat list with all node ids this job is supposed to process"""
+        return np.concatenate([b.node_ids for b in self.batches]).astype(np.int64)
+
+
+def load_circuit(sonata_config, popul_name=None):
     """Load given edges population of a SONATA circuit using SNAP."""
     # Load circuit
-    log.info(f"Loading circuit from {sonata_config} (N_split={N_split})")
+    log.info(f"Loading circuit from {sonata_config}")
     c = Circuit(sonata_config)
 
     if (
@@ -106,56 +116,45 @@ def load_circuit(sonata_config, N_split=1, popul_name=None):
             f'Using edges population "{edges.name}" between nodes "{src_nodes.name}" and "{tgt_nodes.name}"'
         )
 
-    # Define target node splits
-    tgt_node_ids = tgt_nodes.ids()
-    node_ids_split = np.split(
-        tgt_node_ids, np.cumsum([np.ceil(len(tgt_node_ids) / N_split).astype(int)] * (N_split - 1))
-    )
-
-    return c.config, nodes, nodes_files, node_ids_split, edges, edges_file, popul_name
+    return c.config, nodes, nodes_files, edges, edges_file, popul_name
 
 
-def apply_manipulation(edges_table, nodes, job: JobInfo, manip):
+def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'APPLYING MANIPULATION "{manip["name"]}"')
 
-    split_ids = libsonata.Selection(job.selection).flatten().astype(np.int64)
+    with process_edges(edges_table is None, job.out_parquet_file) as writer:
+        for fun, cfg in enumerate(manip["fcts"]):
+            source = cfg.pop("source")
+            models = cfg.pop("model_config")
 
-    for fun, cfg in enumerate(manip["fcts"]):
-        source = cfg.pop("source")
-        models = cfg.pop("model_config")
+            log.info(f">>Function {fun + 1} of {len(manip['fcts'])}: source={source}")
 
-        log.info(f">>Function {fun + 1} of {len(manip['fcts'])}: source={source}")
+            if filename := cfg.pop("model_pathways", None):
+                pathways = pd.read_parquet(filename)
+            else:
+                pathways = None
 
-        if filename := cfg.pop("model_pathways", None):
-            pathways = pd.read_parquet(filename)
-        else:
-            pathways = None
+            m = Manipulation.get(source)(nodes, job.split_index, job.split_total)
 
-        m = Manipulation.get(source)(nodes, job.split_index, job.split_total)
+            for batch in job.batches:
+                for n, (node_ids, sel_src, sel_dest, pathway_specs) in enumerate(
+                    batch.process_pathways(pathways)
+                ):
+                    log.info(f">>Step {n + 1}: source={source}")
+                    edges_table = m.apply(
+                        edges_table,
+                        node_ids,
+                        sel_src=sel_src,
+                        sel_dest=sel_dest,
+                        pathway_specs=pathway_specs,
+                        **cfg,
+                        **models,
+                    )
 
-        if pathways is not None:
-            grouped = pathways.groupby(
-                ["src_hemisphere", "src_region", "dst_hemisphere", "dst_region"], observed=True
-            )
-            for n, ((src_hemi, src_region, dst_hemi, dst_region), group) in enumerate(grouped):
-                log.info(f">>Step {n + 1} of {grouped.ngroups}: source={source}")
+                edges_table, edges_generated = writer.write(edges_table)
 
-                # Reset index to match expectations
-                group = group.set_index(["src_type", "dst_type"])
-
-                edges_table = m.apply(
-                    edges_table,
-                    split_ids,
-                    sel_src={"hemisphere": src_hemi, "region": src_region},
-                    sel_dest={"hemisphere": dst_hemi, "region": dst_region},
-                    pathway_specs=group,
-                    **cfg,
-                    **models,
-                )
-        else:
-            edges_table = m.apply(edges_table, split_ids, **cfg, **models)
-    return edges_table
+    return edges_table, edges_generated
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
@@ -252,17 +251,16 @@ def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
     profiler.ProfilerManager.set_enabled(options.do_profiling)
     config = utils.load_json(options.config_path)
     np.random.seed(config.get("seed", 123456) * (job.split_index + 1))
-    split_ids = libsonata.Selection(job.selection).flatten().astype(np.int64)
 
     # Apply connectome wiring
-    edges_table = _get_afferent_edges_table(split_ids, jobs_common.edges)
+    edges_table = _get_afferent_edges_table(job.flatten(), jobs_common.edges)
 
     for idx in range(len(config["manip"]["fcts"])):
         if filename := config["manip"]["fcts"][idx].get("model_pathways"):
             config["manip"]["fcts"][idx]["model_pathways"] = options.config_path.parent / filename
 
     with profiler.profileit(name="processing"):
-        new_edges_table = _generate_partition_edges(
+        new_edges_table, N_syn_out = apply_manipulation(
             edges_table,
             jobs_common.nodes,
             job,
@@ -271,11 +269,17 @@ def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
 
     # [TESTING/DEBUGGING]
     N_syn_in = len(edges_table) if edges_table is not None else 0
-    N_syn_out = len(new_edges_table)
 
-    # Write back connectome to .parquet file
-    with profiler.profileit(name="write_to_parquet"):
-        edges_to_parquet(new_edges_table, job.out_parquet_file)
+    if new_edges_table is not None:
+        new_edges_table = _adjust_column_types(edges_table, new_edges_table)
+        log.log_assert(
+            new_edges_table["@target_node"].is_monotonic_increasing,
+            "Target nodes not monotonically increasing!",
+        )
+        # Write back connectome to .parquet file
+        with profiler.profileit(name="write_to_parquet"):
+            with process_edges(True, job.out_parquet_file) as writer:
+                writer.write(new_edges_table)
 
     return N_syn_in, N_syn_out, profiler.ProfilerManager
 
@@ -294,50 +298,42 @@ def main(options, log_file, executor_args=()):
     log.log_assert(options.output_path != circuit_path, "Input directory == Output directory")
 
     # Initialize the profiler
-    csv_file = log_file + ".csv"
-    profiler.ProfilerManager.set_csv_file(csv_file=csv_file)
+    profiler.ProfilerManager.set_csv_file(csv_file=log_file + ".csv")
 
-    if options.splits > 0:
-        if "N_split_nodes" in config:
-            log.debug(
-                f"Overwriting N_split_nodes ({config['N_split_nodes']}) from configuration file with command line argument --split {options.splits}"
-            )
-        config["N_split_nodes"] = options.splits
+    sonata_config, nodes, _, edges, _, _ = load_circuit(sonata_config_file)
 
-    # Load circuit (nodes only)
-    sonata_config_file = config["circuit_config"]
-    if "circuit_path" in config:
-        sonata_config_file = os.path.join(config["circuit_path"], sonata_config_file)
+    # Define target node splits
+    node_ids_split = get_node_splits(config, options, nodes)
 
-    N_split = max(config.get("N_split_nodes", 1), 1)
-    log.info(f"Setting up {N_split} processing batch jobs...")
-
-    sonata_config, nodes, _, node_ids_split, edges, _, _ = load_circuit(sonata_config_file, N_split)
     edges_file = options.output_path / "edges.h5"
     log.log_assert(
         options.overwrite_edges or not edges_file.exists(),
         f'Edges file "{edges_file}" already exists! Enable "overwrite_edges" flag to overwrite!',
     )
 
-    # Follow SONATA convention for edge population naming
-    edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
-
     # Prepare params to the executor. Slurm executor will add the prefix itself
     executor_params = dict(x.split("=", 1) for x in executor_args)
-    tracker = JobTracker(options.output_path, N_split)
+    tracker = JobTracker(options.output_path, len(node_ids_split))
 
     with tracker.follow_jobs() as result_hook:
         with executors.in_context(options, executor_params, result_hook=result_hook) as executor:
             log.info("Start job submission")
-            jobs_common_info = JobsCommonInfo(nodes, edges)
+            jobs_common = JobsCommonInfo(nodes, edges)
 
             for i_split, parquet_file in tracker.prepare_parquet_dir(options.do_resume):
-                split_ids = node_ids_split[i_split]
-                sonata_selection = libsonata.Selection(split_ids)
-                job_info = JobInfo(i_split, N_split, sonata_selection, parquet_file)
-                _submit_part(executor, jobs_common_info, job_info, options)
+                job = JobInfo(i_split, len(node_ids_split), node_ids_split[i_split], parquet_file)
+                log.info(
+                    f"Split {job.split_index + 1}/{len(node_ids_split)}: Wiring connectome targeting {job.flat_size} neurons"
+                )
+                executor.submit(
+                    manip_wrapper,
+                    (jobs_common, job, options),
+                    {"out_parquet_file": job.out_parquet_file},
+                )
 
     if options.convert_to_sonata:
+        # Follow SONATA convention for edge population naming
+        edge_population_name = f"{nodes[0].name}__{nodes[1].name}__chemical"
         # [IMPORTANT: .parquet to SONATA converter requires same column data types in all files!! Otherwise, value over-/underflows may occur due to wrong interpretation of numbers!!]
         parquet_to_sonata(
             tracker.parquet_dir,
@@ -364,40 +360,25 @@ def main(options, log_file, executor_args=()):
         create_parquet_metadata(tracker.parquet_dir, nodes)
 
 
-def _submit_part(executor, jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
-    # Resume option: Don't recompute, if .parquet file of current split already exists
-    split_id = job.split_index + 1
-    n_neurons = job.selection.flat_size
-    log.info(f"Split {split_id}/{job.split_total}: Wiring connectome targeting {n_neurons} neurons")
-
-    job.selection = job.selection.ranges  # ! transform because selection is not serializable
-    manip_params = (jobs_common, job, options)
-    executor.submit(manip_wrapper, manip_params, {"out_parquet_file": job.out_parquet_file})
-
-
 def _get_afferent_edges_table(node_ids, edges):
     if edges is None:
         return None
     return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
 
 
-def _generate_partition_edges(edges_table, *args, **kwargs):
-    if edges_table is None:
-        new_edges_table = apply_manipulation(edges_table, *args, **kwargs)
-    else:
-        column_types = {col: edges_table[col].dtype for col in edges_table.columns}
+def _adjust_column_types(edges_table, new_edges_table):
+    """Ensures that column types of the two tables match.
 
-        new_edges_table = apply_manipulation(edges_table, *args, **kwargs)
-        # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
-        column_types = {col: column_types[col] for col in new_edges_table.columns}
-        new_edges_table = new_edges_table.astype(column_types)
+    Returns the second table with column types adjusted to match the first table.  Columns
+    may be removed in the second table.
+    """
+    if edges_table is None or new_edges_table is None:
+        return new_edges_table
 
-    log.log_assert(
-        new_edges_table["@target_node"].is_monotonic_increasing,
-        "Target nodes not monotonically increasing!",
-    )
-
-    return new_edges_table
+    old_column_types = {col: edges_table[col].dtype for col in edges_table.columns}
+    # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
+    new_column_types = {col: old_column_types[col] for col in new_edges_table.columns}
+    return new_edges_table.astype(new_column_types)
 
 
 def _write_blue_config(manip_config, output_path, edges_fn_manip, edges_file_manip):

@@ -2,23 +2,78 @@
 import glob
 import os
 import subprocess
+from contextlib import contextmanager
+from pathlib import Path
 
 import numpy as np
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .. import log, __version__
 
 
-def edges_to_parquet(edges_table, output_file):
-    """Write edge properties table to parquet file (if non-empty!)."""
-    if edges_table.size == 0:
-        log.debug(f"Edges table empty - SKIPPING {os.path.split(output_file)[-1]}")
-    else:
+class EdgeWriter:
+    """Writes data to a Parquet file continuously.
+
+    Pandas has facilities to write to Parquet, but the functionality is limited and does
+    not allow to append to the Parquet file.
+
+    This class will use the underlying PyArrow methods to open a Parquet file when needed,
+    and repeatedly writing more data into the file as required.  Compared to storing a
+    growing Pandas DataFrame and dumping it to disk at once, this will allow us to reduce
+    our memory consumption.
+    """
+
+    def __init__(self, output_file: Path):
+        """Initializes the object"""
+        self._path = output_file
+        self._writer = None
+        self._total_edges = 0
+
+    # Note: should accumulate edges_table until ~64 MiB are reached, then dump
+    # it to disk to take full advantage of Parquet row group compression.
+    def write(self, edges_table):
+        """Write data to disk"""
+        edges_table["edge_type_id"] = 0  # Add type ID, required for SONATA
         edges_table = edges_table.rename(
             columns={"@target_node": "target_node_id", "@source_node": "source_node_id"}
-        )  # Convert column names
-        edges_table["edge_type_id"] = 0  # Add type ID, required for SONATA
-        edges_table.to_parquet(output_file, index=False)
+        )
+        self._total_edges += len(edges_table)
+        table = pa.Table.from_pandas(edges_table)
+        if not self._writer:
+            self._writer = pq.ParquetWriter(self._path, table.schema)
+        self._writer.write_table(table)
+
+        return None, self._total_edges
+
+    def close(self):
+        """Close any open Parquet files"""
+        if self._writer:
+            self._writer.close()
+
+
+class EdgeNoop:
+    """To be removed"""
+
+    def write(self, edges_table):
+        """To be removed"""
+        return edges_table, len(edges_table)
+
+    def close(self):
+        """To be removed"""
+
+
+@contextmanager
+def process_edges(write: bool, output_file: Path):
+    """To be removed"""
+    if write:
+        writer = EdgeWriter(output_file)
+    else:
+        writer = EdgeNoop()
+    try:
+        yield writer
+    finally:
+        writer.close()
 
 
 def create_parquet_metadata(parquet_path, nodes):

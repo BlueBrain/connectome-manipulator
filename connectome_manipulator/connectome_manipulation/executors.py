@@ -1,7 +1,8 @@
 """A module implementing several executor wrappers"""
+from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from distributed import as_completed
+from distributed import as_completed, WorkerPlugin
 
 from .. import log
 
@@ -67,6 +68,18 @@ def serial_ctx(result_hook):
     # DONE!
 
 
+# This allegedly provides a bit safer support for separate processes, skip for now to keep
+# dependencies at bay
+# from loky import ProcessPoolExecutor
+class AddProcessPool(WorkerPlugin):
+    """Helper to avoid threading and use processes instead"""
+
+    def setup(self, worker):
+        """Configures the worker"""
+        if worker.state.nthreads > 1:
+            worker.executors["default"] = ProcessPoolExecutor(max_workers=worker.state.nthreads)
+
+
 @contextmanager
 def dask_ctx(result_hook, executor_params: dict):
     """An executor using the Dask system"""
@@ -81,6 +94,7 @@ def dask_ctx(result_hook, executor_params: dict):
                 executor_params[k] = float(val)
 
     client = Client(**executor_params)
+    client.register_worker_plugin(AddProcessPool())
     executor_wrapper = DaskExecutor(client, result_hook)
 
     yield executor_wrapper

@@ -236,8 +236,11 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 inplace=True, drop=True
             )  # [No index offset required when merging files in block-based processing]
 
+        memsize = edges_table.memory_usage(deep=True).sum() / (1024**2)
         log.info(
-            f"Generated {final_edge_count - init_edge_count} (of {edges_table.shape[0]}) new synapses with {final_prop_count} properties ({init_prop_count - final_prop_count} removed)"
+            f"Generated {final_edge_count - init_edge_count} ({final_edge_count}) "
+            f"new synapses consuming {memsize:.3f} MiB "
+            f"with {final_prop_count} properties ({init_prop_count - final_prop_count} removed)"
         )
 
         return edges_table
@@ -311,10 +314,14 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         for tidx, (tgt, morph) in enumerate(zip(tgt_node_ids, tgt_morphs)):
             new_time = datetime.now()
             if (new_time - log_time) / timedelta(minutes=1) > 1:
-                log.info("Processing target node %d out of %d", tidx, len(tgt_node_ids))
+                memsize = sum(t.memory_usage(deep=True).sum() for t in new_edges_list) / (1024**2)
+                log.info(
+                    "Processing target node %d out of %d, %.3f MiB edges so far",
+                    tidx,
+                    len(tgt_node_ids),
+                    memsize,
+                )
                 log_time = new_time
-            #  if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
-            #     print(f'{progress_pct[tidx]}%', end=' ' if progress_pct[tidx] < 100.0 else '\n') # Just for console, no logging
 
             # Determine conn. prob. of all source nodes to be connected with target node (mtype-specific)
             tgt_pos = tgt_positions[

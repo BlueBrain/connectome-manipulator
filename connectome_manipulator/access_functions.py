@@ -108,6 +108,14 @@ def orientations(nodes, node_sel=None):
     return trans(*args)
 
 
+def get_enumeration_list(pop, column):
+    """Takes a node population and column name and returns a list to values."""
+    raw_pop = pop._population  # pylint: disable=protected-access
+    if column in raw_pop.enumeration_names:
+        return raw_pop.enumeration_values(column)
+    return sorted(np.unique(raw_pop.get_attribute(column, raw_pop.select_all())))
+
+
 def get_enumeration_map(pop, column):
     """Takes a node population and column name and returns a dictionary that maps values to indices."""
     raw_pop = pop._population  # pylint: disable=protected-access
@@ -127,13 +135,17 @@ def get_attribute(pop, column, ids):
     return raw_pop.get_attribute(column, libsonata.Selection(ids))
 
 
-def get_enumeration(pop, column, ids):
+def get_enumeration(pop, column, ids=None):
     """Get the raw enumeration values for `column` from population `pop` for node IDs `ids`."""
     raw_pop = pop._population  # pylint: disable=protected-access
+    if ids is None:
+        ids = raw_pop.select_all()
+    else:
+        ids = libsonata.Selection(ids)
     if column in raw_pop.enumeration_names:
-        return raw_pop.get_enumeration(column, libsonata.Selection(ids))
+        return raw_pop.get_enumeration(column, ids)
     mapping = get_enumeration_map(pop, column)
-    return np.array([mapping[v] for v in raw_pop.get_attribute(column, libsonata.Selection(ids))])
+    return np.array([mapping[v] for v in raw_pop.get_attribute(column, ids)])
 
 
 def get_node_ids(nodes, sel_spec, split_ids=None):
