@@ -11,6 +11,8 @@ _LOG_FORMAT = "[%(levelname)s] %(message)s"
 _LOG_FORMAT_WITH_DATE = "[%(levelname)s] (%(asctime)s) %(message)s"
 _DATE_FORMAT = "%b.%d %H:%M:%S"
 
+_start_time = None
+
 
 def debug(msg, *args, **kwargs):  # pragma: no cover
     """Wrapper for debug logging"""
@@ -30,6 +32,11 @@ def warning(msg, *args, **kwargs):  # pragma: no cover
 def error(msg, *args, **kwargs):  # pragma: no cover
     """Wrapper for error logging"""
     return logging.error(msg, *args, **kwargs)
+
+
+def exception(msg, *args, **kwargs):  # pragma: no cover
+    """Wrapper for error logging"""
+    return logging.exception(msg, *args, **kwargs)
 
 
 def log_assert(cond, msg):
@@ -103,10 +110,16 @@ def create_log_file(log_path, name):
       log_path: The destination directory for log messages besides stdout
       name: Name of the module to log
     """
+    global _start_time  # pylint: disable=global-statement
     os.makedirs(log_path, exist_ok=True)
-    logfile = os.path.join(log_path, "{}_{}.log".format(name, strftime("%Y-%m-%d_%Hh%M")))
+    if not _start_time:
+        _start_time = strftime("%Y-%m-%d_%Hh%M")
+    logfile = os.path.join(log_path, "{}_{}.log".format(name, _start_time))
     fileh = logging.FileHandler(logfile, encoding="utf-8")
     fileh.setFormatter(logging.Formatter(_LOG_FORMAT_WITH_DATE, _DATE_FORMAT))
     logging.root.setLevel(logging.DEBUG)  # So that log files write everything
+    remove = [h for h in logging.root.handlers if isinstance(h, logging.FileHandler)]
+    for h in remove:
+        logging.root.removeHandler(h)
     logging.root.addHandler(fileh)
     return logfile

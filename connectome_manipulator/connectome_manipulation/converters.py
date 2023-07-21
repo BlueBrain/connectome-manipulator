@@ -2,14 +2,44 @@
 import glob
 import os
 import subprocess
-from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .. import log, __version__
+from .. import log, profiler, __version__
+
+
+_WRITE_THRESHOLD = 128 * 1024**2
+
+_SYNAPSE_PROPERTIES = [
+    "source_node_id",
+    "target_node_id",
+    "afferent_section_id",
+    "afferent_section_pos",
+    "afferent_section_type",
+    "afferent_center_x",
+    "afferent_center_y",
+    "afferent_center_z",
+    "syn_type_id",
+    "edge_type_id",
+    "delay",
+]
+_PROPERTY_TYPES = {
+    "source_node_id": "int64",
+    "target_node_id": "int64",
+    "afferent_section_id": "int64",
+    "afferent_section_pos": "float32",
+    "afferent_section_type": "int64",
+    "afferent_center_x": "float32",
+    "afferent_center_y": "float32",
+    "afferent_center_z": "float32",
+    "syn_type_id": "int64",
+    "edge_type_id": "int64",
+    "delay": "float32",
+}
+_ID_COLUMN_MAP = {"@target_node": "target_node_id", "@source_node": "source_node_id"}
 
 
 class EdgeWriter:
@@ -24,56 +54,138 @@ class EdgeWriter:
     our memory consumption.
     """
 
-    def __init__(self, output_file: Path):
-        """Initializes the object"""
-        self._path = output_file
-        self._writer = None
+    def __init__(self, output_file: Path, existing_edges=None, with_delay: bool = True):
+        """Initializes the writer
+
+        If `existing_edges` is a Pandas DataFrame, it will be used to pre-populate the
+        write buffer.  When appending to the writer, columns may be removed from the
+        pre-existing data.
+
+        A default schema is constructed, taking the `with_delay` parameter into account to
+        include or exclude a delay column.  This default schema will be used for appending
+        data to the writer if there is a column mismatch with any pre-existing data.
+
+        If `output_file` is `None`, no writing of data to disk will happen.  Data will
+        have to be retrieved with the `to_pandas` method.
+        """
+        self._batches = []
+        self._batches_size = 0
         self._total_edges = 0
+        self._path = output_file
+        self._with_delay = with_delay
+        self._drop_edge_type_column = False
+        self._schema = None
+        self._writer = None
 
-    # Note: should accumulate edges_table until ~64 MiB are reached, then dump
-    # it to disk to take full advantage of Parquet row group compression.
-    def write(self, edges_table):
-        """Write data to disk"""
-        edges_table["edge_type_id"] = 0  # Add type ID, required for SONATA
-        edges_table = edges_table.rename(
-            columns={"@target_node": "target_node_id", "@source_node": "source_node_id"}
+        if existing_edges is None:
+            self._schema = self._build_schema(with_delay)
+        else:
+            self.from_pandas(existing_edges)
+
+    def __len__(self):
+        """Returns the total number of rows written and cached"""
+        return self._total_edges + sum(map(len, self._batches))
+
+    def clear(self):
+        """Reset the saved edges in the buffer"""
+        self._batches = []
+
+    def __enter__(self):
+        """Entry point for context management"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit point for context management"""
+        self.close()
+        return False
+
+    @staticmethod
+    def _build_schema(with_delay):
+        return pa.schema(
+            [
+                pa.field(n, pa.from_numpy_dtype(_PROPERTY_TYPES[n]))
+                for n in _SYNAPSE_PROPERTIES
+                if with_delay or n != "delay"
+            ]
         )
-        self._total_edges += len(edges_table)
-        table = pa.Table.from_pandas(edges_table)
-        if not self._writer:
-            self._writer = pq.ParquetWriter(self._path, table.schema)
-        self._writer.write_table(table)
 
-        return None, self._total_edges
+    def from_pandas(self, df):
+        """Replace any stored edges with the Pandas DataFrame given
+
+        If a schema has already been set, it will be used to convert the given Pandas
+        DataFrame to the internal representation. If no schema has been set, it will be
+        derived from the DataFrame.
+        """
+        self._drop_edge_type_column = "edge_type_id" not in df.columns
+        if self._drop_edge_type_column:
+            df["edge_type_id"] = 0
+        self._batches = [
+            pa.record_batch(
+                df.rename(columns=_ID_COLUMN_MAP).reset_index(drop=True),
+                schema=self._schema,
+            )
+        ]
+        if not self._schema:
+            self._schema = self._batches[0].schema
+
+    def append(self, **kwargs):
+        """Append new data to the buffer.
+
+        Requires that `kwargs` contains all required data from the default schema or
+        pre-existing data. If the pre-existing data has less columns than the passed in
+        data, additional columns will be removed from the buffered data.
+
+        Once the internal buffer exceeds the write threshold, data
+        will be appended to the associated parquet file.
+        """
+        missing = {f.name for f in self._schema} - set(kwargs.keys())
+        if missing:
+            log.warning(
+                "Dropping columns '%s' and reverting to default schema", "', '".join(missing)
+            )
+            self._schema = self._build_schema(self._with_delay)
+            columns = [f.name for f in self._schema]
+            self._batches = [b.select(columns) for b in self._batches]
+
+        data = [kwargs.pop(f.name) for f in self._schema]
+        log.log_assert(not kwargs, "Additional data for edge writing")
+        self._batches.append(pa.record_batch(data, schema=self._schema))
+        self._batches_size += self._batches[-1].nbytes
+        if self._path and self._batches_size > _WRITE_THRESHOLD:
+            self._write_batches()
+
+    def _write_batches(self):
+        """Write buffers to parquet"""
+        with profiler.profileit(name="write_to_parquet"):
+            table = pa.Table.from_batches(self._batches)
+            self._batches = []
+            self._batches_size = 0
+            self._total_edges += len(table)
+            log.debug("Writing %d edges to disk, total of %d edges", len(table), self._total_edges)
+            if not self._writer:
+                log.log_assert(not self._path.exists(), "Can't append to open file")
+                log.debug("Opening %s to write", self._path)
+                self._writer = pq.ParquetWriter(self._path, table.schema)
+            self._writer.write_table(table)
+
+    def to_pandas(self):
+        """Return the buffer as a Pandas DataFrame"""
+        df = (
+            pa.Table.from_batches(self._batches, schema=self._schema)
+            .to_pandas()
+            .rename(columns={"target_node_id": "@target_node", "source_node_id": "@source_node"})
+        )
+        if self._drop_edge_type_column:
+            del df["edge_type_id"]
+        return df
 
     def close(self):
         """Close any open Parquet files"""
+        if self._path and self._batches:
+            self._write_batches()
         if self._writer:
             self._writer.close()
-
-
-class EdgeNoop:
-    """To be removed"""
-
-    def write(self, edges_table):
-        """To be removed"""
-        return edges_table, len(edges_table)
-
-    def close(self):
-        """To be removed"""
-
-
-@contextmanager
-def process_edges(write: bool, output_file: Path):
-    """To be removed"""
-    if write:
-        writer = EdgeWriter(output_file)
-    else:
-        writer = EdgeNoop()
-    try:
-        yield writer
-    finally:
-        writer.close()
+            self._writer = None
 
 
 def create_parquet_metadata(parquet_path, nodes):
@@ -81,8 +193,11 @@ def create_parquet_metadata(parquet_path, nodes):
 
     [Modified from: https://bbpgitlab.epfl.ch/hpc/circuit-building/spykfunc/-/blob/main/src/spykfunc/functionalizer.py#L328-354]
     """
-    schema: pq.ParquetSchema = pq.ParquetDataset(parquet_path, use_legacy_dataset=False).schema
-    metadata = {k.decode(): v.decode() for k, v in schema.metadata.items()}
+    schema = pq.ParquetDataset(parquet_path, use_legacy_dataset=False).schema
+    if schema.metadata:
+        metadata = {k.decode(): v.decode() for k, v in schema.metadata.items()}
+    else:
+        metadata = {}
     metadata.update(
         {
             "source_population_name": nodes[0].name,

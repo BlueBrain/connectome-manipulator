@@ -15,13 +15,14 @@ import numpy as np
 import pandas as pd
 import bluepysnap
 from bluepysnap.circuit import Circuit
+import libsonata
 
 from .. import log, utils, profiler
 from ..access_functions import get_edges_population, get_nodes_population
 from ..processing import BatchInfo, get_node_splits
 from . import executors
 from .tracker import JobTracker
-from .converters import create_parquet_metadata, parquet_to_sonata, process_edges
+from .converters import create_parquet_metadata, parquet_to_sonata, EdgeWriter
 from .manipulation import Manipulation
 
 logger = logging.getLogger(__name__)
@@ -121,9 +122,10 @@ def load_circuit(sonata_config, popul_name=None):
 
 def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
-    log.info(f'APPLYING MANIPULATION "{manip["name"]}"')
+    log.info(f'Applying manipulation "{manip["name"]}" for split {job.split_index}')
+    log.info(f'Results will be written to "{job.out_parquet_file}"')
 
-    with process_edges(edges_table is None, job.out_parquet_file) as writer:
+    with EdgeWriter(job.out_parquet_file, existing_edges=edges_table) as writer:
         for fun, cfg in enumerate(manip["fcts"]):
             source = cfg.pop("source")
             models = cfg.pop("model_config")
@@ -135,26 +137,22 @@ def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
             else:
                 pathways = None
 
-            m = Manipulation.get(source)(nodes, job.split_index, job.split_total)
+            m = Manipulation.get(source)(nodes, writer, job.split_index, job.split_total)
 
             for batch in job.batches:
                 for n, (node_ids, sel_src, sel_dest, pathway_specs) in enumerate(
                     batch.process_pathways(pathways)
                 ):
                     log.info(f">>Step {n + 1}: source={source}")
-                    edges_table = m.apply(
-                        edges_table,
-                        node_ids,
+                    m.apply(
+                        libsonata.Selection(node_ids).flatten(),
                         sel_src=sel_src,
                         sel_dest=sel_dest,
                         pathway_specs=pathway_specs,
                         **cfg,
                         **models,
                     )
-
-                edges_table, edges_generated = writer.write(edges_table)
-
-    return edges_table, edges_generated
+        return len(writer)
 
 
 def create_new_file_from_template(new_file, template_file, replacements_dict, skip_comments=True):
@@ -259,27 +257,15 @@ def manip_wrapper(jobs_common: JobsCommonInfo, job: JobInfo, options: Options):
         if filename := config["manip"]["fcts"][idx].get("model_pathways"):
             config["manip"]["fcts"][idx]["model_pathways"] = options.config_path.parent / filename
 
+    N_syn_in = len(edges_table) if edges_table is not None else 0
+
     with profiler.profileit(name="processing"):
-        new_edges_table, N_syn_out = apply_manipulation(
+        N_syn_out = apply_manipulation(
             edges_table,
             jobs_common.nodes,
             job,
             config["manip"],
         )
-
-    # [TESTING/DEBUGGING]
-    N_syn_in = len(edges_table) if edges_table is not None else 0
-
-    if new_edges_table is not None:
-        new_edges_table = _adjust_column_types(edges_table, new_edges_table)
-        log.log_assert(
-            new_edges_table["@target_node"].is_monotonic_increasing,
-            "Target nodes not monotonically increasing!",
-        )
-        # Write back connectome to .parquet file
-        with profiler.profileit(name="write_to_parquet"):
-            with process_edges(True, job.out_parquet_file) as writer:
-                writer.write(new_edges_table)
 
     return N_syn_in, N_syn_out, profiler.ProfilerManager
 
@@ -364,21 +350,6 @@ def _get_afferent_edges_table(node_ids, edges):
     if edges is None:
         return None
     return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
-
-
-def _adjust_column_types(edges_table, new_edges_table):
-    """Ensures that column types of the two tables match.
-
-    Returns the second table with column types adjusted to match the first table.  Columns
-    may be removed in the second table.
-    """
-    if edges_table is None or new_edges_table is None:
-        return new_edges_table
-
-    old_column_types = {col: edges_table[col].dtype for col in edges_table.columns}
-    # Filter column type dict in case of removed columns (e.g., conn_wiring operation)
-    new_column_types = {col: old_column_types[col] for col in new_edges_table.columns}
-    return new_edges_table.astype(new_column_types)
 
 
 def _write_blue_config(manip_config, output_path, edges_fn_manip, edges_file_manip):

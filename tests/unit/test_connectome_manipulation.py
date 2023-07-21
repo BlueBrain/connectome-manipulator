@@ -82,34 +82,53 @@ def test_load_circuit():
     assert res[4] == os.path.join(TEST_DATA_DIR, "edges.h5")
 
 
-def test_manipulation_registration():
+@patch("connectome_manipulator.connectome_manipulation.manipulation.base.get_enumeration_map")
+def test_manipulation_registration(nodes):
     manip_mods = glob.glob("connectome_manipulator/connectome_manipulation/manipulation/*.py")
     manip_mods = [os.path.splitext(os.path.basename(m))[0] for m in manip_mods]
     print(manip_mods)
     for mod_name in manip_mods:
         if mod_name not in ["base", "__init__"]:
-            m = Manipulation.get(mod_name)(None)
+            m = Manipulation.get(mod_name)(nodes, None)
 
 
-def test_null_manipulation():
+@patch("connectome_manipulator.connectome_manipulation.manipulation.base.get_enumeration_map")
+def test_null_manipulation(nodes):
     module_name = "null_manipulation"
     manip_config = {"manip": {"name": "test", "fcts": [{"source": module_name, "kwargs": {}}]}}
 
     m = Manipulation.get(module_name)
-    out_edges_table = m(None).apply(None, None, **manip_config)
 
-    assert out_edges_table is None
+    writer = converters.EdgeWriter(None)
+    m(nodes, writer).apply(None, **manip_config)
+    assert len(writer.to_pandas()) == 0
 
 
-def test_edges_to_parquet():
+@patch("connectome_manipulator.connectome_manipulation.manipulation.base.get_enumeration_map")
+def test_null_manipulation_with_edges(nodes):
+    module_name = "null_manipulation"
+    manip_config = {"manip": {"name": "test", "fcts": [{"source": module_name, "kwargs": {}}]}}
+
+    m = Manipulation.get(module_name)
+
+    c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
+    edges = c.edges[c.edges.population_names[0]]
+    tgt_ids = edges.target.ids()
+    edges_table = edges.afferent_edges(tgt_ids, properties=edges.property_names)
+
+    writer = converters.EdgeWriter(None, edges_table.copy())
+    m(nodes, writer).apply(None, **manip_config)
+    assert edges_table.equals(writer.to_pandas())
+
+
+def test_edges_to_parquet(tmp_path):
     edges = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json")).edges
     edges_table = edges.afferent_edges([0, 1], properties=sorted(edges.property_names))
 
-    with setup_tempdir(__name__) as tempdir:
-        outfile = os.path.join(tempdir, "test.parquet")
-        with test_module.process_edges(True, outfile) as writer:
-            writer.write(edges_table)
-        assert os.path.isfile(outfile)
+    outfile = tmp_path / "test.parquet"
+    with converters.EdgeWriter(outfile, existing_edges=edges_table) as writer:
+        pass
+    assert outfile.is_file()
 
 
 def test_parquet_to_sonata():

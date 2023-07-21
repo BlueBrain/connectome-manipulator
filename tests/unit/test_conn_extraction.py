@@ -11,7 +11,6 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 @pytest.fixture
 def manipulation():
-    Manipulation.destroy_instances()
     m = Manipulation.get("conn_extraction")
     return m
 

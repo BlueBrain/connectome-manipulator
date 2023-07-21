@@ -12,11 +12,11 @@ import neurom as nm
 from utils import TEST_DATA_DIR
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
+from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
 
 
 @pytest.fixture
 def manipulation():
-    Manipulation.destroy_instances()
     m = Manipulation.get("conn_wiring")
     return m
 
@@ -73,26 +73,26 @@ def test_apply(manipulation):
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = manipulation(nodes).apply(
-        edges_table_empty,
+    writer = EdgeWriter(None, edges_table_empty)
+    manipulation(nodes, writer).apply(
         tgt_ids,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
     )
-    assert res.equals(
-        edges_table_empty
-    ), "ERROR: Existing edges table changed!"  # Check if unchanged
+    res = writer.to_pandas()
+    assert res.equals(edges_table_empty[res.columns]), "ERROR: Existing edges table changed!"
 
     ## (b) Edges already existing
-    res = manipulation(nodes).apply(
-        edges_table,
+    writer = EdgeWriter(None, edges_table)
+    res = manipulation(nodes, writer).apply(
         tgt_ids,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
     )
-    assert res.equals(edges_table), "ERROR: Existing edges table changed!"  # Check if unchanged
+    res = writer.to_pandas()
+    assert res.equals(edges_table[res.columns]), "ERROR: Existing edges table changed!"
 
     ## (c) Standalone wiring per pathway
     pathway_nodes = nodes[0]
@@ -109,9 +109,7 @@ def test_apply(manipulation):
                     "delay_model": None,
                 }
             )
-    res = manipulation.connectome_wiring_per_pathway(
-        pathway_nodes, pathway_models, seed=0, morph_ext="swc"
-    )
+    res = manipulation.connectome_wiring_per_pathway(nodes, pathway_models, seed=0, morph_ext="swc")
     assert res.size == 0, "ERROR: Connectome should be empty!"
     assert np.all(np.isin(required_properties, res.columns)), "ERROR: Synapse properties missing!"
 
@@ -120,13 +118,14 @@ def test_apply(manipulation):
     prob_model = model_types.AbstractModel.model_from_file(prob_model_file)
 
     ## (a) Empty edges table
-    res = manipulation(nodes).apply(
-        edges_table_empty,
+    writer = EdgeWriter(None)
+    manipulation(nodes, writer).apply(
         tgt_ids,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
     )
+    res = writer.to_pandas()
     assert (
         res.shape[0]
         == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn
@@ -172,13 +171,14 @@ def test_apply(manipulation):
             ), "ERROR: Section position error!"
 
     ## (b) Edges already existing
-    res = manipulation(nodes).apply(
-        edges_table,
+    writer = EdgeWriter(None, edges_table)
+    manipulation(nodes, writer).apply(
         tgt_ids,
         amount_pct=pct,
         prob_model_spec={"file": prob_model_file},
         nsynconn_model_spec={"file": nsynconn_model_file},
     )
+    res = writer.to_pandas()
     assert (
         res.shape[0]
         == edges_table.shape[0]
@@ -206,9 +206,7 @@ def test_apply(manipulation):
                     "delay_model": None,
                 }
             )
-    res = manipulation.connectome_wiring_per_pathway(
-        pathway_nodes, pathway_models, seed=0, morph_ext="swc"
-    )
+    res = manipulation.connectome_wiring_per_pathway(nodes, pathway_models, seed=0, morph_ext="swc")
     assert (
         res.shape[0]
         == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn
@@ -221,13 +219,14 @@ def test_apply(manipulation):
 
     # Case 3: Check pct
     for pct in np.linspace(0, 100, 6):
-        res = manipulation(nodes).apply(
-            edges_table_empty,
+        writer = EdgeWriter(None)
+        manipulation(nodes, writer).apply(
             tgt_ids,
             amount_pct=pct.tolist(),
             prob_model_spec={"file": prob_model_file},
             nsynconn_model_spec={"file": nsynconn_model_file},
         )
+        res = writer.to_pandas()
         assert (
             res.shape[0]
             == (
@@ -245,8 +244,8 @@ def test_apply(manipulation):
         for tgt_class in ["EXC", "INH"]:
             sel_src = {"synapse_class": src_class}
             sel_dest = {"synapse_class": tgt_class}
-            res = manipulation(nodes).apply(
-                edges_table_empty,
+            writer = EdgeWriter(None)
+            manipulation(nodes, writer).apply(
                 tgt_ids,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
@@ -254,6 +253,7 @@ def test_apply(manipulation):
                 prob_model_spec={"file": prob_model_file},
                 nsynconn_model_spec={"file": nsynconn_model_file},
             )
+            res = writer.to_pandas()
             assert np.all(
                 np.isin(res["@source_node"], nodes[0].ids(sel_src))
             ), "ERROR: Source selection error!"
@@ -276,8 +276,8 @@ def test_apply(manipulation):
             sel_dest = {"mtype": tgt_mt}
 
             ### Integrated wiring
-            res = manipulation(nodes).apply(
-                edges_table_empty,
+            writer = EdgeWriter(None)
+            manipulation(nodes, writer).apply(
                 tgt_ids,
                 sel_src=sel_src,
                 sel_dest=sel_dest,
@@ -285,6 +285,7 @@ def test_apply(manipulation):
                 prob_model_spec={"file": prob_model_file},
                 nsynconn_model_spec={"file": nsynconn_model_file},
             )
+            res = writer.to_pandas()
             assert np.all(
                 np.isin(res["@source_node"], nodes[0].ids(sel_src))
             ), "ERROR: Source selection error!"
@@ -311,7 +312,7 @@ def test_apply(manipulation):
                 }
             ]
             res = manipulation.connectome_wiring_per_pathway(
-                pathway_nodes, pathway_models, seed=0, morph_ext="swc"
+                nodes, pathway_models, seed=0, morph_ext="swc"
             )
             assert np.all(
                 np.isin(res["@source_node"], nodes[0].ids(sel_src))
@@ -330,19 +331,16 @@ def test_apply(manipulation):
 
     # Case 5: Check block-based processing
     split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
-    res_list = []
+    writer = EdgeWriter(None)
     for i_split, split_ids in enumerate(split_ids_list):
         print(split_ids)
-        res_list.append(
-            manipulation(nodes, i_split, len(split_ids_list)).apply(
-                edges_table_empty,
-                split_ids,
-                amount_pct=pct,
-                prob_model_spec={"file": prob_model_file},
-                nsynconn_model_spec={"file": nsynconn_model_file},
-            )
+        manipulation(nodes, writer, i_split, len(split_ids_list)).apply(
+            split_ids,
+            amount_pct=pct,
+            prob_model_spec={"file": prob_model_file},
+            nsynconn_model_spec={"file": nsynconn_model_file},
         )
-    res = pd.concat(res_list, ignore_index=True)
+    res = writer.to_pandas()
     assert (
         res.shape[0]
         == (len(src_ids) * len(tgt_ids) - len(np.intersect1d(src_ids, tgt_ids))) * n_syn_conn
@@ -362,7 +360,8 @@ def test_apply(manipulation):
             assert np.all(np.isclose(res.iloc[i]["delay"], delay)), "ERROR: Delay mismatch!"
 
     ## (a) Integrated wiring
-    res = manipulation(nodes).apply(
+    writer = EdgeWriter(None)
+    manipulation(nodes, writer).apply(
         edges_table_empty,
         tgt_ids,
         amount_pct=pct,
@@ -370,6 +369,7 @@ def test_apply(manipulation):
         nsynconn_model_spec={"file": nsynconn_model_file},
         delay_model_spec={"file": delay_model_file},
     )
+    res = writer.to_pandas()
     check_delay(nodes, delay_model, res)
 
     ## (b) Standalone wiring per pathway
@@ -385,9 +385,7 @@ def test_apply(manipulation):
                     "delay_model": delay_model,
                 }
             )
-    res = manipulation.connectome_wiring_per_pathway(
-        pathway_nodes, pathway_models, seed=0, morph_ext="swc"
-    )
+    res = manipulation.connectome_wiring_per_pathway(nodes, pathway_models, seed=0, morph_ext="swc")
     check_delay([pathway_nodes, pathway_nodes], delay_model, res)
 
     # Case 7: Check connectivity with conn. prob. p=0.1
@@ -400,13 +398,14 @@ def test_apply(manipulation):
     for rep in range(
         30
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
-        res = manipulation(nodes).apply(
-            edges_table_empty,
+        writer = EdgeWriter(None)
+        res = manipulation(nodes, writer).apply(
             tgt_ids,
             amount_pct=pct,
             prob_model_spec={"file": prob_model_file},
             nsynconn_model_spec={"file": nsynconn_model_file},
         )
+        res = writer.to_pandas()
         syn_counts.append(res.shape[0])
     assert np.std(syn_counts) > 0, "ERROR: No variability over repetitions!"
     assert np.isclose(
@@ -433,7 +432,7 @@ def test_apply(manipulation):
         40
     ):  # Estimate synapse counts over N repetitions => May be increased if variation still to large
         res = manipulation.connectome_wiring_per_pathway(
-            pathway_nodes, pathway_models, seed=rep, morph_ext="swc"
+            nodes, pathway_models, seed=rep, morph_ext="swc"
         )
         syn_counts.append(res.shape[0])
     assert np.std(syn_counts) > 0, "ERROR: No variability over repetitions!"

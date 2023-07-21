@@ -49,17 +49,16 @@ class ConnectomeRewiring(Manipulation):
     supported so far!).
     """
 
-    def __init__(self, nodes):
+    def __init__(self, nodes, writer, split_index=0, split_total=1):
         """Construct ConnectomeRewiring Manipulation and declare state vars..."""
         self.duplicate_sample_synapses_per_mtype_dict = tuple({})
         self.props_sel = []
         self.syn_sel_idx_type = None
-        super().__init__(nodes)
+        super().__init__(nodes, writer, split_index, split_total)
 
     @profiler.profileit(name="conn_rewiring")
     def apply(
         self,
-        edges_table,
         split_ids,
         syn_class,
         prob_model_spec,
@@ -82,6 +81,7 @@ class ConnectomeRewiring(Manipulation):
         => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
         """
         # pylint: disable=arguments-differ
+        edges_table = self.writer.to_pandas()
         log.log_assert(
             np.all(np.diff(edges_table["@target_node"]) >= 0),
             "Edges table must be ordered by @target_node!",
@@ -208,7 +208,8 @@ class ConnectomeRewiring(Manipulation):
                 tgt_node_ids=tgt_node_ids,
                 tgt_sel=tgt_sel,
             )
-            return edges_table
+            self.writer.from_pandas(edges_table)
+            return
 
         log.info(
             f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})"
@@ -462,7 +463,8 @@ class ConnectomeRewiring(Manipulation):
                 f"EstimationStats_{self.split_index + 1}_{self.split_total}",
                 **{k: v for k, v in stats_dict.items() if k in stat_sel},
             )
-            return edges_table.iloc[[]].copy()
+            self.writer.from_pandas(edges_table.iloc[[]].copy())
+            return
 
         # Update statistics
         stats_dict["num_syn_unchanged"] = (
@@ -631,7 +633,7 @@ class ConnectomeRewiring(Manipulation):
             )
         # ######### #
 
-        return edges_table
+        self.writer.from_pandas(edges_table)
 
     def duplicate_synapses(self, syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt):
         """Duplicate num_gen_syn synapse positions on target neuron

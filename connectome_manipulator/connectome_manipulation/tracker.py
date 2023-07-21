@@ -36,7 +36,7 @@ class JobTracker:
             ]
 
         # Check if parquet folder is clean
-        existing_parquet_files = set(p.stem for p in self.parquet_dir.glob("*.parquet"))
+        existing_parquet_files = {p.stem for p in self.parquet_dir.glob("*.parquet")}
         done_list = set()
         if resume:
             # Resume from an existing run:
@@ -47,7 +47,7 @@ class JobTracker:
             else:
                 # Load completed files from existing list [can be in arbitrary order!!]
                 done_list = set(utils.load_json(self.parquet_done_file))
-                unexpected = list(done_list - set(p.stem for p in file_list))
+                unexpected = list(done_list - {p.stem for p in file_list})
                 log.log_assert(
                     not unexpected,
                     f'Unable to resume! "{self.parquet_done_file}" contains unexpected entries: {unexpected}',
@@ -55,7 +55,7 @@ class JobTracker:
             unexpected = list(existing_parquet_files - done_list)
             log.log_assert(
                 not unexpected,
-                f"Unable to resume! Parquet output directory contains unexpected .parquet files, please clean your output dir: {unexpected}",
+                f"Unable to resume! Parquet output directory contains unexpected .parquet files, please clean your output dir: {len(unexpected)} files",
             )
             # [NOTE: Empty files don't exist but may be marked as done!]
         else:  # Running from scratch: Parquet folder must not contain any .parquet files (so not to mix up existing and new files!!)

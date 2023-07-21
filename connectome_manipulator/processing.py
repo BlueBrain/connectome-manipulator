@@ -133,6 +133,14 @@ class BatchInfo:
     node_ids: list
     """Either a plain list of ids or a list of SONATA selection style ranges"""
 
+    def __repr__(self):
+        """Condensed representation of the class"""
+        if len(self.node_ids) > 5:
+            node_str = f"[{self.node_ids[0]}, ..., {self.node_ids[-1]}]"
+        else:
+            node_str = str(self.node_ids)
+        return f"BatchInfo(payload={self.payload}, selection={self.selection}, node_ids={node_str})"
+
     @staticmethod
     def group_batches(all_batches: ["BatchInfo"], target_payload: int) -> [["BatchInfo"]]:
         """Partition batches into groups given a desired target_payload"""

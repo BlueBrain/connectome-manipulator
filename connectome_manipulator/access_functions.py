@@ -20,6 +20,11 @@ def property_names(nodes):
     )
 
 
+def _ids_to_ranges(ids):
+    """Convert a list of IDs to libsonata.Selection style ranges"""
+    return libsonata.Selection(ids).ranges
+
+
 def get_nodes(nodes, selection=None):
     """Get a pandas table of all nodes and their properties, optionally narrowed by a selection"""
     population = nodes._population  # pylint: disable=protected-access

@@ -27,7 +27,6 @@ class MetaManipulation(ABCMeta):
     """
 
     __manipulations = {}
-    __instances = {}
 
     def __init__(cls, name, bases, attrs) -> None:
         """Register the implementing class (if concrete) into a dictionary for later lookup"""
@@ -36,19 +35,6 @@ class MetaManipulation(ABCMeta):
             mod = os.path.splitext(os.path.basename(modpath))[0]
             cls.__manipulations[mod] = cls
         ABCMeta.__init__(cls, name, bases, attrs)
-
-    def __call__(cls, *args, **kwargs):
-        """We want the Manipulation subclasses to be singletons"""
-        if cls not in cls.__instances:
-            cls.__instances[cls] = super(MetaManipulation, cls).__call__(*args, **kwargs)
-        return cls.__instances[cls]
-
-    @classmethod
-    def destroy_instances(mcs):
-        """Destroy all instances (for testing)"""
-        # deal with pylint false-positive
-        # pylint: disable=unused-private-member
-        mcs.__instances = {}
 
     @classmethod
     def get(mcs, name):
@@ -63,17 +49,18 @@ class Manipulation(metaclass=MetaManipulation):
     The abstract base class of which all manipulation classes must inherit and implement its methods.
     """
 
-    def __init__(self, nodes, split_index=0, split_total=1):
+    def __init__(self, nodes, writer=None, split_index=0, split_total=1):
         """Initialize with the nodes and split_ids"""
         self.split_index = split_index
         self.split_total = split_total
         self.nodes = nodes
-        if self.nodes:
-            self.src_type_map = get_enumeration_map(self.nodes[0], "mtype")
-            self.tgt_type_map = get_enumeration_map(self.nodes[1], "mtype")
+        self.writer = writer
+
+        self.src_type_map = get_enumeration_map(self.nodes[0], "mtype")
+        self.tgt_type_map = get_enumeration_map(self.nodes[1], "mtype")
 
     @abstractmethod
-    def apply(self, edges_table, split_ids, **kwargs):
+    def apply(self, split_ids, **kwargs):
         """An abstract method for the actual application of the algorithm
 
         This funciton is to be implemented by concrete Manipulation subclasses.
@@ -90,9 +77,9 @@ class MorphologyCachingManipulation(Manipulation):
 
     # pylint: disable=abstract-method
 
-    def __init__(self, nodes, split_index=0, split_total=1):
+    def __init__(self, nodes, writer=None, split_index=0, split_total=1):
         """Initialize the MorphHelper object needed later."""
-        super().__init__(nodes, split_index, split_total)
+        super().__init__(nodes, writer, split_index, split_total)
         morph_dir = self.nodes[1].config["morphologies_dir"]
         self.morpho_helper = MorphHelper(
             morph_dir,
