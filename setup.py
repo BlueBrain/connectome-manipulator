@@ -41,7 +41,6 @@ setup(
         "voxcell",
         "pyarrow",
         "scikit-learn",
-        "tables",
         "distributed",  # Dask
         "dask-mpi",
     ],
