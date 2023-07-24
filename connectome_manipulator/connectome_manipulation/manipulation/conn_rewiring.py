@@ -164,7 +164,7 @@ class ConnectomeRewiring(Manipulation):
             )
             props_model = None
 
-        # Determine source/target nodes for rewiring
+        # Initialize statistics dict
         stats_dict = {}  # Keep track of statistics
         stats_dict["num_syn_removed"] = []
         stats_dict["num_conn_removed"] = []
@@ -172,12 +172,32 @@ class ConnectomeRewiring(Manipulation):
         stats_dict["num_conn_rewired"] = []
         stats_dict["num_syn_added"] = []
         stats_dict["num_conn_added"] = []
+        stats_dict["input_syn_count"] = edges_table.shape[0]
+        stats_dict["unable_to_rewire_nrn_count"] = 0  # (Neurons)
+        stats_dict[
+            "input_conn_count_sel"
+        ] = []  # Number of input connections within src/tgt node selection
+        stats_dict[
+            "output_conn_count_sel"
+        ] = (
+            []
+        )  # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
+        stats_dict[
+            "output_conn_count_sel_avg"
+        ] = (
+            []
+        )  # Average number of output connections within src/tgt node selection (based on prob. model)
+
+        # Determine source/target nodes for rewiring
         src_node_ids = get_node_ids(self.nodes[0], sel_src)
         src_class = self.nodes[0].get(src_node_ids, properties="synapse_class")
         src_node_ids = src_class[
             src_class == syn_class
         ].index.to_numpy()  # Select only source nodes with given synapse class (EXC/INH)
         log.log_assert(len(src_node_ids) > 0, f"No {syn_class} source nodes found!")
+        stats_dict["source_nrn_count_all"] = len(
+            src_node_ids
+        )  # All source neurons (corresponding to chosen sel_src and syn_class)
         syn_sel_idx_src = np.isin(edges_table["@source_node"], src_node_ids)
         log.log_assert(
             np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] >= 100)
@@ -194,22 +214,42 @@ class ConnectomeRewiring(Manipulation):
         # Only select target nodes that are actually in current split of edges_table
         tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, split_ids)
         num_tgt_total = len(tgt_node_ids)
+        stats_dict[
+            "target_nrn_count_all"
+        ] = num_tgt_total  # All target neurons in current split (corresponding to chosen sel_dest)
         num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
-        tgt_sel = np.random.permutation([True] * num_tgt + [False] * (len(tgt_node_ids) - num_tgt))
-        if len(tgt_node_ids) > 0:
+        stats_dict[
+            "target_nrn_count_sel"
+        ] = num_tgt  # Selected target neurons in current split (based on amount_pct)
+        tgt_sel = np.random.permutation([True] * num_tgt + [False] * (num_tgt_total - num_tgt))
+        if num_tgt_total > 0:
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
-        if np.sum(tgt_sel) == 0:  # Nothing to rewire
+        if num_tgt == 0:  # Nothing to rewire
             log.debug("No target nodes selected, nothing to rewire")
-            log.data(
-                f"RewiringIndices_{self.split_index + 1}_{self.split_total}",
-                i_split=self.split_index,
-                N_split=self.split_total,
-                split_ids=split_ids,
-                tgt_node_ids=tgt_node_ids,
-                tgt_sel=tgt_sel,
-            )
-            self.writer.from_pandas(edges_table)
-            return
+            if estimation_run:
+                log.data(
+                    f"EstimationStats_{self.split_index + 1}_{self.split_total}",
+                    input_syn_count=stats_dict["input_syn_count"],
+                    source_nrn_count_all=stats_dict["source_nrn_count_all"],
+                    target_nrn_count_all=stats_dict["target_nrn_count_all"],
+                    target_nrn_count_sel=stats_dict["target_nrn_count_sel"],
+                    unable_to_rewire_nrn_count=stats_dict["unable_to_rewire_nrn_count"],
+                    input_conn_count_sel=stats_dict["input_conn_count_sel"],
+                    output_conn_count_sel_avg=stats_dict["output_conn_count_sel_avg"],
+                )
+                self.writer.from_pandas(edges_table.iloc[[]].copy())
+                return
+            else:
+                log.data(
+                    f"RewiringIndices_{self.split_index + 1}_{self.split_total}",
+                    i_split=self.split_index,
+                    N_split=self.split_total,
+                    split_ids=split_ids,
+                    tgt_node_ids=tgt_node_ids,
+                    tgt_sel=tgt_sel,
+                )
+                self.writer.from_pandas(edges_table)
+                return
 
         log.info(
             f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})"
@@ -227,7 +267,6 @@ class ConnectomeRewiring(Manipulation):
         inp_conns = np.fliplr(
             inp_conns
         )  # Restore ['@source_node', '@target_node'] order of elements
-        stats_dict["input_syn_count"] = edges_table.shape[0]
         stats_dict["input_conn_count"] = len(inp_syn_per_conn)
         stats_dict["input_syn_per_conn"] = list(inp_syn_per_conn)
 
@@ -239,29 +278,6 @@ class ConnectomeRewiring(Manipulation):
             edges_table.shape[0], False
         )  # Global synapse indices to keep track of all rewired synapses [for data logging]
         new_edges_list = []  # New edges list to collect all generated synapses
-        stats_dict["source_nrn_count_all"] = len(
-            src_node_ids
-        )  # All source neurons (corresponding to chosen sel_src and syn_class)
-        stats_dict["target_nrn_count_all"] = len(
-            tgt_node_ids
-        )  # All target neurons in current split (corresponding to chosen sel_dest)
-        stats_dict[
-            "target_nrn_count_sel"
-        ] = num_tgt  # Selected target neurons in current split (based on amount_pct)
-        stats_dict["unable_to_rewire_nrn_count"] = 0  # (Neurons)
-        stats_dict[
-            "input_conn_count_sel"
-        ] = []  # Number of input connections within src/tgt node selection
-        stats_dict[
-            "output_conn_count_sel"
-        ] = (
-            []
-        )  # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
-        stats_dict[
-            "output_conn_count_sel_avg"
-        ] = (
-            []
-        )  # Average number of output connections within src/tgt node selection (based on prob. model)
         progress_pct = np.round(
             100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)
         ).astype(int)
@@ -699,6 +715,7 @@ class ConnectomeRewiring(Manipulation):
                             "_section",
                             "_segment",
                             "_length",
+                            "_morphology",
                             "delay",
                         ]
                     ]
@@ -848,14 +865,6 @@ class ConnectomeRewiring(Manipulation):
 
         # Assign distance-dependent delays (in-place), based on (generative) delay model
         self.assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
-
-        # [TESTING] #
-        for cidx, c in enumerate(src_gen):
-            log.log_assert(
-                len(np.unique(new_edges[syn_conn_idx == cidx]["u_syn"])) == 1,
-                f"u_syn not unique within connection {c}-{tgt_id}!",
-            )
-        # ######### #
 
         return new_edges
 

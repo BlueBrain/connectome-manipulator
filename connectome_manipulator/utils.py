@@ -86,6 +86,11 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
     if "node_sets_file" in config:
         reduced_config["node_sets_file"] = _reduce_path(config["node_sets_file"], config_dir)
 
+    if "components" in config:
+        reduced_config["components"] = {
+            key: _reduce_path(value, config_dir) for key, value in config["components"].items()
+        }
+
     reducer = {
         "nodes_file": _reduce_path,
         "node_types_file": _reduce_path,

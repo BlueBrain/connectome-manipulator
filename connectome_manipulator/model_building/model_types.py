@@ -119,7 +119,7 @@ class AbstractModel(metaclass=ABCMeta):
             k for k in kwargs if not k.startswith("__")
         ]  # Unused paramters, excluding meta data ('__<name>') that may be included in file
         if len(unused_params) > 0:
-            log.warning(f"Unused parameter(s): {set(kwargs.keys())}!")
+            log.warning(f"Unused parameter(s): {set(unused_params)}!")
 
     def init_params(self, model_dict):
         """Initialize model parameters from dict (removing used keys from dict)."""
@@ -158,7 +158,7 @@ class AbstractModel(metaclass=ABCMeta):
         #         )
         inp_dict = {inp: kwargs.pop(inp) for inp in self.input_names}
         if len(kwargs) > 0:
-            log.warning(f"Unused input(s): {set(kwargs.keys())}!")
+            log.debug(f"Unused input(s): {set(kwargs.keys())}!")
         return self.get_model_output(**inp_dict)
 
     def get_param_dict(self):

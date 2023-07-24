@@ -51,15 +51,12 @@ def data(filespec, **kwargs):
 
     WARNING: Existing files will be overwritten
     """
-    if len(logging.root.handlers) == 0:
+    file_handlers = [hdl for hdl in logging.root.handlers if hasattr(hdl, "baseFilename")]
+    if len(file_handlers) == 0:
         warning("Data logging not possible!")
         return
 
-    file_handler = logging.root.handlers[0]
-    if not hasattr(file_handler, "baseFilename"):
-        warning("Data logging not possible!")
-        return
-
+    file_handler = file_handlers[0]
     base_name = os.path.splitext(file_handler.baseFilename)[0]
     if len(filespec) > 0:
         filespec = "." + filespec

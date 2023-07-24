@@ -150,7 +150,7 @@ def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no c
                     get_flattened_data(res_dicts[cidx][res_sel]["data"])
                     for cidx in range(len(circuit_ids))
                 ]
-            )
+            ).astype(float)
             all_data = all_data[np.isfinite(all_data)]
             plot_range = [
                 -np.percentile(-all_data[all_data < 0], range_prctile)

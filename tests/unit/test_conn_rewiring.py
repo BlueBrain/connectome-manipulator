@@ -11,6 +11,7 @@ from utils import TEST_DATA_DIR
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 from connectome_manipulator.model_building import model_types
 from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
+from connectome_manipulator import log
 
 
 @pytest.fixture
@@ -20,6 +21,8 @@ def manipulation():
 
 
 def test_apply(manipulation):
+    log.setup_logging()  # To have data logging in a defined state
+
     c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]

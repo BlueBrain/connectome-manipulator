@@ -84,7 +84,7 @@ def load_circuit(sonata_config, popul_name=None):
         and len(c.edges.population_names) > 0
     ):
         # Select edge population
-        edges = get_edges_population(c, popul_name)
+        edges, popul_name = get_edges_population(c, popul_name, return_popul_name=True)
         edges_file = c.config["networks"]["edges"][0]["edges_file"]
 
         # Select corresponding source/target nodes populations
@@ -134,6 +134,10 @@ def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
 
             if filename := cfg.pop("model_pathways", None):
                 pathways = pd.read_parquet(filename)
+                if "sel_src" in cfg or "sel_dest" in cfg:
+                    raise KeyError(
+                        "Cannot specify pathway configuration and sel_src/sel_dest at the same time."
+                    )
             else:
                 pathways = None
 
@@ -143,14 +147,20 @@ def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
                 for n, (node_ids, sel_src, sel_dest, pathway_specs) in enumerate(
                     batch.process_pathways(pathways)
                 ):
-                    log.info(f">>Step {n + 1}: source={source}")
+                    kwargs = cfg | models
+                    if sel_src:
+                        kwargs["sel_src"] = sel_src
+                    if sel_dest:
+                        kwargs["sel_dest"] = sel_dest
+
+                    log.info(
+                        f">>Step {n + 1}: source={source} sel_src={kwargs.get('sel_src')} sel_dest={kwargs.get('sel_dest')}"
+                    )
+
                     m.apply(
                         libsonata.Selection(node_ids).flatten(),
-                        sel_src=sel_src,
-                        sel_dest=sel_dest,
                         pathway_specs=pathway_specs,
-                        **cfg,
-                        **models,
+                        **kwargs,
                     )
         return len(writer)
 
@@ -177,20 +187,28 @@ def create_new_file_from_template(new_file, template_file, replacements_dict, sk
         file.write(content)
 
 
-def create_sonata_config(existing_config, out_config_path, out_edges_path, population_name):
+def create_sonata_config(
+    existing_config, out_config_path, out_edges_path, population_name, src_popul_name=None
+):
     """Create new SONATA config (.JSON) from original, incl. modifications."""
     log.info(f"Creating SONATA config {out_config_path}")
 
     config = copy.deepcopy(existing_config)
 
-    # Ensure there are no multiple edge populations from the original config
-    edge_list = config["networks"].get("edges", [])
-    if edge_list:
-        log.log_assert(len(edge_list) == 1, "Multiple edge populations are not supported.")
-
+    existing_edge_list = config["networks"].get("edges")
+    if existing_edge_list is None:
+        existing_edge_list = []
+    if src_popul_name is not None:
+        existing_edge_list = [
+            _e for _e in existing_edge_list if src_popul_name not in _e["populations"]
+        ]  # Remove source edges population, if existing
+    new_edges = {
+        "edges_file": str(out_edges_path),
+        "populations": {population_name: {"type": "chemical"}},
+    }
     config["networks"]["edges"] = [
-        {"edges_file": str(out_edges_path), "populations": {population_name: {"type": "chemical"}}}
-    ]
+        new_edges
+    ] + existing_edge_list  # Add new (manipulated) population
 
     config = utils.reduce_config_paths(config, config_dir=Path(out_config_path).parent)
 
@@ -286,7 +304,7 @@ def main(options, log_file, executor_args=()):
     # Initialize the profiler
     profiler.ProfilerManager.set_csv_file(csv_file=log_file + ".csv")
 
-    sonata_config, nodes, _, edges, _, _ = load_circuit(sonata_config_file)
+    sonata_config, nodes, _, edges, _, src_popul_name = load_circuit(sonata_config_file)
 
     # Define target node splits
     node_ids_split = get_node_splits(config, options, nodes)
@@ -337,6 +355,7 @@ def main(options, log_file, executor_args=()):
             out_config_path=out_config_path,
             out_edges_path=edges_file,
             population_name=edge_population_name,
+            src_popul_name=src_popul_name,
         )
     else:
         if not options.keep_parquet:

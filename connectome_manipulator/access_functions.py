@@ -224,7 +224,7 @@ def get_nodes_population(circuit, popul_name=None):
     return nodes
 
 
-def get_edges_population(circuit, popul_name=None):
+def get_edges_population(circuit, popul_name=None, return_popul_name=False):
     """Select default edge population. Optionally, the population name can be specified."""
     #     log.log_assert(len(circuit.edges.population_names) == 1, 'Only a single edge population per file supported!')
     #     edges = circuit.edges[circuit.edges.population_names[0]]
@@ -232,8 +232,10 @@ def get_edges_population(circuit, popul_name=None):
     if popul_name is None:
         if len(circuit.edges.population_names) == 1:
             popul_name = circuit.edges.population_names[0]  # Select the only existing population
-        else:
-            popul_name = "default"  # Use default name
+        else:  # Try to use one of default names
+            popul_name = "default__default__chemical"
+            if popul_name not in circuit.edges.population_names:
+                popul_name = "default"
             log.warning(
                 f'Multiple edges populations found - Trying to load "{popul_name}" population!'
             )
@@ -243,4 +245,7 @@ def get_edges_population(circuit, popul_name=None):
     )
     edges = circuit.edges[popul_name]
 
-    return edges
+    if return_popul_name:
+        return edges, popul_name
+    else:
+        return edges
