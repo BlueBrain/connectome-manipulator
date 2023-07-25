@@ -313,7 +313,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                     tgt_type=tgt_mtypes[tidx],
                 )
                 if np.isscalar(delay):
-                    kwargs["delay"] = np.full_like(syn_type, delay)
+                    kwargs["delay"] = np.full(syn_type.shape, delay)
                 else:
                     kwargs["delay"] = delay
 
