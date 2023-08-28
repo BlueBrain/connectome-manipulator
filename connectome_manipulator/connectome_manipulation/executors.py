@@ -1,4 +1,6 @@
 """A module implementing several executor wrappers"""
+import time
+
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -93,17 +95,22 @@ def dask_ctx(result_hook, executor_params: dict):
             except ValueError:
                 executor_params[k] = float(val)
 
-    client = Client(**executor_params)
-    client.register_worker_plugin(AddProcessPool())
-    executor_wrapper = DaskExecutor(client, result_hook)
+    with Client(**executor_params) as client:
+        client.register_worker_plugin(AddProcessPool())
+        executor_wrapper = DaskExecutor(client, result_hook)
 
-    yield executor_wrapper
+        yield executor_wrapper
 
-    log.info("Jobs submitted to DASK")
+        log.info("Jobs submitted to DASK")
 
-    executor_wrapper.process_jobs()
+        executor_wrapper.process_jobs()
 
-    log.info("DASK jobs finished")
+        log.info("DASK jobs finished")
+
+        log.info("Shutting down DASK gracefully")
+        client.retire_workers()
+        time.sleep(1)
+        client.shutdown()
 
 
 def in_context(options, params, result_hook=None):

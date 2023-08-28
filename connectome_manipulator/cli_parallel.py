@@ -12,49 +12,60 @@ from .cli import app, manipulate_connectome
 
 logging.getLogger("distributed").setLevel(logging.WARNING)
 
-# Dask likes to eat file descriptors for breakfast, lunch, diner, so give it the most we
-# can get
-_, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
 
-_TMP = os.environ.get("SHMDIR", os.environ.get("TMPDIR", os.getcwd()))
+def setup():
+    """Dask parallel initialization
 
-dask.config.set(
-    {
-        "distributed.worker.memory.target": False,
-        "distributed.worker.memory.spill": False,
-        "distributed.worker.memory.pause": 0.8,
-        "distributed.worker.memory.terminate": 0.95,
-        "distributed.worker.use-file-locking": False,
-        "distributed.worker.profile.interval": "1s",
-        "distributed.worker.profile.cycle": "10s",
-        "distributed.admin.tick.limit": "1m",
-        "temporary-directory": _TMP,
-    }
-)
+    This allows us to bail out early if we are not the root MPI rank that will start the scheduler.
+    """
+    # Dask likes to eat file descriptors for breakfast, lunch, diner, so give it the most we
+    # can get
+    _, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
 
-# Using 1 thread avoids issues with non-thread-save RNG etc, we are modifying the Dask
-# process pool in executors.py to use a process pool, not a thread pool.
-threads = int(os.environ.get("SLURM_CPUS_PER_TASK", 1))
+    _TMP = os.environ.get("SHMDIR", os.environ.get("TMPDIR", os.getcwd()))
 
-dash_url = f"{socket.getfqdn()}:8787"
+    dask.config.set(
+        {
+            "distributed.worker.memory.target": False,
+            "distributed.worker.memory.spill": False,
+            "distributed.worker.memory.pause": 0.8,
+            "distributed.worker.memory.terminate": 0.95,
+            "distributed.worker.use-file-locking": False,
+            "distributed.worker.profile.interval": "1s",
+            "distributed.worker.profile.cycle": "10s",
+            "distributed.admin.tick.limit": "1m",
+            "temporary-directory": _TMP,
+        }
+    )
 
-initialize(
-    dashboard_address=dash_url,
-    worker_class="distributed.Worker",
-    worker_options={
-        "local_directory": _TMP,
-        "nthreads": threads,
-    },
-)
+    # Using 1 thread avoids issues with non-thread-save RNG etc, we are modifying the Dask
+    # process pool in executors.py to use a process pool, not a thread pool.
+    threads = int(os.environ.get("SLURM_CPUS_PER_TASK", 1))
 
-print("Dashboard URL:", dash_url)
+    dash_url = f"{socket.getfqdn()}:8787"
 
-# This is a bit hackish, but seems to be a good way to change the default for the
-# application: we always want to be parallel when starting our own distributed Dask
-for param in manipulate_connectome.params:
-    if param.name == "parallel":
-        param.default = True
+    is_client = initialize(
+        dashboard_address=dash_url,
+        worker_class="distributed.Worker",
+        worker_options={
+            "local_directory": _TMP,
+            "nthreads": threads,
+        },
+    )
+    if not is_client:
+        return
 
-if __name__ == "__main__":
-    app()  # pylint: disable=no-value-for-parameter
+    print("Dashboard URL:", dash_url)
+
+    # This is a bit hackish, but seems to be a good way to change the default for the
+    # application: we always want to be parallel when starting our own distributed Dask
+    for param in manipulate_connectome.params:
+        if param.name == "parallel":
+            param.default = True
+
+    if __name__ == "__main__":
+        app()  # pylint: disable=no-value-for-parameter
+
+
+setup()
