@@ -214,7 +214,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
     dist_val_data = dist_mat_data[triu_idx]
     dist_val_model = dist_mat_model[triu_idx]
 
-    dist_max = max(dist_val_data, dist_val_model)
+    dist_max = max(*dist_val_data, *dist_val_model)
     plt.figure(figsize=(5, 5), dpi=300)
     plt.plot(dist_val_data, dist_val_model, "b.", alpha=0.1, markersize=1.0, markeredgecolor="none")
     plt.plot([0, dist_max], [0, dist_max], "k--")

@@ -41,6 +41,7 @@ setup(
         "voxcell",
         "pyarrow",
         "scikit-learn",
+        "tables",  # Optional dependency of pandas.DataFrame.to_hdf()
         "distributed",  # Dask
         "dask-mpi",
     ],

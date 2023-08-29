@@ -87,9 +87,8 @@ def reduce_config_paths(config: dict, config_dir: os.PathLike) -> dict:
         reduced_config["node_sets_file"] = _reduce_path(config["node_sets_file"], config_dir)
 
     if "components" in config:
-        reduced_config["components"] = {
-            key: _reduce_path(value, config_dir) for key, value in config["components"].items()
-        }
+        # Reduce components dict recursively (may have nested dicts!)
+        reduced_config["components"] = _reduce_dict(config["components"], config_dir)
 
     reducer = {
         "nodes_file": _reduce_path,
@@ -141,6 +140,16 @@ def _reduce_populations(populations_dict: dict, base_dir: os.PathLike) -> dict:
         pop_name: {key: reduce_entry(key, value) for key, value in pop_dict.items()}
         for pop_name, pop_dict in populations_dict.items()
     }
+
+
+def _reduce_dict(entry: dict, base_dir: os.PathLike) -> dict:
+    reduced_dict = {}
+    for key, value in entry.items():
+        if isinstance(value, dict):
+            reduced_dict[key] = _reduce_dict(value, base_dir)
+        else:
+            reduced_dict[key] = _reduce_path(value, base_dir)
+    return reduced_dict
 
 
 class ConsoleColors:

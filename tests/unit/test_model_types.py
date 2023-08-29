@@ -171,7 +171,7 @@ def test_ConnPropsModel():
                             "type": "normal",
                             "mean": cond_mean,
                             "std": cond_std,
-                            "std-within": 0.0,
+                            "shared_within": True,
                             "dtype": "float",
                         }
                     }
@@ -179,7 +179,9 @@ def test_ConnPropsModel():
             },
         }
         model = test_module.AbstractModel.model_from_dict(model_dict)
-        props = model.apply(src_type="L4_MC", tgt_type="L4_MC")
+        props = model.apply(
+            src_type="L4_MC", tgt_type="L4_MC"
+        )  # Single connection with N_syn synapses
         assert props.shape[0] == N_syn  # Number of synapses per connection
         assert len(np.unique(props["conductance"])) == 1  # No variation within connection
 
@@ -200,8 +202,8 @@ def test_ConnPropsModel():
                         "L4_MC": {
                             "type": "normal",
                             "mean": cond_mean,
-                            "std": 0.0,
-                            "std-within": cond_std,
+                            "std": cond_std,
+                            "shared_within": False,
                             "dtype": "float",
                         }
                     }
@@ -209,7 +211,9 @@ def test_ConnPropsModel():
             },
         }
         model = test_module.AbstractModel.model_from_dict(model_dict)
-        props = model.apply(src_type="L4_MC", tgt_type="L4_MC")
+        props = model.apply(
+            src_type="L4_MC", tgt_type="L4_MC"
+        )  # Single connection with N_syn synapses
         assert props.shape[0] == N_syn  # Number of synapses per connection
         assert np.isclose(cond_mean, np.mean(props["conductance"]), rtol=1e-2)
         assert np.isclose(cond_std, np.std(props["conductance"]), rtol=2e-2)
@@ -230,8 +234,8 @@ def test_ConnPropsModel():
                         "L4_MC": {
                             "type": "normal",
                             "mean": cond_mean,
-                            "std": 0.0,
-                            "std-within": cond_std,
+                            "std": cond_std,
+                            "shared_within": False,
                             "lower_bound": cond_range[0],
                             "upper_bound": cond_range[1],
                             "dtype": "float",
@@ -241,7 +245,9 @@ def test_ConnPropsModel():
             },
         }
         model = test_module.AbstractModel.model_from_dict(model_dict)
-        props = model.apply(src_type="L4_MC", tgt_type="L4_MC")
+        props = model.apply(
+            src_type="L4_MC", tgt_type="L4_MC"
+        )  # Single connection with N_syn synapses
         assert np.all(props["conductance"] <= cond_range[1])
         assert np.all(props["conductance"] >= cond_range[0])
 

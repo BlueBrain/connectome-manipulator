@@ -293,6 +293,7 @@ def main(options, log_file, executor_args=()):
     """Build local connectome."""
     config = utils.load_json(options.config_path)
     sonata_config_file = config["circuit_config"]
+    edges_popul_name = config.get("edges_popul_name")
 
     if "circuit_path" in config:
         circuit_path = Path(config["circuit_path"])
@@ -304,7 +305,9 @@ def main(options, log_file, executor_args=()):
     # Initialize the profiler
     profiler.ProfilerManager.set_csv_file(csv_file=log_file + ".csv")
 
-    sonata_config, nodes, _, edges, _, src_popul_name = load_circuit(sonata_config_file)
+    sonata_config, nodes, _, edges, _, src_popul_name = load_circuit(
+        sonata_config_file, edges_popul_name
+    )
 
     # Define target node splits
     node_ids_split = get_node_splits(config, options, nodes)

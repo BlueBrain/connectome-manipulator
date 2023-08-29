@@ -8,6 +8,7 @@ import json
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interpn
+from scipy.optimize import fsolve
 from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 
@@ -537,11 +538,9 @@ class ConnPropsModel(AbstractModel):
 
     - Connection/synapse property values drawn from given distributions
 
-    NOTE: 'std-within' larger than zero can be used to specify variability within
-          connections (all properties except <N_SYN_PER_CONN_NAME>). However, the
-          actual value of 'std-within' will only be used for distribution types that
-          have a 'std' attribute, so that 'std' can be set to 'std-within'!
-          For 'std-within' equal to zero, all values within a connection will be the same.
+    NOTE: 'shared_within' flag is used to indicate that same property values are used
+          for all synapses within the same connection. Otherwise, property values are
+          drawn for all synapses independently from same distribution.
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
@@ -554,11 +553,19 @@ class ConnPropsModel(AbstractModel):
     distribution_attributes = {
         "constant": ["mean"],
         "normal": ["mean", "std"],
-        "truncnorm": ["mean", "std", "min", "max"],
+        "truncnorm": ["norm_loc", "norm_scale", "min", "max"],
         "gamma": ["mean", "std"],
         "poisson": ["mean"],
+        "ztpoisson": ["mean"],
         "discrete": ["val", "p"],
+        "zero": [],
     }
+    # Notes:
+    # constant: "mean" corresponds to the constant value
+    # truncnorm: "norm_loc"/"norm_scale" are center location (mean) and scale (standard deviation) of the underlying (non-truncated) normal distribution
+    # ztpoisson: Zero-truncated poisson distribution
+    # discrete: "val"/"p" are discrete values and probabilities of the discrete distribution
+    # zero: Empty distribution always returning zero, to model unused parameters
 
     def __init__(self, **kwargs):
         """Model initialization."""
@@ -594,114 +601,110 @@ class ConnPropsModel(AbstractModel):
         )
         log.log_assert(
             all(
-                [isinstance(self.prop_stats[p][src], dict) for p in self.prop_names]
+                all(isinstance(self.prop_stats[p][src], dict) for p in self.prop_names)
                 for src in self.src_types
             ),
             "Property statistics dictionary required!",
         )
         log.log_assert(
             all(
-                [
-                    np.all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys())))
+                all(
+                    all(np.isin(self.tgt_types, list(self.prop_stats[p][src].keys())))
                     for p in self.prop_names
-                ]
+                )
                 for src in self.src_types
             ),
             "Target type statistics missing!",
         )
         log.log_assert(
             all(
-                [
-                    ["type" in self.prop_stats[p][src][tgt].keys() for p in self.prop_names]
+                all(
+                    all("type" in self.prop_stats[p][src][tgt].keys() for p in self.prop_names)
                     for src in self.src_types
-                ]
+                )
                 for tgt in self.tgt_types
             ),
             "Distribution type missing!",
         )
         log.log_assert(
             all(
-                [
-                    [
-                        np.all(
+                all(
+                    all(
+                        all(
                             np.isin(
                                 self.distribution_attributes[self.prop_stats[p][src][tgt]["type"]],
                                 list(self.prop_stats[p][src][tgt].keys()),
                             )
                         )
                         for p in self.prop_names
-                    ]
+                    )
                     for src in self.src_types
-                ]
+                )
                 for tgt in self.tgt_types
             ),
             f"Distribution attributes missing (required: {self.distribution_attributes})!",
         )
         log.log_assert(
             all(
-                [
-                    [
-                        np.all(
-                            [
-                                len(self.prop_stats[p][src][tgt][a]) > 0
-                                for a in self.distribution_attributes[
-                                    self.prop_stats[p][src][tgt]["type"]
-                                ]
-                                if hasattr(self.prop_stats[p][src][tgt][a], "__iter__")
+                all(
+                    all(
+                        all(
+                            len(self.prop_stats[p][src][tgt][a]) > 0
+                            for a in self.distribution_attributes[
+                                self.prop_stats[p][src][tgt]["type"]
                             ]
+                            if hasattr(self.prop_stats[p][src][tgt][a], "__iter__")
                         )
                         for p in self.prop_names
-                    ]
+                    )
                     for src in self.src_types
-                ]
+                )
                 for tgt in self.tgt_types
             ),
             f"Distribution attribute(s) empty (required: {self.distribution_attributes})!",
         )
         log.log_assert(
             all(
-                [
-                    [
+                all(
+                    all(
                         np.isclose(np.sum(self.prop_stats[p][src][tgt]["p"]), 1.0)
                         for p in self.prop_names
                         if "p" in self.prop_stats[p][src][tgt].keys()
-                    ]
+                    )
                     for src in self.src_types
-                ]
+                )
                 for tgt in self.tgt_types
             ),
             'Probability attribute "p" does not sum to 1.0!',
         )
         log.log_assert(
             all(
-                [
-                    [
+                all(
+                    all(
                         len(self.prop_stats[p][src][tgt]["p"])
                         == len(self.prop_stats[p][src][tgt]["val"])
                         for p in self.prop_names
                         if np.all(np.isin(["p", "val"], list(self.prop_stats[p][src][tgt].keys())))
-                    ]
+                    )
                     for src in self.src_types
-                ]
+                )
                 for tgt in self.tgt_types
             ),
             'Probability attribute "p" does not match length of corresponding "val"!',
         )
         log.log_assert(
-            np.all(
-                [
-                    [
-                        [
-                            self.prop_stats[p][src][tgt]["lower_bound"]
-                            <= self.prop_stats[p][src][tgt]["upper_bound"]
-                            for p in self.prop_names
-                            if "lower_bound" in self.prop_stats[p][src][tgt].keys()
-                            and "upper_bound" in self.prop_stats[p][src][tgt].keys()
-                        ]
-                        for src in self.src_types
-                    ]
-                    for tgt in self.tgt_types
-                ]
+            all(
+                all(
+                    all(
+                        self.prop_stats[p][src][tgt]["lower_bound"]
+                        <= self.prop_stats[p][src][tgt]["upper_bound"]
+                        for p in self.prop_names
+                        if "lower_bound" in self.prop_stats[p][src][tgt].keys()
+                        and "upper_bound" in self.prop_stats[p][src][tgt].keys()
+                    )
+                    for src in self.src_types
+                )
+                for tgt in self.tgt_types
             ),
             "Data bounds error!",
         )
@@ -723,45 +726,68 @@ class ConnPropsModel(AbstractModel):
         return self.prop_stats[prop_name][src_type][tgt_type]
 
     @staticmethod
-    def draw_from_distribution(
-        distr_type,
-        distr_mean=None,
-        distr_std=None,
-        distr_min=None,
-        distr_max=None,
-        distr_val=None,
-        distr_p=None,
-        size=1,
-    ):
+    def zero_truncated_poisson(lam, size=1):
+        """Draw value(s) from zero-truncated poisson distribution."""
+        u = np.random.uniform(np.exp(-lam), 1, size=size)
+        t = -np.log(u)
+        return 1 + np.random.poisson(lam - t)
+
+    @staticmethod
+    def compute_ztpoisson_lambda(mean):
+        """Compute lambda of zero-truncated poission distribution corresponding to given mean (numerically)."""
+
+        def fct(lam, mn):
+            return lam / (1 - np.exp(-lam)) - mn
+
+        lam = fsolve(fct, mean, mean)[0]
+        lam = np.maximum(lam, 0.0)
+        return lam
+
+    @staticmethod
+    def draw_from_distribution(distr_spec, size=1):
         """Draw value(s) from given distribution"""
+        distr_type = distr_spec.get("type")
         if distr_type == "constant":
-            drawn_values = np.full(size, distr_mean)
+            distr_val = distr_spec.get("mean")
+            log.log_assert(
+                distr_val is not None,
+                "Distribution parameter missing (required: mean)!",
+            )
+            drawn_values = np.full(size, distr_val)
         elif distr_type == "normal":
+            distr_mean = distr_spec.get("mean")
+            distr_std = distr_spec.get("std")
             log.log_assert(
                 distr_mean is not None and distr_std is not None,
                 "Distribution parameter missing (required: mean/std)!",
             )
             drawn_values = np.random.normal(loc=distr_mean, scale=distr_std, size=size)
         elif distr_type == "truncnorm":
+            distr_loc = distr_spec.get("norm_loc")
+            distr_scale = distr_spec.get("norm_scale")
+            distr_min = distr_spec.get("min")
+            distr_max = distr_spec.get("max")
             log.log_assert(
-                distr_mean is not None
-                and distr_std is not None
+                distr_loc is not None
+                and distr_scale is not None
                 and distr_min is not None
                 and distr_max is not None,
-                "Distribution parameters missing (required: mean/std/min/max)!",
+                "Distribution parameters missing (required: norm_loc/norm_scale/min/max)!",
             )
             log.log_assert(distr_min <= distr_max, "Range error (truncnorm)!")
-            if distr_std > 0.0:
+            if distr_scale > 0.0:
                 drawn_values = truncnorm(
-                    a=(distr_min - distr_mean) / distr_std,
-                    b=(distr_max - distr_mean) / distr_std,
-                    loc=distr_mean,
-                    scale=distr_std,
+                    a=(distr_min - distr_loc) / distr_scale,
+                    b=(distr_max - distr_loc) / distr_scale,
+                    loc=distr_loc,
+                    scale=distr_scale,
                 ).rvs(size=size)
             else:
-                drawn_values = np.clip(np.full(size, distr_mean), distr_min, distr_max)
+                drawn_values = np.clip(np.full(size, distr_loc), distr_min, distr_max)
 
         elif distr_type == "gamma":
+            distr_mean = distr_spec.get("mean")
+            distr_std = distr_spec.get("std")
             log.log_assert(
                 distr_mean is not None and distr_std is not None,
                 "Distribution parameter missing (required: mean/std)!",
@@ -776,13 +802,37 @@ class ConnPropsModel(AbstractModel):
             else:
                 drawn_values = np.full(size, distr_mean)
         elif distr_type == "poisson":
+            distr_mean = distr_spec.get("mean")
             log.log_assert(
                 distr_mean is not None, "Distribution parameter missing (required: mean)!"
             )
             log.log_assert(distr_mean >= 0.0, "Range error (poisson)!")
             drawn_values = np.random.poisson(lam=distr_mean, size=size)
+        elif distr_type == "ztpoisson":
+            distr_mean = distr_spec.get("mean")
+            log.log_assert(
+                distr_mean is not None, "Distribution parameter missing (required: mean)!"
+            )
+            log.log_assert(distr_mean >= 1.0, "Range error (zero-truncated poisson)!")
+
+            # Determine lambda corresponding to given mean...
+            lam = ConnPropsModel.compute_ztpoisson_lambda(distr_mean)
+            # ...and draw values from zero-truncated poisson distribition
+            drawn_values = ConnPropsModel.zero_truncated_poisson(lam=lam, size=size)
         elif distr_type == "discrete":
+            distr_val = distr_spec.get("val")
+            distr_p = distr_spec.get("p")
+            log.log_assert(
+                distr_val is not None
+                and distr_p is not None
+                and not np.isscalar(distr_val)
+                and not np.isscalar(distr_p)
+                and len(distr_val) == len(distr_p),
+                "Distribution parameters error or missing (required: list-like val/p of same length)!",
+            )
             drawn_values = np.random.choice(distr_val, size=size, p=distr_p)
+        elif distr_type == "zero":
+            drawn_values = np.full(size, 0.0)
         else:
             log.log_assert(False, f'Distribution type "{distr_type}" not supported!')
         return drawn_values
@@ -792,52 +842,34 @@ class ConnPropsModel(AbstractModel):
 
         (or multiple connections, if prop_name==N_SYN_PER_CONN_NAME)
         """
-        stats_dict = self.prop_stats.get(prop_name)
-
-        distr_type = stats_dict[src_type][tgt_type].get("type")
-        mean_val = stats_dict[src_type][tgt_type].get("mean", np.nan)
-        std_val = stats_dict[src_type][tgt_type].get("std", 0.0)
-        std_within = stats_dict[src_type][tgt_type].get("std-within", 0.0)
-        min_val = stats_dict[src_type][tgt_type].get("min", -np.inf)
-        max_val = stats_dict[src_type][tgt_type].get("max", np.inf)
-        distr_val = stats_dict[src_type][tgt_type].get("val", [])
-        distr_p = stats_dict[src_type][tgt_type].get("p", [])
-
+        stats_dict = self.prop_stats.get(prop_name)[src_type][tgt_type]
         if prop_name == N_SYN_PER_CONN_NAME:  # Draw <size> N_SYN_PER_CONN_NAME value(s)
             drawn_values = np.maximum(
-                np.round(
-                    self.draw_from_distribution(
-                        distr_type, mean_val, std_val, min_val, max_val, distr_val, distr_p, size
-                    )
-                ).astype(int),
+                np.round(self.draw_from_distribution(stats_dict, size)).astype(int),
                 1,
             )  # At least one synapse/connection, otherwise no connection!!
         else:
-            conn_mean = self.draw_from_distribution(
-                distr_type, mean_val, std_val, min_val, max_val, distr_val, distr_p, 1
-            )  # Draw connection mean
-            if std_within > 0.0 and size > 0:
-                drawn_values = self.draw_from_distribution(
-                    distr_type, conn_mean, std_within, min_val, max_val, distr_val, distr_p, size
-                )  # Draw property values for synapses within connection
-            else:
-                drawn_values = np.full(size, conn_mean)  # No within-connection variability
+            shared_within = stats_dict.get("shared_within", True)
+            if shared_within:  # Same property value for all synapses within connection
+                val = self.draw_from_distribution(stats_dict, 1)  # Draw a single value...
+                drawn_values = np.full(size, val)  # ...and reuse in all synapses
+            else:  # Redraw property values independently for all synapses within connection
+                drawn_values = self.draw_from_distribution(stats_dict, size)
 
         # Apply upper/lower bounds (optional)
-        lower_bound = stats_dict[src_type][tgt_type].get("lower_bound")
-        upper_bound = stats_dict[src_type][tgt_type].get("upper_bound")
+        lower_bound = stats_dict.get("lower_bound")
+        upper_bound = stats_dict.get("upper_bound")
         if lower_bound is not None:
             drawn_values = np.maximum(drawn_values, lower_bound)
         if upper_bound is not None:
             drawn_values = np.minimum(drawn_values, upper_bound)
 
         # Set data type (optional)
-        data_type = stats_dict[src_type][tgt_type].get("dtype")
+        data_type = stats_dict.get("dtype")
         if data_type is not None:
             if data_type == "int":
-                drawn_values = np.round(drawn_values).astype(data_type)
-            else:
-                drawn_values = drawn_values.astype(data_type)
+                drawn_values = np.round(drawn_values)
+            drawn_values = drawn_values.astype(data_type)
 
         return drawn_values
 

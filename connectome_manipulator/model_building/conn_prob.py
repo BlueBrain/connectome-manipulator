@@ -25,14 +25,16 @@ JET = plt.cm.get_cmap("jet")
 HOT = plt.cm.get_cmap("hot")
 
 
-def extract(circuit, order, sel_src=None, sel_dest=None, sample_size=None, **kwargs):
+def extract(
+    circuit, order, sel_src=None, sel_dest=None, sample_size=None, edges_popul_name=None, **kwargs
+):
     """Extract connection probability between samples of neurons."""
     log.info(
         f"Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)..."
     )
 
     # Select edge population
-    edges = get_edges_population(circuit)
+    edges = get_edges_population(circuit, edges_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source

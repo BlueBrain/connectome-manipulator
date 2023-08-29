@@ -157,23 +157,23 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
             tgt_mtypes = get_enumeration(self.nodes[1], "mtype", tgt_node_ids)
 
-            if pos_acc:
-                # FIXME: this is going to be VERY SLOW!
-                # Get neuron positions (incl. position mapping, if provided)
-                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[0]
+            _src_pop = self.nodes[0]._population  # pylint: disable=protected-access
+            _src_sel = libsonata.Selection(src_node_ids)
+            raw_src_pos = np.column_stack(
+                (
+                    _src_pop.get_attribute("x", _src_sel),
+                    _src_pop.get_attribute("y", _src_sel),
+                    _src_pop.get_attribute("z", _src_sel),
+                )
+            )  # Raw src positions required for delay computations
 
-                # Get neuron positions (incl. position mapping, if provided)
+            if pos_acc:  # Position mapping provided
+                # FIXME: this is going to be VERY SLOW!
+                # Get neuron positions (incl. position mapping)
+                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[0]
                 tgt_pos = conn_prob.get_neuron_positions(pos_acc, [tgt_node_ids])[0]
             else:
-                _src_pop = self.nodes[0]._population  # pylint: disable=protected-access
-                _src_sel = libsonata.Selection(src_node_ids)
-                src_pos = np.column_stack(
-                    (
-                        _src_pop.get_attribute("x", _src_sel),
-                        _src_pop.get_attribute("y", _src_sel),
-                        _src_pop.get_attribute("z", _src_sel),
-                    )
-                )
+                src_pos = raw_src_pos
                 _tgt_pop = self.nodes[1]._population  # pylint: disable=protected-access
                 _tgt_sel = libsonata.Selection(tgt_node_ids)
                 tgt_pos = np.column_stack(
@@ -201,6 +201,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             p_model,
             nsynconn_model,
             delay_model,
+            raw_src_pos,
         )
 
     @profiler.profileit(name="conn_wiring/wiring")
@@ -217,6 +218,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         p_model,
         nsynconn_model,
         delay_model,
+        raw_src_positions,  # src positions w/o pos mapping (for delays!)
     ):
         """Stand-alone wrapper for connectome wiring."""
         # get morphologies for this selection
@@ -301,9 +303,10 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             )  # INH: 0-99 (Using 0); EXC: >=100 (Using 100)
 
             # Assign distance-dependent delays (mtype-specific), based on (generative) delay model (optional)
+            # IMPORTANT: Distances for delays are computed in them original coordinate system w/o coordinate transformation!
             kwargs = {}
             if delay_model is not None:
-                src_new_pos = src_positions[src_new_sel, :]
+                src_new_pos = raw_src_positions[src_new_sel, :]
                 syn_dist = np.sqrt(
                     np.sum((pos_sel - src_new_pos[syn_conn_idx, :]) ** 2, 1)
                 )  # Distance from source neurons (soma) to synapse positions on target neuron
@@ -382,6 +385,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 prob_model,
                 nsynconn_model,
                 delay_model,
+                src_positions,
             )
 
             # ALTERNATIVE: Write to .parquet file and merge/convert to SONATA later

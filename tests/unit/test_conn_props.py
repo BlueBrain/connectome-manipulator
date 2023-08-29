@@ -32,43 +32,60 @@ def test_extract():
     }
     prop_data = {
         k: np.full((len(src_mtypes), len(tgt_mtypes), 1), np.nan)
-        for k in ["mean", "std", "std-within", "min", "max"]
+        for k in ["mean", "std", "shared_within", "min", "max"]
     }
     for i1, mt1 in enumerate(src_mtypes):
         for i2, mt2 in enumerate(tgt_mtypes):
             tab_sel = edges_table.loc[np.logical_and(tab_mtypes_src == mt1, tab_mtypes_tgt == mt2)]
             if tab_sel.size == 0:
                 continue
-            conns, nsyn_conn = np.unique(
-                tab_sel[["@source_node", "@target_node"]], axis=0, return_counts=True
+            _, syn_conn_idx, nsyn_conn = np.unique(
+                tab_sel[["@source_node", "@target_node"]],
+                axis=0,
+                return_inverse=True,
+                return_counts=True,
             )
             nsyn_data["mean"][i1, i2] = np.mean(nsyn_conn)
             nsyn_data["std"][i1, i2] = np.std(nsyn_conn)
             nsyn_data["min"][i1, i2] = np.min(nsyn_conn)
             nsyn_data["max"][i1, i2] = np.max(nsyn_conn)
 
-            prop_conn_means = []
-            prop_conn_stds = []
-            for conn in conns:
-                sel_data = tab_sel[sel_prop].loc[
-                    np.logical_and(
-                        tab_sel["@source_node"] == conn[0], tab_sel["@target_node"] == conn[1]
-                    )
-                ]
-                prop_conn_means.append(np.mean(sel_data))
-                prop_conn_stds.append(np.std(sel_data))
-            prop_data["mean"][i1, i2] = np.mean(prop_conn_means)
-            prop_data["std"][i1, i2] = np.std(prop_conn_means)
-            prop_data["std-within"][i1, i2] = np.mean(prop_conn_stds)
-            prop_data["min"][i1, i2] = np.min(tab_sel[sel_prop])
-            prop_data["max"][i1, i2] = np.max(tab_sel[sel_prop])
+            # Check if property value shared within connection
+            if len(nsyn_conn) > 1 and len(np.unique(tab_sel[sel_prop])) == 1:
+                # In case of a constant distribution, assume no sharing
+                is_shared = False
+            else:
+                is_shared = True
+                for cidx in range(len(nsyn_conn)):
+                    if len(np.unique(tab_sel.loc[syn_conn_idx == cidx, sel_prop])) > 1:
+                        # Found different property values within same connection
+                        is_shared = False
+                        break
+
+            # Get property values
+            prop_values = []
+            for cidx in range(len(nsyn_conn)):
+                if is_shared:
+                    # Shared within connection, so take only first value
+                    prop_values.append(tab_sel.loc[syn_conn_idx == cidx, sel_prop].iloc[0])
+                else:
+                    # Different values within connection, so take all values
+                    prop_values.append(tab_sel.loc[syn_conn_idx == cidx, sel_prop].to_numpy())
+            prop_values = np.hstack(prop_values)
+
+            # Compute statistics
+            prop_data["mean"][i1, i2] = np.mean(prop_values)
+            prop_data["std"][i1, i2] = np.std(prop_values)
+            prop_data["shared_within"][i1, i2] = is_shared
+            prop_data["min"][i1, i2] = np.min(prop_values)
+            prop_data["max"][i1, i2] = np.max(prop_values)
 
     # Check extraction (w/o histograms)
     res = test_module.extract(
         c,
         min_sample_size_per_group=None,
         max_sample_size_per_group=None,
-        hist_bins=50,
+        hist_bins=51,
         sel_props=[sel_prop],
         sel_src=None,
         sel_dest=None,
@@ -111,12 +128,13 @@ def test_build():
     np.random.seed(0)
     nsyn_data = {
         k: np.random.randint(low=1, high=10, size=(len(src_mtypes), len(tgt_mtypes)))
-        for k in ["mean", "std", "min", "max"]
+        for k in ["mean", "std", "min", "max", "norm_loc", "norm_scale"]
     }
     prop_data = {
         k: np.random.rand(len(src_mtypes), len(tgt_mtypes), len(props))
-        for k in ["mean", "std", "std-within", "min", "max"]
+        for k in ["mean", "std", "shared_within", "min", "max", "norm_loc", "norm_scale"]
     }
+    prop_data["shared_within"] = np.round(prop_data["shared_within"])
 
     # Check model building (default settings)
     res = test_module.build(
@@ -137,7 +155,7 @@ def test_build():
                 assert model_distr["type"] == "normal"
                 assert model_distr["mean"] == prop_data["mean"][sidx, tidx, pidx]
                 assert model_distr["std"] == prop_data["std"][sidx, tidx, pidx]
-                assert model_distr["std-within"] == prop_data["std-within"][sidx, tidx, pidx]
+                assert model_distr["shared_within"] == prop_data["shared_within"][sidx, tidx, pidx]
             model_distr = res.get_distr_props(
                 prop_name="n_syn_per_conn", src_type=s_mt, tgt_type=t_mt
             )
@@ -151,7 +169,7 @@ def test_build():
     with pytest.raises(KeyError):
         res.get_distr_props(prop_name="n_syn_per_conn", src_type=s_mt, tgt_type="WRONG_TYPE")
 
-    # Check distribution types
+    # Check distribution types (truncnorm)
     res = test_module.build(
         nsyn_data,
         prop_data,
@@ -168,11 +186,11 @@ def test_build():
             for pidx, pp in enumerate(props):
                 model_distr = res.get_distr_props(prop_name=pp, src_type=s_mt, tgt_type=t_mt)
                 assert model_distr["type"] == "truncnorm"
-                assert model_distr["mean"] == prop_data["mean"][sidx, tidx, pidx]
-                assert model_distr["std"] == prop_data["std"][sidx, tidx, pidx]
+                assert model_distr["norm_loc"] == prop_data["norm_loc"][sidx, tidx, pidx]
+                assert model_distr["norm_scale"] == prop_data["norm_scale"][sidx, tidx, pidx]
                 assert model_distr["min"] == prop_data["min"][sidx, tidx, pidx]
                 assert model_distr["max"] == prop_data["max"][sidx, tidx, pidx]
-                assert model_distr["std-within"] == prop_data["std-within"][sidx, tidx, pidx]
+                assert model_distr["shared_within"] == prop_data["shared_within"][sidx, tidx, pidx]
 
     with pytest.raises(AssertionError, match='Distribution type "WRONG_TYPE" not supported!'):
         test_module.build(
@@ -272,8 +290,9 @@ def test_build():
         k: np.full((len(src_mtypes), len(tgt_mtypes), len(props)), p_val)
         for k in ["mean", "min", "max"]
     }
+    prop_data.update({k: np.zeros((len(src_mtypes), len(tgt_mtypes), len(props))) for k in ["std"]})
     prop_data.update(
-        {k: np.zeros((len(src_mtypes), len(tgt_mtypes), len(props))) for k in ["std", "std-within"]}
+        {k: np.ones((len(src_mtypes), len(tgt_mtypes), len(props))) for k in ["shared_within"]}
     )
     nsyn_data = {
         k: np.full((len(src_mtypes), len(tgt_mtypes)), n_syn) for k in ["mean", "min", "max"]
@@ -308,12 +327,13 @@ def test_build():
     np.random.seed(0)
     nsyn_data = {
         k: np.random.randint(low=1, high=10, size=(len(src_mtypes), len(tgt_mtypes))).astype(float)
-        for k in ["mean", "std", "min", "max"]
+        for k in ["mean", "std", "min", "max", "norm_loc", "norm_scale"]
     }
     prop_data = {
         k: np.random.rand(len(src_mtypes), len(tgt_mtypes), 1)
-        for k in ["mean", "std", "std-within", "min", "max"]
+        for k in ["mean", "std", "shared_within", "min", "max", "norm_loc", "norm_scale"]
     }
+    prop_data["shared_within"] = np.round(prop_data["shared_within"])
 
     nsyn_data.update(
         {
@@ -368,9 +388,9 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == prop_data["mean"][test_src_idx, test_tgt_idx, 0]
-    assert model_distr["std"] == prop_data["std"][test_src_idx, test_tgt_idx, 0]
-    assert model_distr["std-within"] == prop_data["std-within"][test_src_idx, test_tgt_idx, 0]
+    assert model_distr["norm_loc"] == prop_data["norm_loc"][test_src_idx, test_tgt_idx, 0]
+    assert model_distr["norm_scale"] == prop_data["norm_scale"][test_src_idx, test_tgt_idx, 0]
+    assert model_distr["shared_within"] == prop_data["shared_within"][test_src_idx, test_tgt_idx, 0]
     assert model_distr["min"] == prop_data["min"][test_src_idx, test_tgt_idx, 0]
     assert model_distr["max"] == prop_data["max"][test_src_idx, test_tgt_idx, 0]
 
@@ -388,7 +408,7 @@ def test_build():
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
     assert np.array_equal(model_distr["val"], prop_data["val"][test_src_idx, test_tgt_idx, 0])
     assert np.array_equal(model_distr["p"], prop_data["p"][test_src_idx, test_tgt_idx, 0])
-    assert model_distr["std-within"] == prop_data["std-within"][test_src_idx, test_tgt_idx, 0]
+    assert model_distr["shared_within"] == prop_data["shared_within"][test_src_idx, test_tgt_idx, 0]
 
     ## Level0 interpolation (source m-type & target layer/synapse class value)
     prop_data["mean"][
@@ -412,11 +432,13 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == np.nanmean(prop_data["mean"][test_src_idx, tgt_sel, 0])
-    assert model_distr["std"] == np.nanmean(prop_data["std"][test_src_idx, tgt_sel, 0])
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][test_src_idx, tgt_sel, 0]
+    assert model_distr["norm_loc"] == np.nanmean(prop_data["norm_loc"][test_src_idx, tgt_sel, 0])
+    assert model_distr["norm_scale"] == np.nanmean(
+        prop_data["norm_scale"][test_src_idx, tgt_sel, 0]
     )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][test_src_idx, tgt_sel, 0]).astype(bool)
+    )  # Majority vote
     assert model_distr["min"] == np.nanmin(prop_data["min"][test_src_idx, tgt_sel, 0])
     assert model_distr["max"] == np.nanmax(prop_data["max"][test_src_idx, tgt_sel, 0])
 
@@ -437,9 +459,9 @@ def test_build():
     )
     assert np.array_equal(model_distr["val"], val)
     assert np.array_equal(model_distr["p"], p)
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][test_src_idx, tgt_sel, 0]
-    )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][test_src_idx, tgt_sel, 0]).astype(bool)
+    )  # Majority vote
 
     ## Level1 interpolation (source m-type & target synapse class value)
     prop_data["mean"][
@@ -460,11 +482,13 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == np.nanmean(prop_data["mean"][test_src_idx, tgt_sel, 0])
-    assert model_distr["std"] == np.nanmean(prop_data["std"][test_src_idx, tgt_sel, 0])
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][test_src_idx, tgt_sel, 0]
+    assert model_distr["norm_loc"] == np.nanmean(prop_data["norm_loc"][test_src_idx, tgt_sel, 0])
+    assert model_distr["norm_scale"] == np.nanmean(
+        prop_data["norm_scale"][test_src_idx, tgt_sel, 0]
     )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][test_src_idx, tgt_sel, 0]).astype(bool)
+    )  # Majority vote
     assert model_distr["min"] == np.nanmin(prop_data["min"][test_src_idx, tgt_sel, 0])
     assert model_distr["max"] == np.nanmax(prop_data["max"][test_src_idx, tgt_sel, 0])
 
@@ -485,9 +509,9 @@ def test_build():
     )
     assert np.array_equal(model_distr["val"], val)
     assert np.array_equal(model_distr["p"], p)
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][test_src_idx, tgt_sel, 0]
-    )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][test_src_idx, tgt_sel, 0]).astype(bool)
+    )  # Majority vote
 
     ## Level2 interpolation (source & target per layer/synapse class value)
     prop_data["mean"][
@@ -515,11 +539,13 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == np.nanmean(prop_data["mean"][src_sel, :, 0][:, tgt_sel])
-    assert model_distr["std"] == np.nanmean(prop_data["std"][src_sel, :, 0][:, tgt_sel])
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][src_sel, :, 0][:, tgt_sel]
+    assert model_distr["norm_loc"] == np.nanmean(prop_data["norm_loc"][src_sel, :, 0][:, tgt_sel])
+    assert model_distr["norm_scale"] == np.nanmean(
+        prop_data["norm_scale"][src_sel, :, 0][:, tgt_sel]
     )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][src_sel, :, 0][:, tgt_sel]).astype(bool)
+    )  # Majority vote
     assert model_distr["min"] == np.nanmin(prop_data["min"][src_sel, :, 0][:, tgt_sel])
     assert model_distr["max"] == np.nanmax(prop_data["max"][src_sel, :, 0][:, tgt_sel])
 
@@ -540,9 +566,9 @@ def test_build():
     )
     assert np.array_equal(model_distr["val"], val)
     assert np.array_equal(model_distr["p"], p)
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][src_sel, :, 0][:, tgt_sel]
-    )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][src_sel, :, 0][:, tgt_sel]).astype(bool)
+    )  # Majority vote
 
     ## Level3 interpolation (source & target per synapse class value)
     for tidx in np.where(tgt_sel)[0]:
@@ -565,11 +591,13 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == np.nanmean(prop_data["mean"][src_sel, :, 0][:, tgt_sel])
-    assert model_distr["std"] == np.nanmean(prop_data["std"][src_sel, :, 0][:, tgt_sel])
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][src_sel, :, 0][:, tgt_sel]
+    assert model_distr["norm_loc"] == np.nanmean(prop_data["norm_loc"][src_sel, :, 0][:, tgt_sel])
+    assert model_distr["norm_scale"] == np.nanmean(
+        prop_data["norm_scale"][src_sel, :, 0][:, tgt_sel]
     )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][src_sel, :, 0][:, tgt_sel]).astype(bool)
+    )  # Majority vote
     assert model_distr["min"] == np.nanmin(prop_data["min"][src_sel, :, 0][:, tgt_sel])
     assert model_distr["max"] == np.nanmax(prop_data["max"][src_sel, :, 0][:, tgt_sel])
 
@@ -590,9 +618,9 @@ def test_build():
     )
     assert np.array_equal(model_distr["val"], val)
     assert np.array_equal(model_distr["p"], p)
-    assert model_distr["std-within"] == np.nanmean(
-        prop_data["std-within"][src_sel, :, 0][:, tgt_sel]
-    )
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"][src_sel, :, 0][:, tgt_sel]).astype(bool)
+    )  # Majority vote
 
     ## Level4 interpolation (overall value)
     for tidx in np.where(tgt_sel)[0]:
@@ -613,9 +641,11 @@ def test_build():
         data_bounds={},
     )
     model_distr = res.get_distr_props(prop_name=prop, src_type=test_src, tgt_type=test_tgt)
-    assert model_distr["mean"] == np.nanmean(prop_data["mean"])
-    assert model_distr["std"] == np.nanmean(prop_data["std"])
-    assert model_distr["std-within"] == np.nanmean(prop_data["std-within"])
+    assert np.isclose(model_distr["norm_loc"], np.nanmean(prop_data["norm_loc"]))
+    assert np.isclose(model_distr["norm_scale"], np.nanmean(prop_data["norm_scale"]))
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"]).astype(bool)
+    )  # Majority vote
     assert model_distr["min"] == np.nanmin(prop_data["min"])
     assert model_distr["max"] == np.nanmax(prop_data["max"])
 
@@ -634,4 +664,6 @@ def test_build():
     val, _, p = comb_discrete(np.squeeze(prop_data["val"]), np.squeeze(prop_data["cnt"]))
     assert np.array_equal(model_distr["val"], val)
     assert np.array_equal(model_distr["p"], p)
-    assert model_distr["std-within"] == np.nanmean(prop_data["std-within"])
+    assert model_distr["shared_within"] == np.round(
+        np.nanmean(prop_data["shared_within"]).astype(bool)
+    )  # Majority vote

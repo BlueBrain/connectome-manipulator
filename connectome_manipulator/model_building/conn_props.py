@@ -10,6 +10,8 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
+from scipy.optimize import curve_fit
+from scipy.stats import norm
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
@@ -26,10 +28,11 @@ def extract(
     circuit,
     min_sample_size_per_group=None,
     max_sample_size_per_group=None,
-    hist_bins=50,
+    hist_bins=51,  # [In case of constant distributions, better to use odd bin count so that center bin symmetrically centered around constant value; otherwise, rounding problems at bin edges possible]
     sel_props=None,
     sel_src=None,
     sel_dest=None,
+    edges_popul_name=None,
     **_,
 ):
     """Extract statistics for synaptic properties between samples of neurons for each pair of m-types.
@@ -38,7 +41,7 @@ def extract(
                 only #synapses/connection will be estimated)
     """
     # Select edge population
-    edges = get_edges_population(circuit)
+    edges = get_edges_population(circuit, edges_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
@@ -95,49 +98,38 @@ def extract(
     )
 
     # Statistics for #syn/conn
+    # (incl. fitted norm loc/scale for truncnorm distribution,
+    #  incl. unique values/counts/probabilities for discrete distribution)
     syns_per_conn_data = {
         "mean": np.full((len(m_types[0]), len(m_types[1])), np.nan),
         "std": np.full((len(m_types[0]), len(m_types[1])), np.nan),
         "min": np.full((len(m_types[0]), len(m_types[1])), np.nan),
         "max": np.full((len(m_types[0]), len(m_types[1])), np.nan),
         "hist": np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object),
-        "val": np.full(
-            (len(m_types[0]), len(m_types[1])), np.nan, dtype=object
-        ),  # Unique values (for discrete distribution)
-        "cnt": np.full(
-            (len(m_types[0]), len(m_types[1])), np.nan, dtype=object
-        ),  # Unique value counts (for discrete distribution)
+        "norm_loc": np.full((len(m_types[0]), len(m_types[1])), np.nan),
+        "norm_scale": np.full((len(m_types[0]), len(m_types[1])), np.nan),
+        "val": np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object),
+        "cnt": np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object),
         "p": np.full((len(m_types[0]), len(m_types[1])), np.nan, dtype=object),
-    }  # Unique value probabilities (for discrete distribution)
+    }
 
     # Statistics for synapse/connection properties
+    # (incl. fitted norm loc/scale for truncnorm distribution,
+    #  incl. unique values/counts/probabilities for discrete distribution;
+    #  incl. shared_within to indicate that all synapses within a connection share same value)
     conn_prop_data = {
-        "mean": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan
-        ),  # Property value means across connections
-        "std": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan
-        ),  # Property value stds across connections
-        "std-within": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan
-        ),  # Property value stds across synapses within connections
-        "min": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan
-        ),  # Property value overall min
-        "max": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan
-        ),  # Property value overall max
-        "hist": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object
-        ),  # Histogram of distribution
-        "val": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object
-        ),  # Unique values (for discrete distribution)
-        "cnt": np.full(
-            (len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object
-        ),  # Unique value counts (for discrete distribution)
+        "mean": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "std": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "min": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "max": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "hist": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object),
+        "norm_loc": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "norm_scale": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+        "val": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object),
+        "cnt": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object),
         "p": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan, dtype=object),
-    }  # Unique value probabilities (for discrete distribution)
+        "shared_within": np.full((len(m_types[0]), len(m_types[1]), len(syn_props)), np.nan),
+    }
 
     # Extract statistics
     conn_counts = {"min": np.inf, "max": -np.inf, "sel": 0}  # Count connections for reporting
@@ -182,9 +174,17 @@ def extract(
             syns_per_conn_data["std"][sidx, tidx] = np.std(num_syn_per_conn[conn_sel])
             syns_per_conn_data["min"][sidx, tidx] = np.min(num_syn_per_conn[conn_sel])
             syns_per_conn_data["max"][sidx, tidx] = np.max(num_syn_per_conn[conn_sel])
-            syns_per_conn_data["hist"][sidx, tidx] = np.histogram(
-                num_syn_per_conn[conn_sel], bins=hist_bins
+            hist_counts, bin_edges = np.histogram(num_syn_per_conn[conn_sel], bins=hist_bins)
+            syns_per_conn_data["hist"][sidx, tidx] = (hist_counts, bin_edges)
+            bin_centers = [np.mean(bin_edges[i : i + 2]) for i in range(len(hist_counts))]
+            loc, scale, _ = _norm_fitting(
+                bin_centers,
+                hist_counts,
+                def_mn=syns_per_conn_data["mean"][sidx, tidx],
+                def_sd=syns_per_conn_data["std"][sidx, tidx],
             )
+            syns_per_conn_data["norm_loc"][sidx, tidx] = loc
+            syns_per_conn_data["norm_scale"][sidx, tidx] = scale
             v, c = np.unique(num_syn_per_conn[conn_sel], return_counts=True)
             if len(v) == 1 or (
                 len(v) < len(num_syn_per_conn[conn_sel]) and len(v) <= MAX_UNIQUE_COUNT
@@ -198,36 +198,34 @@ def extract(
                 syns_per_conn_data["p"][sidx, tidx] = []
                 # log.warning(f'Discrete #synapses/connection values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(num_syn_per_conn[conn_sel])} unique values)!')
 
-            means_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-            stds_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-            mins_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-            maxs_within = np.full((len(conn_sel), len(syn_props)), np.nan)
-            for cidx, c in enumerate(conn_sel):
-                means_within[cidx, :] = np.mean(
-                    edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0, dtype=np.float64
-                )  # [float64 required, otherwise rounding problems!!!]
-                stds_within[cidx, :] = np.std(
-                    edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0, dtype=np.float64
-                )
-                mins_within[cidx, :] = np.min(
-                    edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0
-                ).astype(np.float64)
-                maxs_within[cidx, :] = np.max(
-                    edges_sel.loc[syn_conn_idx == c, syn_props].to_numpy(), 0
-                ).astype(np.float64)
+            # Collect property statistics over connections (if shared values) or synapses (if non-shared values)
+            for pidx, p in enumerate(syn_props):
+                is_shared = _check_shared_property(edges_sel, p, conn_sel, syn_conn_idx)
+                prop_values = _get_property_values(edges_sel, p, conn_sel, syn_conn_idx, is_shared)
 
-            conn_prop_data["mean"][sidx, tidx, :] = np.mean(means_within, 0)
-            conn_prop_data["std"][sidx, tidx, :] = np.std(means_within, 0)
-            conn_prop_data["std-within"][sidx, tidx, :] = np.mean(stds_within, 0)
-            conn_prop_data["min"][sidx, tidx, :] = np.min(mins_within, 0)
-            conn_prop_data["max"][sidx, tidx, :] = np.max(maxs_within, 0)
-            for pidx in range(len(syn_props)):
-                conn_prop_data["hist"][sidx, tidx, pidx] = np.histogram(
-                    means_within[:, pidx], bins=hist_bins
+                conn_prop_data["shared_within"][sidx, tidx, pidx] = is_shared
+                conn_prop_data["mean"][sidx, tidx, pidx] = np.mean(
+                    prop_values, dtype=np.float64
+                )  # [float64 required, otherwise rounding problems!!!]
+                conn_prop_data["std"][sidx, tidx, pidx] = np.std(
+                    prop_values, dtype=np.float64
+                )  # [float64 required, otherwise rounding problems!!!]
+                conn_prop_data["min"][sidx, tidx, pidx] = np.min(prop_values).astype(np.float64)
+                conn_prop_data["max"][sidx, tidx, pidx] = np.max(prop_values).astype(np.float64)
+                hist_counts, bin_edges = np.histogram(prop_values, bins=hist_bins)
+                conn_prop_data["hist"][sidx, tidx, pidx] = (hist_counts, bin_edges)
+                bin_centers = [np.mean(bin_edges[i : i + 2]) for i in range(len(hist_counts))]
+                loc, scale, _ = _norm_fitting(
+                    bin_centers,
+                    hist_counts,
+                    def_mn=conn_prop_data["mean"][sidx, tidx, pidx],
+                    def_sd=conn_prop_data["std"][sidx, tidx, pidx],
                 )
-                v, c = np.unique(means_within[:, pidx], return_counts=True)
+                conn_prop_data["norm_loc"][sidx, tidx, pidx] = loc
+                conn_prop_data["norm_scale"][sidx, tidx, pidx] = scale
+                v, c = np.unique(prop_values, return_counts=True)
                 if len(v) == 1 or (
-                    len(v) < len(means_within[:, pidx]) and len(v) <= MAX_UNIQUE_COUNT
+                    len(v) < len(prop_values) and len(v) <= MAX_UNIQUE_COUNT
                 ):  # Store discrete values only if not too many [otherwise, it is probably not a discrete distribution]
                     conn_prop_data["val"][sidx, tidx, pidx] = v
                     conn_prop_data["cnt"][sidx, tidx, pidx] = c
@@ -236,7 +234,7 @@ def extract(
                     conn_prop_data["val"][sidx, tidx, pidx] = []
                     conn_prop_data["cnt"][sidx, tidx, pidx] = []
                     conn_prop_data["p"][sidx, tidx, pidx] = []
-                    # log.warning(f'Discrete {syn_props[pidx]} values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(means_within[:, pidx])} unique values)!')
+                    # log.warning(f'Discrete {p} values not stored for {m_types[0][sidx]}-{m_types[1][tidx]} ({len(v)} of {len(prop_values)} unique values)!')
 
     log.debug(
         f'Between {conn_counts["min"]} and {conn_counts["max"]} connections per pathway found. {conn_counts["sel"]} of {len(m_types[0])}x{len(m_types[1])} pathways selected.'
@@ -263,6 +261,7 @@ def build(
     distr_types={},
     data_types={},
     data_bounds={},
+    shared_within={},
     **_,
 ):
     """Build model from data (lookup table with missing values interpolated at different levels of granularity)."""
@@ -339,6 +338,12 @@ def build(
         syns_per_conn_model["max"][sidx, tidx] = np.nanmax(
             syns_per_conn_data["max"][src_sel, :][:, tgt_sel]
         )
+        syns_per_conn_model["norm_loc"][sidx, tidx] = np.nanmean(
+            syns_per_conn_data["norm_loc"][src_sel, :][:, tgt_sel]
+        )
+        syns_per_conn_model["norm_scale"][sidx, tidx] = np.nanmean(
+            syns_per_conn_data["norm_scale"][src_sel, :][:, tgt_sel]
+        )
 
         uvals = syns_per_conn_data["val"][src_sel, :][:, tgt_sel].flatten()
         ucnts = syns_per_conn_data["cnt"][src_sel, :][:, tgt_sel].flatten()
@@ -355,10 +360,6 @@ def build(
             np.nanmean(conn_prop_data["std"][src_sel, :, p][:, tgt_sel])
             for p in range(len(syn_props))
         ]
-        conn_prop_model["std-within"][sidx, tidx, :] = [
-            np.nanmean(conn_prop_data["std-within"][src_sel, :, p][:, tgt_sel])
-            for p in range(len(syn_props))
-        ]
         conn_prop_model["min"][sidx, tidx, :] = [
             np.nanmin(conn_prop_data["min"][src_sel, :, p][:, tgt_sel])
             for p in range(len(syn_props))
@@ -367,6 +368,20 @@ def build(
             np.nanmax(conn_prop_data["max"][src_sel, :, p][:, tgt_sel])
             for p in range(len(syn_props))
         ]
+        conn_prop_model["norm_loc"][sidx, tidx, :] = [
+            np.nanmean(conn_prop_data["norm_loc"][src_sel, :, p][:, tgt_sel])
+            for p in range(len(syn_props))
+        ]
+        conn_prop_model["norm_scale"][sidx, tidx, :] = [
+            np.nanmean(conn_prop_data["norm_scale"][src_sel, :, p][:, tgt_sel])
+            for p in range(len(syn_props))
+        ]
+        conn_prop_model["shared_within"][sidx, tidx, :] = [
+            np.round(np.nanmean(conn_prop_data["shared_within"][src_sel, :, p][:, tgt_sel])).astype(
+                bool
+            )
+            for p in range(len(syn_props))
+        ]  # Majority vote in case of inconsistent sharing behavior
 
         for pidx in range(len(syn_props)):
             uvals = [conn_prop_model["val"][s][t][pidx] for s in src_sel for t in tgt_sel]
@@ -393,6 +408,7 @@ def build(
         )
         dtype = data_types.get(prop)
         bounds = data_bounds.get(prop)
+        shared = shared_within.get(prop)
         for sidx, src in enumerate(m_types[0]):
             prop_model_dict[prop][src] = {}
             for tidx, tgt in enumerate(m_types[1]):
@@ -407,7 +423,7 @@ def build(
                         {attr: syns_per_conn_model[attr][sidx, tidx] for attr in distr_attr}
                     )
                 else:
-                    distr_attr = distr_attr + ["std-within"]
+                    distr_attr = distr_attr + ["shared_within"]
                     log.log_assert(
                         np.all([attr in conn_prop_model for attr in distr_attr]),
                         f'ERROR: Not all required attribute(s) {distr_attr} for distribution "{distr_type}" found!',
@@ -422,6 +438,12 @@ def build(
                         attr_dict.update({"lower_bound": bounds[0]})
                     if bounds[1] is not None:
                         attr_dict.update({"upper_bound": bounds[1]})
+                if shared is not None and isinstance(shared, bool):
+                    # Overwrite data-derived value
+                    attr_dict.update({"shared_within": shared})
+                elif distr_type == "zero":
+                    # Overwrite data-derived value for unused properties
+                    attr_dict.update({"shared_within": False})
                 prop_model_dict[prop][src][tgt] = attr_dict
 
     # Create model
@@ -433,7 +455,236 @@ def build(
     return model
 
 
-def compute_AUC(distr_A, distr_B, bins_A, bins_B, dth=0.05, dx=0.01):
+def plot(
+    out_dir,
+    syns_per_conn_data,
+    conn_prop_data,
+    m_types,
+    syn_props,
+    model,
+    plot_sample_size=1000,
+    **_,
+):  # pragma: no cover
+    """Visualize data vs. model."""
+    model_params = model.get_param_dict()
+    prop_names = model.get_prop_names()
+
+    # Plot data vs. model: property maps
+    title_str = ["Data", "Model"]
+    for stat_sel in ["mean", "std", "shared_within"]:
+        for pidx, p in enumerate(prop_names):
+            if pidx < len(prop_names) - 1:
+                data_stat_sel = conn_prop_data[stat_sel][:, :, pidx]
+            else:  # Last element is n_syn_per_conn
+                if stat_sel not in syns_per_conn_data:
+                    continue  # Skip if statistics does not exist here
+                data_stat_sel = syns_per_conn_data[stat_sel]
+            plt.figure(figsize=(8, 3), dpi=300)
+            model_stat_sel = np.full((len(m_types[0]), len(m_types[1])), np.nan)
+            for sidx, s in enumerate(m_types[0]):
+                for tidx, t in enumerate(m_types[1]):
+                    model_stat_sel[sidx, tidx] = _get_model_stat(
+                        stat_sel, model_params["prop_stats"][p][s][t]
+                    )
+            for didx, data in enumerate([data_stat_sel, model_stat_sel]):
+                plt.subplot(1, 2, didx + 1)
+                plt.imshow(data, interpolation="nearest", cmap="jet")
+                plt.xticks(range(len(m_types[1])), m_types[1], rotation=90, fontsize=3)
+                plt.yticks(range(len(m_types[0])), m_types[0], rotation=0, fontsize=3)
+                plt.colorbar()
+                plt.title(title_str[didx])
+            plt.suptitle(f"{p} ({stat_sel})", fontweight="bold")
+            plt.tight_layout()
+
+            out_fn = os.path.abspath(
+                os.path.join(out_dir, f"data_vs_model_map_{stat_sel}__{p}.png")
+            )
+            log.info(f"Saving {out_fn}...")
+            plt.savefig(out_fn)
+
+    # Plot data vs. model: Distribution histogram examples (generative model) + AUC
+    conn_counts = [
+        [
+            np.sum(syns_per_conn_data["hist"][sidx, tidx][0])
+            if (
+                hasattr(syns_per_conn_data["hist"][sidx, tidx], "__iter__")
+                and len(syns_per_conn_data["hist"][sidx, tidx]) > 0
+            )
+            else 0
+            for sidx in range(len(m_types[0]))
+        ]
+        for tidx in range(len(m_types[1]))
+    ]
+    max_pathways = np.where(
+        np.array(conn_counts) == np.max(conn_counts)
+    )  # Select pathway(s) with maximum number of connections (i.e., most robust statistics)
+    sidx, tidx = [
+        max_pathways[i][0] for i in range(len(max_pathways))
+    ]  # Select first of these pathways for plotting
+    src, tgt = [m_types[0][sidx], m_types[1][tidx]]
+    for pidx, p in enumerate(prop_names):
+        plt.figure(figsize=(5, 3), dpi=300)
+        if pidx < len(syn_props):
+            data_hist = conn_prop_data["hist"][sidx, tidx, pidx]
+        else:
+            data_hist = syns_per_conn_data["hist"][sidx, tidx]
+        plt.bar(
+            data_hist[1][:-1],
+            data_hist[0] / np.sum(data_hist[0]),
+            align="edge",
+            width=np.min(np.diff(data_hist[1])),
+            label=f"Data (N={np.max(conn_counts)})",
+        )
+        model_data = np.hstack(
+            [
+                model.draw(prop_name=p, src_type=src, tgt_type=tgt, size=1)
+                for n in range(plot_sample_size)
+            ]
+        )  # Draw <plot_sample_size> single values from property distribution
+        hist_bins = data_hist[1]  # Use same model distribution binning as for data
+        bin_size = np.min(np.diff(hist_bins))
+        if min(model_data) < hist_bins[0]:  # Extend binning to lower values to cover whole range
+            hist_bins = np.hstack(
+                [
+                    np.flip(np.arange(hist_bins[0], min(model_data) - bin_size, -bin_size)),
+                    hist_bins[1:],
+                ]
+            )
+        if max(model_data) > hist_bins[-1]:  # Extend binning to higher values to cover whole range
+            hist_bins = np.hstack(
+                [hist_bins[:-1], np.arange(hist_bins[-1], max(model_data) + bin_size, bin_size)]
+            )
+        model_hist = np.histogram(model_data, bins=hist_bins)
+        plt.step(
+            model_hist[1],
+            np.hstack([model_hist[0][0], model_hist[0]]) / np.sum(model_hist[0]),
+            where="pre",
+            color="tab:orange",
+            label=f"Model (N={plot_sample_size})",
+        )
+        plt.grid()
+        plt.gca().set_axisbelow(True)
+        plt.title(f"{src} to {tgt}", fontweight="bold")
+        plt.xlabel(p)
+        plt.ylabel("Density")
+        plt.legend()
+        plt.tight_layout()
+
+        out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_hist__{p}.png"))
+        log.info(f"Saving {out_fn}...")
+        plt.savefig(out_fn)
+
+        # AUC/ROC plot
+        (
+            AUC,
+            ERR,
+            _FPR,
+            _TPR,
+            _distr_norm_A,
+            _distr_norm_B,
+            _pos_norm_A,
+            _pos_norm_B,
+            xp,
+            yp,
+            x,
+            y,
+        ) = _compute_AUC(data_hist[0], model_hist[0], data_hist[1], model_hist[1])
+
+        plt.figure()
+        plt.plot([0.0, 1.0], [0.0, 1.0], "--k")
+        plt.plot(xp, yp, ".-")
+        plt.plot(x, y, ".--")
+        plt.grid()
+        plt.gca().set_axisbelow(True)
+        plt.title(f"{src} to {tgt}: {p} (AUC={AUC:.2f}, ERR={ERR:.2f})", fontweight="bold")
+        plt.xlabel("FPR")
+        plt.ylabel("TPR")
+        plt.tight_layout()
+
+        out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_AUC__{p}.png"))
+        log.info(f"Saving {out_fn}...")
+        plt.savefig(out_fn)
+
+
+# Helper functions
+def _norm_fitting(
+    hist_values,
+    hist_counts,
+    max_nfev=30,
+    rel_fit_err_th=0.5,
+    def_mn=np.nan,
+    def_sd=np.nan,
+    def_sc=np.nan,
+):
+    """Helper function to extract fitted norm mean/SD/scaling attributes from histogram (using a large error threshold by default in order to get at least a rough estimate)."""
+
+    def norm_fct(x, mn, sd, sc):
+        return sc * norm(loc=mn, scale=sd).pdf(x)
+
+    p0 = [np.mean(hist_values), 1.0, 1.0]
+    bounds = [[min(hist_values), 0, 0], [max(hist_values), np.inf, np.inf]]
+    # Note: "mean" assumed to be within hist value bounds!!
+
+    invalid_fit = False
+    try:
+        (mn_opt, sd_opt, sc_opt), pcov, *_ = curve_fit(
+            norm_fct, hist_values, hist_counts, p0=p0, bounds=bounds, max_nfev=max_nfev
+        )
+    except (
+        ValueError,
+        RuntimeError,
+    ):  # Raised if input data invalid or optimization fails
+        invalid_fit = True
+
+    if not invalid_fit:
+        rel_err = np.sqrt(np.diag(pcov)) / np.array(
+            [mn_opt, sd_opt, sc_opt]
+        )  # Rel. standard error of the coefficients
+        # log.debug(f"Rel. error of norm model fit: {rel_err}")
+        if not all(np.isfinite(rel_err)) or max(rel_err) > rel_fit_err_th:
+            # log.error(
+            #     f"Rel. error of norm model fit exceeds error threshold of {rel_fit_err_th} (or could not be determined)!"
+            # )
+            invalid_fit = True
+
+    if invalid_fit:  # Set default values
+        mn_opt = def_mn
+        sd_opt = def_sd
+        sc_opt = def_sc
+
+    return mn_opt, sd_opt, sc_opt
+
+
+def _check_shared_property(edges_sel, prop_name, conn_sel, syn_conn_idx):
+    """Check if shared property values within connections."""
+    if len(conn_sel) > 1 and len(np.unique(edges_sel[prop_name])) == 1:
+        # In case of a constant overall distribution, assume no sharing
+        is_shared = False
+    else:
+        is_shared = True
+        for c in conn_sel:
+            if len(np.unique(edges_sel.loc[syn_conn_idx == c, prop_name])) > 1:
+                # Found different property values within same connection
+                is_shared = False
+                break
+    return is_shared
+
+
+def _get_property_values(edges_sel, prop_name, conn_sel, syn_conn_idx, is_shared):
+    """Collect property values over connections (if shared values) or synapses (if non-shared values)."""
+    prop_values = []
+    for c in conn_sel:
+        if is_shared:
+            # Shared within connection, so take only first value
+            prop_values.append(edges_sel.loc[syn_conn_idx == c, prop_name].iloc[0])
+        else:
+            # Different values within connection, so take all values
+            prop_values.append(edges_sel.loc[syn_conn_idx == c, prop_name].to_numpy())
+    prop_values = np.hstack(prop_values)
+    return prop_values
+
+
+def _compute_AUC(distr_A, distr_B, bins_A, bins_B, dth=0.05, dx=0.01):
     """Computes area under the ROC curve for comparing two distributions."""
     pos_A = np.array(
         [np.mean(bins_A[i : i + 2]) for i in range(len(bins_A) - 1)]
@@ -468,172 +719,52 @@ def compute_AUC(distr_A, distr_B, bins_A, bins_B, dth=0.05, dx=0.01):
     return AUC, ERR, FPR, TPR, distr_norm_A, distr_norm_B, pos_norm_A, pos_norm_B, xp, yp, x, y
 
 
-def plot(
-    out_dir, syns_per_conn_data, conn_prop_data, m_types, syn_props, model, **_
-):  # pragma: no cover
-    """Visualize data vs. model."""
-    model_params = model.get_param_dict()
-    prop_names = model.get_prop_names()
-
-    # Plot data vs. model: property maps
-    def get_model_stat(stat, m_params):
-        """Get distribution statistic (if existing) or derive from other model paramters, if possible."""
-        val = np.nan
-        if stat in m_params:  # Return existing stat. parameter
-            val = m_params[stat]
-        else:
-            if (
-                stat == "mean" and "val" in m_params and "p" in m_params
-            ):  # Derive mean from discrete values/probabilities
+def _get_model_stat(stat, m_params):
+    """Get distribution statistic (if existing) or derive from other model paramters, if possible."""
+    val = np.nan
+    if stat in m_params:  # Return existing stat. parameter
+        val = m_params[stat]
+    else:
+        if m_params["type"] == "constant":
+            if stat == "std":
+                val = 0.0
+            elif stat in {"min", "max"}:
+                val = m_params["mean"]
+        elif m_params["type"] == "discrete":
+            # Derive missing statistics from discrete values/probabilities
+            if stat == "mean":
                 val = np.sum(np.array(m_params["p"] * np.array(m_params["val"])))
-            elif (
-                stat == "std" and "val" in m_params and "p" in m_params
-            ):  # Derive std from discrete values/probabilities
+            elif stat == "std":
                 m = np.sum(np.array(m_params["p"] * np.array(m_params["val"])))
                 val = np.sqrt(
                     np.sum(np.array(m_params["p"]) * (np.array(m_params["val"]) - m) ** 2)
                 )
-            elif (
-                stat == "min" and "val" in m_params and "p" in m_params
-            ):  # Derive min from discrete values/probabilities
+            elif stat == "min":
                 val = np.min(np.array(m_params["val"])[np.array(m_params["p"]) > 0.0])
-            elif (
-                stat == "max" and "val" in m_params and "p" in m_params
-            ):  # Derive max from discrete values/probabilities
+            elif stat == "max":
                 val = np.max(np.array(m_params["val"])[np.array(m_params["p"]) > 0.0])
-        return val
-
-    title_str = ["Data", "Model"]
-    for stat_sel in ["mean", "std"]:
-        for pidx, p in enumerate(prop_names):
-            plt.figure(figsize=(8, 3), dpi=300)
-            if pidx < conn_prop_data[stat_sel].shape[2]:
-                data_stat_sel = conn_prop_data[stat_sel][:, :, pidx]
-            else:
-                data_stat_sel = syns_per_conn_data[stat_sel]
-            model_stat_sel = np.full((len(m_types[0]), len(m_types[1])), np.nan)
-            for sidx, s in enumerate(m_types[0]):
-                for tidx, t in enumerate(m_types[1]):
-                    model_stat_sel[sidx, tidx] = get_model_stat(
-                        stat_sel, model_params["prop_stats"][p][s][t]
-                    )
-            for didx, data in enumerate([data_stat_sel, model_stat_sel]):
-                plt.subplot(1, 2, didx + 1)
-                plt.imshow(data, interpolation="nearest", cmap="jet")
-                plt.xticks(range(len(m_types[1])), m_types[1], rotation=90, fontsize=3)
-                plt.yticks(range(len(m_types[0])), m_types[0], rotation=0, fontsize=3)
-                plt.colorbar()
-                plt.title(title_str[didx])
-            plt.suptitle(f"{p} ({stat_sel})", fontweight="bold")
-            plt.tight_layout()
-
-            out_fn = os.path.abspath(
-                os.path.join(out_dir, f"data_vs_model_map_{stat_sel}__{p}.png")
-            )
-            log.info(f"Saving {out_fn}...")
-            plt.savefig(out_fn)
-
-    # Plot data vs. model: Distribution histogram examples (generative model) + AUC
-    N = 1000  # Number of samples
-    conn_counts = [
-        [
-            np.sum(syns_per_conn_data["hist"][sidx, tidx][0])
-            if (
-                hasattr(syns_per_conn_data["hist"][sidx, tidx], "__iter__")
-                and len(syns_per_conn_data["hist"][sidx, tidx]) > 0
-            )
-            else 0
-            for sidx in range(len(m_types[0]))
-        ]
-        for tidx in range(len(m_types[1]))
-    ]
-    max_pathways = np.where(
-        np.array(conn_counts) == np.max(conn_counts)
-    )  # Select pathway(s) with maximum number of connections (i.e., most robust statistics)
-    sidx, tidx = [
-        max_pathways[i][0] for i in range(len(max_pathways))
-    ]  # Select first of these pathways for plotting
-    src, tgt = [m_types[0][sidx], m_types[1][tidx]]
-    full_model_data = [model.apply(src_type=src, tgt_type=tgt) for n in range(N)]
-    for pidx, p in enumerate(prop_names):
-        plt.figure(figsize=(5, 3), dpi=300)
-        if pidx < len(syn_props):
-            data_hist = conn_prop_data["hist"][sidx, tidx, pidx]
-            model_data = np.array(
-                [_d[p].mean() for _d in full_model_data]
-            )  # Within-connection property means for plotting
-        else:
-            data_hist = syns_per_conn_data["hist"][sidx, tidx]
-            model_data = np.array(
-                [_d.shape[0] for _d in full_model_data]
-            )  # Number of synapses per connection
-        plt.bar(
-            data_hist[1][:-1],
-            data_hist[0] / np.sum(data_hist[0]),
-            align="edge",
-            width=np.min(np.diff(data_hist[1])),
-            label=f"Data (N={np.max(conn_counts)})",
-        )
-        hist_bins = data_hist[1]  # Use same model distribution binning as for data
-        bin_size = np.min(np.diff(hist_bins))
-        if min(model_data) < hist_bins[0]:  # Extend binning to lower values to cover whole range
-            hist_bins = np.hstack(
-                [
-                    np.flip(np.arange(hist_bins[0], min(model_data) - bin_size, -bin_size)),
-                    hist_bins[1:],
-                ]
-            )
-        if max(model_data) > hist_bins[-1]:  # Extend binning to higher values to cover whole range
-            hist_bins = np.hstack(
-                [hist_bins[:-1], np.arange(hist_bins[-1], max(model_data) + bin_size, bin_size)]
-            )
-        model_hist = np.histogram(model_data, bins=hist_bins)
-        plt.step(
-            model_hist[1],
-            np.hstack([model_hist[0][0], model_hist[0]]) / np.sum(model_hist[0]),
-            where="pre",
-            color="tab:orange",
-            label=f"Model (N={N})",
-        )
-        plt.grid()
-        plt.gca().set_axisbelow(True)
-        plt.title(f"{src} to {tgt}", fontweight="bold")
-        plt.xlabel(p)
-        plt.ylabel("Density")
-        plt.legend()
-        plt.tight_layout()
-
-        out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_hist__{p}.png"))
-        log.info(f"Saving {out_fn}...")
-        plt.savefig(out_fn)
-
-        # AUC/ROC plot
-        (
-            AUC,
-            ERR,
-            _FPR,
-            _TPR,
-            _distr_norm_A,
-            _distr_norm_B,
-            _pos_norm_A,
-            _pos_norm_B,
-            xp,
-            yp,
-            x,
-            y,
-        ) = compute_AUC(data_hist[0], model_hist[0], data_hist[1], model_hist[1])
-
-        plt.figure()
-        plt.plot([0.0, 1.0], [0.0, 1.0], "--k")
-        plt.plot(xp, yp, ".-")
-        plt.plot(x, y, ".--")
-        plt.grid()
-        plt.gca().set_axisbelow(True)
-        plt.title(f"{src} to {tgt}: {p} (AUC={AUC:.2f}, ERR={ERR:.2f})", fontweight="bold")
-        plt.xlabel("FPR")
-        plt.ylabel("TPR")
-        plt.tight_layout()
-
-        out_fn = os.path.abspath(os.path.join(out_dir, f"data_vs_model_AUC__{p}.png"))
-        log.info(f"Saving {out_fn}...")
-        plt.savefig(out_fn)
+        elif m_params["type"] == "truncnorm":
+            # Estimate missing statistics from generated truncnorm distribution
+            distr = model_types.ConnPropsModel.draw_from_distribution(m_params, size=200)
+            if stat == "mean":
+                val = np.mean(distr)
+            elif stat == "std":
+                val = np.std(distr)
+        elif m_params["type"] == "poisson":
+            if stat == "std":
+                # Derive std from poisson mean
+                val = np.sqrt(m_params["mean"])
+            elif stat == "min":
+                val = 0
+        elif m_params["type"] == "ztpoisson":
+            if stat == "std":
+                # Derive std from zero-truncated poisson mean
+                mn = m_params["mean"]
+                lam = model_types.ConnPropsModel.compute_ztpoisson_lambda(mn)
+                val = np.sqrt(mn * (1 + lam - mn))
+            elif stat == "min":
+                val = 1
+        elif m_params["type"] == "zero":
+            # Set missing statistics to zero
+            val = 0.0
+    return val

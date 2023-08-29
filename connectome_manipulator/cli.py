@@ -9,6 +9,7 @@ import click
 from . import utils, log, profiler
 from .connectome_manipulation import connectome_manipulation
 from .model_building import model_building
+from .connectome_comparison import structural_comparator
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,32 @@ def build_model(config, force_reextract, force_rebuild):
         config_dict = json.load(f)
 
     model_building.main(config_dict, show_fig=False, force_recomp=[force_reextract, force_rebuild])
+
+
+@app.command()
+@click.argument("config", required=True, type=Path)
+@click.option(
+    "--force-recomp-circ1",
+    required=False,
+    is_flag=True,
+    type=bool,
+    help="Force re-computation of 1st circuit's comparison data, in case already existing.",
+)
+@click.option(
+    "--force-recomp-circ2",
+    required=False,
+    is_flag=True,
+    type=bool,
+    help="Force re-computation of 2nd circuit's comparison data, in case already existing.",
+)
+def compare_connectomes(config, force_recomp_circ1, force_recomp_circ2):
+    """Compare connectome structure of two circuits."""
+    with open(config, "r") as f:
+        config_dict = json.load(f)
+
+    structural_comparator.main(
+        config_dict, show_fig=False, force_recomp=[force_recomp_circ1, force_recomp_circ2]
+    )
 
 
 if __name__ == "__main__":

@@ -278,15 +278,7 @@ class ConnectomeRewiring(Manipulation):
             edges_table.shape[0], False
         )  # Global synapse indices to keep track of all rewired synapses [for data logging]
         new_edges_list = []  # New edges list to collect all generated synapses
-        progress_pct = np.round(
-            100 * np.arange(len(tgt_node_ids)) / (len(tgt_node_ids) - 1)
-        ).astype(int)
         for tidx, tgt in enumerate(tgt_node_ids):
-            if tidx == 0 or progress_pct[tidx - 1] != progress_pct[tidx]:
-                print(
-                    f"{progress_pct[tidx]}%", end=" " if progress_pct[tidx] < 100.0 else "\n"
-                )  # Just for console, no logging
-
             syn_sel_idx_tgt = edges_table["@target_node"] == tgt
             syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_src)
             num_sel = np.sum(syn_sel_idx)
@@ -295,12 +287,12 @@ class ConnectomeRewiring(Manipulation):
                 stats_dict["unable_to_rewire_nrn_count"] += 1  # (Neurons)
                 continue  # Nothing to rewire (no synapses on target node)
 
-            # Determine conn. prob. of all source nodes to be connected with target node
-
-            # Get neuron positions (incl. position mapping, if provided)
+            # Get target neuron position (incl. position mapping, if provided)
             tgt_pos = conn_prob.get_neuron_positions(
                 self.nodes[1].positions if pos_acc is None else pos_acc, [[tgt]]
             )[0]
+
+            # Determine conn. prob. of all source nodes to be connected with target node
             p_src = (
                 p_model.apply(
                     src_pos=src_pos,
@@ -882,6 +874,7 @@ class ConnectomeRewiring(Manipulation):
             return
 
         # Determine distance from source neuron (soma) to synapse on target neuron
+        # IMPORTANT: Distances for delays are computed in them original coordinate system w/o coordinate transformation!
         src_new_pos = self.nodes[0].positions(src_new).to_numpy()
         # Synapse position on post-synaptic dendrite
         syn_pos = edges_table.loc[
