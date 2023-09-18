@@ -52,20 +52,20 @@ def setup():
             "local_directory": _TMP,
             "nthreads": threads,
         },
+        exit=True,
     )
-    if not is_client:
-        return
 
-    print("Dashboard URL:", dash_url)
+    if is_client:
+        print("Dashboard URL:", dash_url)
 
-    # This is a bit hackish, but seems to be a good way to change the default for the
-    # application: we always want to be parallel when starting our own distributed Dask
-    for param in manipulate_connectome.params:
-        if param.name == "parallel":
-            param.default = True
+        # This is a bit hackish, but seems to be a good way to change the default for the
+        # application: we always want to be parallel when starting our own distributed Dask
+        for param in manipulate_connectome.params:
+            if param.name == "parallel":
+                param.default = True
 
-    if __name__ == "__main__":
-        app()  # pylint: disable=no-value-for-parameter
+        if __name__ == "__main__":
+            app()  # pylint: disable=no-value-for-parameter
 
 
 setup()

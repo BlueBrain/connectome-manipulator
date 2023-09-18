@@ -1,6 +1,4 @@
 """A module implementing several executor wrappers"""
-import time
-
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -107,10 +105,13 @@ def dask_ctx(result_hook, executor_params: dict):
 
         log.info("DASK jobs finished")
 
-        log.info("Shutting down DASK gracefully")
+        log.info("Shutting down DASK workers gracefully")
         client.retire_workers()
-        time.sleep(1)
-        client.shutdown()
+        # In some cases, we seem to need to shut down the client: while using dask-mpi
+        # though, it will attempt to shut down the client itself. If the code below is
+        # activated while dask-mpi is used, exceptions will be displayed.
+        # time.sleep(1)
+        # client.shutdown()
 
 
 def in_context(options, params, result_hook=None):
