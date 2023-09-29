@@ -94,7 +94,7 @@ def get_node_splits(config, options, nodes):
         .to_frame(index=False)
         .join(src_ids.map(len), on=[f"src_{c}" for c in src_ids.index.names])
         .groupby(["dst_hemisphere", "dst_region"])
-        .sum()
+        .sum(numeric_only=True)
     )
 
     # Consider two queues: jobs that split a region go into full_batches, whereas other
