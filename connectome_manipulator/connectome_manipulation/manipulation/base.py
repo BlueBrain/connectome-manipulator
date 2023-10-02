@@ -80,14 +80,10 @@ class MorphologyCachingManipulation(Manipulation):
     def __init__(self, nodes, writer=None, split_index=0, split_total=1):
         """Initialize the MorphHelper object needed later."""
         super().__init__(nodes, writer, split_index, split_total)
-        morph_dir = self.nodes[1].config["morphologies_dir"]
         self.morpho_helper = MorphHelper(
-            morph_dir,
+            self.nodes[1].config.get("morphologies_dir"),
             self.nodes[1],
-            {
-                "h5v1": os.path.join(morph_dir, "h5v1"),
-                "neurolucida-asc": os.path.join(morph_dir, "ascii"),
-            },
+            self.nodes[1].config.get("alternate_morphologies"),
         )
 
     def _get_tgt_morphs(self, morph_ext, tgt_node_sel):

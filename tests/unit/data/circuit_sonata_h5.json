@@ -11,8 +11,10 @@
                 "populations": {
                     "nodeA": {
                         "type": "biophysical",
-                        "morphologies_dir": "$BASE_DIR/swc",
-                        "biophysical_neuron_models_dir": "."
+                        "biophysical_neuron_models_dir": ".",
+                        "alternate_morphologies": {
+                          "h5v1": "$BASE_DIR/h5"
+                        }
                     }
                 }
             }

@@ -57,7 +57,7 @@ def test_reduce_config_paths():
                 "populations": {
                     "nodeA": {
                         "type": "biophysical",
-                        "morphologies_dir": "$BASE_DIR",
+                        "morphologies_dir": "$BASE_DIR/swc",
                         "biophysical_neuron_models_dir": "$BASE_DIR",
                     },
                 },

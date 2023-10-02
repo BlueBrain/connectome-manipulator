@@ -44,14 +44,10 @@ def test_apply(manipulation):
         "syn_type_id",
     ]
 
-    morph_dir = nodes[1].config["morphologies_dir"]
     tgt_morph = MorphHelper(
-        morph_dir,
+        nodes[1].config.get("morphologies_dir"),
         nodes[1],
-        {
-            "h5v1": os.path.join(morph_dir, "h5v1"),
-            "neurolucida-asc": os.path.join(morph_dir, "ascii"),
-        },
+        nodes[1].config.get("alternate_morphologies"),
     )
     get_tgt_morph = lambda node_id: tgt_morph.get(
         node_id, transform=True, extension="swc"
