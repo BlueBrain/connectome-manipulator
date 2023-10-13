@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
+from scipy.sparse import csc_matrix
 
 from utils import setup_tempdir, TEST_DATA_DIR
 import connectome_manipulator.model_building.model_types as test_module
@@ -550,3 +551,60 @@ def test_ConnProb5thOrderLinInterpnReducedModel():
                 for k in model.get_data_dict().keys()
             ]
         )
+
+
+def test_ConnProbAdjModel():
+    np.random.seed(999)
+    with setup_tempdir(__name__) as tempdir:
+        # Define (random) adjacency matrix
+        src_node_ids = np.arange(5, 20)
+        tgt_node_ids = np.arange(50, 100)
+        adj_mat = csc_matrix(np.random.rand(len(src_node_ids), len(tgt_node_ids)) > 0.75)
+
+        # Prepare data frames
+        src_nodes_table = pd.DataFrame(src_node_ids, columns=["src_node_ids"])
+        tgt_nodes_table = pd.DataFrame(tgt_node_ids, columns=["tgt_node_ids"])
+        rows, cols = adj_mat.nonzero()
+        adj_table = pd.DataFrame({"row_ind": rows, "col_ind": cols})
+
+        # Test non-inverted & inverted model
+        for inverted in [False, True]:
+            ## (a) Build
+            model_dict = {"model": "ConnProbAdjModel", "inverted": inverted}
+            data_dict = {
+                "src_nodes_table": src_nodes_table,
+                "tgt_nodes_table": tgt_nodes_table,
+                "adj_table": adj_table,
+            }
+            model = test_module.AbstractModel.model_from_dict(model_dict, data_dict)
+
+            ## (b) Access
+            assert_array_equal(src_node_ids, model.get_src_nids())
+            assert_array_equal(tgt_node_ids, model.get_tgt_nids())
+            assert_array_equal(adj_mat.toarray(), model.get_adj_matrix().toarray())
+            assert model.is_inverted() == inverted
+            if inverted:
+                assert_array_equal(
+                    adj_mat.toarray().astype(float),
+                    1.0 - model.apply(src_nid=src_node_ids, tgt_nid=tgt_node_ids),
+                )
+            else:
+                assert_array_equal(
+                    adj_mat.toarray().astype(float),
+                    model.apply(src_nid=src_node_ids, tgt_nid=tgt_node_ids),
+                )
+
+            ## (c) Load/save
+            model_name = "ConnProbAdjModel_TEST"
+            model.save_model(tempdir, model_name)
+            model2 = test_module.AbstractModel.model_from_file(
+                os.path.join(tempdir, model_name + ".json")
+            )
+            assert model.get_param_dict() == model2.get_param_dict()
+            assert sorted(model.get_data_dict().keys()) == sorted(model2.get_data_dict().keys())
+            assert np.all(
+                [
+                    np.array_equal(model.get_data_dict()[k], model2.get_data_dict()[k])
+                    for k in model.get_data_dict().keys()
+                ]
+            )

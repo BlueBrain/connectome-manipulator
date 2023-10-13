@@ -235,7 +235,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 )
                 log_time = new_time
 
-            # Determine conn. prob. of all source nodes to be connected with target node (mtype-specific)
+            # Determine conn. prob. of all source nodes to be connected with target node
             tgt_pos = tgt_positions[
                 tidx : tidx + 1, :
             ]  # Get neuron positions (incl. position mapping, if provided)
@@ -244,6 +244,8 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 tgt_pos=tgt_pos,
                 src_type=src_mtypes,
                 tgt_type=[tgt_mtypes[tidx]],
+                src_nid=src_node_ids,
+                tgt_nid=[tgt],
             ).flatten()
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
             # Exclude autapses [ASSUMING node IDs are unique across src/tgt

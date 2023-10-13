@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interpn
 from scipy.optimize import fsolve
+from scipy.sparse import csc_matrix
 from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 
@@ -183,7 +184,7 @@ class AbstractModel(metaclass=ABCMeta):
         )
         data_file = os.path.splitext(model_file)[0] + ".h5"
         for idx, (key, df) in enumerate(data_dict.items()):
-            df.to_hdf(data_file, key, append=idx > 0)
+            df.to_hdf(data_file, key, mode="w" if idx == 0 else "a")
         model_dict["data_keys"] = list(data_dict.keys())
 
         # Save model dict to .json file
@@ -366,7 +367,7 @@ class NSynConnModel(PathwayModel):
         log.log_assert(np.all(self.mean > 0.0), "Mean must be larger than zero!")
         log.log_assert(np.all(self.std >= 0.0), "Std cannot be negative!")
 
-    def get_model_output(self, src_type, tgt_type, **kwargs):  # pylint: disable=arguments-differ
+    def get_model_output(self, src_type, tgt_type):  # pylint: disable=arguments-differ
         """Draw #syn/conn value for one connection between src_type and tgt_type [seeded through numpy]."""
         # Get distribution attribute values
         distr_mean = self.mean[src_type, tgt_type]
@@ -465,9 +466,8 @@ class PosMapModel(AbstractModel):
         """Return coordinate names of this model."""
         return list(self.pos_table.columns)
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, gids):  # pylint: disable=arguments-differ
         """Return (mapped) neuron positions for a given set of GIDs."""
-        gids = np.array(kwargs["gids"])
         return self.pos_table.loc[gids].to_numpy()
 
     def __str__(self):
@@ -510,7 +510,7 @@ class ConnProbModel(PathwayModel):
     def get_model_output(
         self, src_type, tgt_type, src_pos, tgt_pos
     ):  # pylint: disable=arguments-differ
-        """Return pathway-specific connection probabilities <#ysrc x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
+        """Return pathway-specific connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
         if np.isscalar(src_type):
             src_type = [src_type] * src_pos.shape[0]
         if np.isscalar(tgt_type):
@@ -873,14 +873,14 @@ class ConnPropsModel(AbstractModel):
 
         return drawn_values
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_type, tgt_type):  # pylint: disable=arguments-differ
         """Draw property values for one connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
         syn_props = [p for p in self.prop_names if p != N_SYN_PER_CONN_NAME]
-        n_syn = self.draw(N_SYN_PER_CONN_NAME, kwargs["src_type"], kwargs["tgt_type"], 1)[0]
+        n_syn = self.draw(N_SYN_PER_CONN_NAME, src_type, tgt_type, 1)[0]
 
         df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
         for p in syn_props:
-            df[p] = self.draw(p, kwargs["src_type"], kwargs["tgt_type"], n_syn)
+            df[p] = self.draw(p, src_type, tgt_type, n_syn)
         return df
 
     def __str__(self):
@@ -955,10 +955,8 @@ class ConnProb1stOrderModel(AbstractModel):
         """Return (constant) connection probability."""
         return self.p_conn
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (constant) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1011,10 +1009,8 @@ class ConnProb2ndOrderExpModel(AbstractModel):
         dist_mat[dist_mat == 0.0] = np.nan  # Exclude autaptic connections
         return dist_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1081,10 +1077,8 @@ class ConnProb2ndOrderComplexExpModel(AbstractModel):
         dist_mat[dist_mat == 0.0] = np.nan  # Exclude autaptic connections
         return dist_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1176,10 +1170,8 @@ class ConnProb3rdOrderExpModel(AbstractModel):
         )  # Bipolar distinction based on difference in specified coordinate
         return bip_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (bipolar distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1320,10 +1312,8 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
         )  # Bipolar distinction based on difference in specified coordinate
         return bip_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (bipolar distance-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1451,10 +1441,8 @@ class ConnProb4thOrderLinInterpnModel(AbstractModel):
         ]  # Relative difference in z coordinate
         return dx_mat, dy_mat, dz_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1594,10 +1582,8 @@ class ConnProb4thOrderLinInterpnReducedModel(AbstractModel):
 
         return dr_mat, dz_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1741,10 +1727,8 @@ class ConnProb5thOrderLinInterpnModel(AbstractModel):
         ]  # Relative difference in z coordinate
         return dx_mat, dy_mat, dz_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1896,10 +1880,8 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
 
         return dr_mat, dz_mat
 
-    def get_model_output(self, **kwargs):
+    def get_model_output(self, src_pos, tgt_pos):  # pylint: disable=arguments-differ
         """Return (position- & offset-dependent) connection probabilities <#src x #tgt> for all combinations of source/target neuron positions <#src/#tgt x #dim>."""
-        src_pos = kwargs["src_pos"]
-        tgt_pos = kwargs["tgt_pos"]
         #         log.log_assert(
         #             src_pos.shape[1] == tgt_pos.shape[1],
         #             "Dimension mismatch of source/target neuron positions!",
@@ -1931,4 +1913,97 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
             model_str
             + f"  z...axial src position, dr/dz...radial/axial position offset (tgt minus src), with axial coordinate {self.axial_coord}"
         )
+        return model_str
+
+
+class ConnProbAdjModel(AbstractModel):
+    """Deterministic connection probability model, defined by an adjacency matrix:
+
+    - Adjacency matrix must be boolean and in sparse CSC format
+      (stored as data frame with 'row_ind' and 'col_ind' columns)
+    - Size of adjacency matrix must match selected src/dest neuron selections
+      (stored as data frames with 'src_node_ids' and 'tgt_node_ids')
+    - Returns deterministic connection probability (0.0 or 1.0) for given source/target neuron IDs
+    - Can optionally store inverted connectivity (i.e., True...no connection, False...connection)
+    """
+
+    # Names of model inputs, parameters and data frames which are part of this model
+    param_names = ["inverted"]
+    param_defaults = {"inverted": False}
+    data_names = ["src_nodes_table", "tgt_nodes_table", "adj_table"]
+    input_names = ["src_nid", "tgt_nid"]
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        log.log_assert(
+            self.src_nodes_table.shape[1] == 1,
+            "Data frame with 1 column (src_node_ids) required!",
+        )
+        self.src_node_ids = self.src_nodes_table.to_numpy().flatten()
+        self.src_idx_table = pd.Series(
+            self.src_nodes_table.index, index=self.src_node_ids, name="src_index"
+        )
+
+        log.log_assert(
+            self.tgt_nodes_table.shape[1] == 1,
+            "Data frame with 1 column (tgt_node_ids) required!",
+        )
+        self.tgt_node_ids = self.tgt_nodes_table.to_numpy().flatten()
+        self.tgt_idx_table = pd.Series(
+            self.tgt_nodes_table.index, index=self.tgt_node_ids, name="tgt_index"
+        )
+
+        log.log_assert(
+            self.adj_table.shape[1] == 2,
+            "Data frame with 2 columns (row_ind, col_ind) required!",
+        )
+        self.adj_mat = csc_matrix(
+            (
+                [True] * self.adj_table.shape[0],
+                (self.adj_table["row_ind"], self.adj_table["col_ind"]),
+            ),
+            shape=(len(self.src_nodes_table), len(self.tgt_nodes_table)),
+        )
+        log.log_assert(
+            isinstance(self.inverted, bool),
+            "Inverted flag must be boolean!",
+        )
+
+    def get_adj_matrix(self):
+        """Return adjacency matrix."""
+        return self.adj_mat
+
+    def get_src_nids(self):
+        """Return source node IDs stored in this model."""
+        return self.src_node_ids
+
+    def get_tgt_nids(self):
+        """Return target node IDs stored in this model."""
+        return self.tgt_node_ids
+
+    def is_inverted(self):
+        """Return if connectivity is stored inverted."""
+        return self.inverted
+
+    def get_model_output(self, src_nid, tgt_nid):  # pylint: disable=arguments-differ
+        """Return deterministic connection probabilities (0.0 or 1.0) of size <#src x #tgt> as given by adjacency matrix."""
+        src_sel = self.src_idx_table.loc[src_nid].values
+        tgt_sel = self.tgt_idx_table.loc[tgt_nid].values
+        adj_sel = self.adj_mat[:, tgt_sel][src_sel, :].toarray()
+        if self.inverted:
+            return np.logical_not(adj_sel).astype(float)
+        else:
+            return adj_sel.astype(float)
+
+    def __str__(self):
+        """Return model string describing the model."""
+        if self.inverted:
+            inv_str = "Inverted "
+        else:
+            inv_str = ""
+        model_str = f"{inv_str}{self.__class__.__name__}\n"
+        model_str = model_str + "  " + self.adj_mat.__repr__()
         return model_str

@@ -9,14 +9,14 @@ Description: Structural comparison of two connectomes in terms of adjacency matr
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csc_matrix
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
-def compute(circuit, sel_src=None, sel_dest=None, **_):
+def compute(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
     """Extract adjacency and count matrices."""
     # Select edge population
-    edges = get_edges_population(circuit)
+    edges = get_edges_population(circuit, edges_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
@@ -24,6 +24,10 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
 
     src_node_ids = get_node_ids(src_nodes, sel_src)
     tgt_node_ids = get_node_ids(tgt_nodes, sel_dest)
+
+    assert (
+        len(src_node_ids) > 0 and len(tgt_node_ids) > 0
+    ), "ERROR: Empty src/tgt node selection(s)!"
 
     # Map source/target node ids to continuous range of indices for plotting
     src_gid_min = min(src_nodes.ids())
@@ -63,9 +67,14 @@ def compute(circuit, sel_src=None, sel_dest=None, **_):
             edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)
         )
     )
-    count_matrix = csr_matrix(
-        (conns[:, 2], (src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1])))
-    )
+    if len(conns) == 0:  # No connections, creating empty matrix
+        count_matrix = csc_matrix((len(src_node_ids), len(tgt_node_ids)), dtype=int)
+    else:
+        count_matrix = csc_matrix(
+            (conns[:, 2], (src_gid_to_idx(conns[:, 0]), tgt_gid_to_idx(conns[:, 1]))),
+            shape=(len(src_node_ids), len(tgt_node_ids)),
+            dtype=int,
+        )
 
     adj_matrix = count_matrix > 0
 

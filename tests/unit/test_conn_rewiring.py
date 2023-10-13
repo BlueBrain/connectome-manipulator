@@ -111,6 +111,16 @@ def test_apply(manipulation):
             ]
         ), f"ERROR: Non-{syn_class} connections changed!"
 
+    def check_all_removed(ref, res, nodes, syn_class):
+        """Check if all (EXC or INH) connections are removed"""
+        assert (
+            ref[~np.isin(ref["@source_node"], nodes[0].ids({"synapse_class": syn_class}))][
+                res.columns
+            ]
+            .reset_index(drop=True)
+            .equals(res)
+        ), f"ERROR: Removed {syn_class} connections mismatch!"
+
     def check_sampling(ref, res, col_sel):
         """Check if synapse properties (incl. #syn/conn) sampled from existing values"""
         nsyn_per_conn1 = np.unique(
@@ -126,7 +136,7 @@ def test_apply(manipulation):
             [np.all(np.isin(np.unique(res[col]), np.unique(ref[col]))) for col in col_sel]
         ), "ERROR: Synapse properties sampling error!"  # Check duplicate_sample (w/o #syn/conn)
 
-    def check_all_to_all(ref, res, nodes, props_model=None):
+    def check_all_to_all(ref, res, nodes, syn_class, props_model=None):
         """Check if all-to-all connectivity (incl. #syn/conn, if props_model provided)"""
         src_sel = nodes[0].ids({"synapse_class": syn_class})
         tgt_sel = np.unique(
@@ -167,6 +177,32 @@ def test_apply(manipulation):
                 assert (
                     r[p] == props_model.draw(prop_name=p, src_type=src_type, tgt_type=tgt_type)[0]
                 )  # Assuming constant model!!
+
+    def get_adj(edges_table, src_ids, tgt_ids):
+        """Extract adjacency matrix from edges table"""
+        conns = np.unique(edges_table[["@source_node", "@target_node"]], axis=0)
+        adj_mat = np.zeros((len(src_ids), len(tgt_ids)), dtype=bool)
+        for _s, _t in conns:
+            adj_mat[np.where(src_ids == _s)[0], np.where(tgt_ids == _t)[0]] = True
+        return adj_mat
+
+    def check_adj(res, edges_table, nodes, syn_class, compare_to="ref"):
+        """Check adj. matrices (excl. tgt nodes w/o any original synapses; excl. autapses)"""
+        _src = nodes[0].ids({"synapse_class": syn_class})
+        _tgt = np.unique(edges_table["@target_node"])
+        res_adj = get_adj(res, _src, _tgt)
+        ref_adj = get_adj(edges_table, _src, _tgt)
+        for _sidx, _s in enumerate(_src):
+            for _tidx, _t in enumerate(_tgt):
+                if _s == _t:  # Skip autapses
+                    continue
+                if compare_to == "ref":  # Compare to reference
+                    assert res_adj[_sidx, _tidx] == ref_adj[_sidx, _tidx]
+                elif compare_to == "inv_ref":  # Compare to inverse reference
+                    assert res_adj[_sidx, _tidx] == ~ref_adj[_sidx, _tidx]
+                else:  # Expect boolean value to compare to
+                    assert isinstance(compare_to, bool)
+                    assert res_adj[_sidx, _tidx] == compare_to
 
     for syn_class in ["EXC", "INH"]:
         # Case 1: Rewire connectivity with conn. prob. p=1.0 but no target selection => Nothing should be changed
@@ -235,13 +271,7 @@ def test_apply(manipulation):
             pos_map_file=None,
         )
         res = writer.to_pandas()
-        assert (
-            edges_table[
-                ~np.isin(edges_table["@source_node"], nodes[0].ids({"synapse_class": syn_class}))
-            ][res.columns]
-            .reset_index(drop=True)
-            .equals(res)
-        ), "ERROR: Results table mismatch!"
+        check_all_removed(edges_table, res, nodes, syn_class)
 
         # Case 3: Rewire connectivity with conn. prob. p=1.0 (full connectivity, w/o autapses)
         prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__ConnProb1p0.json")
@@ -318,7 +348,7 @@ def test_apply(manipulation):
             )
             res = writer.to_pandas()
 
-        check_all_to_all(edges_table, res, nodes)  # Check all-to-all connectivity
+        check_all_to_all(edges_table, res, nodes, syn_class)  # Check all-to-all connectivity
         check_indegree(
             edges_table, res, nodes, check_not_equal=True
         )  # Check if keep_indegree changed
@@ -351,7 +381,7 @@ def test_apply(manipulation):
             res_list.append(writer.to_pandas())
         res = pd.concat(res_list, ignore_index=True)
 
-        check_all_to_all(edges_table, res, nodes)  # Check all-to-all connectivity
+        check_all_to_all(edges_table, res, nodes, syn_class)  # Check all-to-all connectivity
         check_indegree(
             edges_table, res, nodes, check_not_equal=True
         )  # Check if keep_indegree changed
@@ -379,7 +409,9 @@ def test_apply(manipulation):
         )
         res = writer.to_pandas()
 
-        check_all_to_all(edges_table, res, nodes, props_model)  # Check all-to-all connectivity
+        check_all_to_all(
+            edges_table, res, nodes, syn_class, props_model
+        )  # Check all-to-all connectivity
         check_indegree(
             edges_table, res, nodes, check_not_equal=True
         )  # Check if keep_indegree changed
@@ -412,7 +444,9 @@ def test_apply(manipulation):
             res_list.append(writer.to_pandas())
         res = pd.concat(res_list, ignore_index=True)
 
-        check_all_to_all(edges_table, res, nodes, props_model)  # Check all-to-all connectivity
+        check_all_to_all(
+            edges_table, res, nodes, syn_class, props_model
+        )  # Check all-to-all connectivity
         check_indegree(
             edges_table, res, nodes, check_not_equal=True
         )  # Check if keep_indegree changed
@@ -421,3 +455,360 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_randomization(edges_table, res, props_model)  # Check duplicate_randomize method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
+
+        # Case 4: Keeping indegree & add/delete only => NOT POSSIBLE!
+        pct = 100.0
+        for _mode in ["add_only", "delete_only"]:
+            with pytest.raises(
+                AssertionError,
+                match=re.escape(f'"keep_indegree" not supported for rewire mode "{_mode}"!'),
+            ):
+                with EdgeWriter(None, existing_edges=edges_table.copy()) as writer:
+                    manipulation(nodes, writer).apply(
+                        tgt_ids,
+                        syn_class=syn_class,
+                        prob_model_spec={"file": prob_model_file},
+                        delay_model_spec={"file": delay_model_file},
+                        sel_src=None,
+                        sel_dest=None,
+                        amount_pct=pct,
+                        keep_indegree=True,
+                        rewire_mode=_mode,
+                        reuse_conns=False,
+                        gen_method=None,
+                        props_model_spec=None,
+                        pos_map_file=None,
+                    )
+
+        # Case 5: Deterministic rewiring (+ keep_conns) with empty adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMatEmpty.json")
+
+        ## (a) Default rewire mode => All (EXC or INH) connections should be removed
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode=None,
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_removed(edges_table, res, nodes, syn_class)
+
+        ## (b) Rewire mode "add_only" => All connections should be unchanged
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="add_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        assert edges_table.equals(res), "ERROR: Edges table mismatch!"
+
+        ## (c) Rewire mode "delete_only" => All (EXC or INH) connections should be removed
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="delete_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_removed(edges_table, res, nodes, syn_class)
+
+        # Case 6: Deterministic rewiring (+ keep_conns) with full adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMatFull.json")
+
+        ## (a) Default rewire mode => All-to-all (EXC or INH) connections should exist
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode=None,
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_to_all(edges_table, res, nodes, syn_class)
+        for _sclass in ["EXC", "INH"]:
+            # With "keep_conns", all existing synapses should be unchanged
+            check_unchanged(edges_table, res, nodes, _sclass)
+
+        ## (b) Rewire mode "add_only" => All-to-all (EXC or INH) connections should exist
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="add_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_to_all(edges_table, res, nodes, syn_class)
+        for _sclass in ["EXC", "INH"]:
+            # With "keep_conns", all existing synapses should be unchanged
+            check_unchanged(edges_table, res, nodes, _sclass)
+
+        ## (c) Rewire mode "delete_only" => All connections should be unchanged
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="delete_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        assert edges_table.equals(res), "ERROR: Edges table mismatch!"
+
+        # Case 7: Deterministic rewiring (+ keep_conns) with actual adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMat.json")
+
+        ## All rewire modes => All connections should be unchanged
+        for _mode in [None, "add_only", "delete_only"]:
+            writer = EdgeWriter(None, edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
+                syn_class=syn_class,
+                prob_model_spec={"file": prob_model_file},
+                delay_model_spec={"file": delay_model_file},
+                sel_src=None,
+                sel_dest=None,
+                amount_pct=pct,
+                keep_indegree=False,
+                reuse_conns=False,
+                keep_conns=True,
+                rewire_mode=_mode,
+                gen_method="duplicate_randomize",
+                props_model_spec={"file": props_model_file},
+                pos_map_file=None,
+            )
+            res = writer.to_pandas()
+            assert edges_table.equals(res), "ERROR: Edges table mismatch!"
+
+        # Case 8: Deterministic rewiring (+ keep_conns) with actual inverted adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMatInv.json")
+
+        ## (a) Default rewire mode => Connectivity should be inverted (EXC or INH)
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode=None,
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_adj(res, edges_table, nodes, syn_class, compare_to="inv_ref")
+
+        ## (b) Rewire mode "add_only" => All-to-all (EXC or INH) connections should exist
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="add_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_to_all(edges_table, res, nodes, syn_class)
+        for _sclass in ["EXC", "INH"]:
+            # With "keep_conns", all existing synapses should be unchanged
+            check_unchanged(edges_table, res, nodes, _sclass)
+
+        ## (c) Rewire mode "delete_only" => All (EXC or INH) connections should be removed
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=True,
+            rewire_mode="delete_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_removed(edges_table, res, nodes, syn_class)
+
+        # Case 9: Deterministic rewiring (w/o keep/reuse_conns) with full adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMatFull.json")
+
+        ## (a) Default rewire mode => All-to-all (EXC or INH) connections should exist
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            rewire_mode=None,
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_to_all(edges_table, res, nodes, syn_class)
+        check_adj(res, edges_table, nodes, syn_class, compare_to=True)
+
+        ## (b) Rewire mode "add_only" => All-to-all (EXC or INH) connections should exist
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            rewire_mode="add_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        check_all_to_all(edges_table, res, nodes, syn_class)
+        check_adj(res, edges_table, nodes, syn_class, compare_to=True)
+
+        ## (c) Rewire mode "delete_only" => Connectivity should be unchanged, but connections re-drawn
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            sel_src=None,
+            sel_dest=None,
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            rewire_mode="delete_only",
+            gen_method="duplicate_randomize",
+            props_model_spec={"file": props_model_file},
+            pos_map_file=None,
+        )
+        res = writer.to_pandas()
+        assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+        check_adj(res, edges_table, nodes, syn_class, compare_to="ref")
+
+        # Case 10: Deterministic rewiring (w/o keep/reuse_conns) with actual adj. matrix
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMat.json")
+
+        ## All rewire modes => Connectivity should be unchanged, but connections re-drawn
+        for _mode in [None, "add_only", "delete_only"]:
+            writer = EdgeWriter(None, edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
+                syn_class=syn_class,
+                prob_model_spec={"file": prob_model_file},
+                delay_model_spec={"file": delay_model_file},
+                sel_src=None,
+                sel_dest=None,
+                amount_pct=pct,
+                keep_indegree=False,
+                reuse_conns=False,
+                keep_conns=False,
+                rewire_mode=_mode,
+                gen_method="duplicate_randomize",
+                props_model_spec={"file": props_model_file},
+                pos_map_file=None,
+            )
+            res = writer.to_pandas()
+            assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+            check_adj(res, edges_table, nodes, syn_class, compare_to="ref")

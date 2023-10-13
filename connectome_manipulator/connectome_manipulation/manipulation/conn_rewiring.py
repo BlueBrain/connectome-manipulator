@@ -75,6 +75,8 @@ class ConnectomeRewiring(Manipulation):
         p_scale=1.0,
         opt_nconn=False,
         pathway_specs=None,
+        keep_conns=False,
+        rewire_mode=None,
     ):
         """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
 
@@ -111,6 +113,16 @@ class ConnectomeRewiring(Manipulation):
             )
             log.debug(
                 f"Enabled optimization of #connections to match expected number on average (max. {OPT_NCONN_MAX_ITER} iterations)"
+            )
+
+        if rewire_mode is not None:
+            log.log_assert(
+                rewire_mode in ["add_only", "delete_only"],
+                f'Rewire mode "{rewire_mode}" not supported (must be "add_only", "delete_only", or None for full rewiring)!',
+            )
+            log.log_assert(
+                keep_indegree is False,
+                f'"keep_indegree" not supported for rewire mode "{rewire_mode}"!',
             )
 
         if keep_indegree and reuse_conns:
@@ -165,28 +177,26 @@ class ConnectomeRewiring(Manipulation):
             props_model = None
 
         # Initialize statistics dict
-        stats_dict = {}  # Keep track of statistics
+        stats_dict = {}
+        # Number of synapses and connections removed/rewired/added/kept
         stats_dict["num_syn_removed"] = []
         stats_dict["num_conn_removed"] = []
         stats_dict["num_syn_rewired"] = []
         stats_dict["num_conn_rewired"] = []
         stats_dict["num_syn_added"] = []
         stats_dict["num_conn_added"] = []
+        stats_dict["num_syn_kept"] = []
+        stats_dict["num_conn_kept"] = []
+        # Total input synapse count
         stats_dict["input_syn_count"] = edges_table.shape[0]
-        stats_dict["unable_to_rewire_nrn_count"] = 0  # (Neurons)
-        stats_dict[
-            "input_conn_count_sel"
-        ] = []  # Number of input connections within src/tgt node selection
-        stats_dict[
-            "output_conn_count_sel"
-        ] = (
-            []
-        )  # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
-        stats_dict[
-            "output_conn_count_sel_avg"
-        ] = (
-            []
-        )  # Average number of output connections within src/tgt node selection (based on prob. model)
+        # Number of tgt neurons unable to rewire
+        stats_dict["unable_to_rewire_nrn_count"] = 0
+        # Number of input connections within src/tgt node selection
+        stats_dict["input_conn_count_sel"] = []
+        # Number of output connections within src/tgt node selection (based on prob. model; for specific seed)
+        stats_dict["output_conn_count_sel"] = []
+        # Average number of output connections within src/tgt node selection (based on prob. model)
+        stats_dict["output_conn_count_sel_avg"] = []
 
         # Determine source/target nodes for rewiring
         src_node_ids = get_node_ids(self.nodes[0], sel_src)
@@ -252,7 +262,7 @@ class ConnectomeRewiring(Manipulation):
                 return
 
         log.info(
-            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method})"
+            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, rewire_mode={rewire_mode})"
         )
 
         # Init/reset static variables (function attributes) related to duplicate_... methods which need only be initialized once [for better performance]
@@ -281,9 +291,8 @@ class ConnectomeRewiring(Manipulation):
         for tidx, tgt in enumerate(tgt_node_ids):
             syn_sel_idx_tgt = edges_table["@target_node"] == tgt
             syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_src)
-            num_sel = np.sum(syn_sel_idx)
 
-            if (keep_indegree and num_sel == 0) or np.sum(syn_sel_idx_tgt) == 0:
+            if (keep_indegree and np.sum(syn_sel_idx) == 0) or np.sum(syn_sel_idx_tgt) == 0:
                 stats_dict["unable_to_rewire_nrn_count"] += 1  # (Neurons)
                 continue  # Nothing to rewire (no synapses on target node)
 
@@ -296,9 +305,11 @@ class ConnectomeRewiring(Manipulation):
             p_src = (
                 p_model.apply(
                     src_pos=src_pos,
-                    src_type=get_enumeration(self.nodes[0], "mtype", src_node_ids),
                     tgt_pos=tgt_pos,
+                    src_type=get_enumeration(self.nodes[0], "mtype", src_node_ids),
                     tgt_type=get_enumeration(self.nodes[1], "mtype", [tgt]),
+                    src_nid=src_node_ids,
+                    tgt_nid=[tgt],
                 ).flatten()
                 * p_scale
             )
@@ -314,6 +325,13 @@ class ConnectomeRewiring(Manipulation):
             num_src = len(src)
             stats_dict["input_conn_count_sel"] = stats_dict["input_conn_count_sel"] + [num_src]
 
+            # Apply rewiring modes ("add_only", "delete_only", or full rewiring otherwise)
+            conn_src = np.isin(src_node_ids, src)  # Existing source connectivity
+            if rewire_mode == "add_only":  # Only new connections can be added, nothing deleted
+                p_src = np.maximum(p_src, conn_src.astype(float))
+            elif rewire_mode == "delete_only":  # Connections can only be deleted, nothing added
+                p_src = np.minimum(p_src, conn_src.astype(float))
+
             # Sample new presynaptic neurons from list of source nodes according to conn. prob.
             if keep_indegree:  # Keep the same number of ingoing connections
                 log.log_assert(
@@ -327,32 +345,47 @@ class ConnectomeRewiring(Manipulation):
                 src_new = np.random.choice(
                     src_node_ids, size=num_src, replace=False, p=p_src / np.sum(p_src)
                 )  # New source node IDs per connection
-            else:  # Number of ingoing connections NOT kept the same
+            else:  # Number of ingoing connections NOT necessarily kept the same
                 stats_dict["output_conn_count_sel_avg"].append(np.round(np.sum(p_src)).astype(int))
                 if estimation_run:
                     continue
 
-                if (
-                    opt_nconn
-                ):  # Optimizing #connections [Repeat random generation up to OPT_NCONN_MAX_ITER times and keep the one with #connestions closest to average]
-                    num_conns_avg = np.round(np.sum(p_src)).astype(
-                        int
-                    )  # Number of connections on average (=target count)
-                    new_conn_count = -np.inf
-                    for _ in range(OPT_NCONN_MAX_ITER):
-                        src_new_sel_tmp = np.random.rand(len(src_node_ids)) < p_src
-                        if np.abs(np.sum(src_new_sel_tmp) - num_conns_avg) < np.abs(
-                            new_conn_count - num_conns_avg
-                        ):  # Keep closest value among all tries
-                            src_new_sel = src_new_sel_tmp
-                            new_conn_count = np.sum(src_new_sel)
-                        if new_conn_count == num_conns_avg:
-                            break  # Optimum found
-                else:  # Just draw once (w/o optimization)
-                    src_new_sel = np.random.rand(len(src_node_ids)) < p_src
-
+                # Select source neurons (with or without optimizing numbers of connections)
+                src_new_sel = self._select_sources(src_node_ids, p_src, opt_nconn)
                 src_new = src_node_ids[src_new_sel]  # New source node IDs per connection
                 stats_dict["output_conn_count_sel"].append(np.sum(src_new_sel))
+
+            # Keep existing connections as they are (i.e., exclude them from any rewiring)
+            if keep_conns:
+                # Identify connections to keep
+                keep_sel = np.logical_and(src_new_sel, conn_src)
+                keep_ids = src_node_ids[keep_sel]  # Source node IDs to keep connections from
+
+                # Remove from list of new connections
+                src_new_sel[keep_sel] = False
+                src_new = src_node_ids[src_new_sel]
+
+                # Recompute source nodes selection used for rewiring
+                keep_syn_idx = np.isin(edges_table["@source_node"], keep_ids)
+                keep_syn_sel = np.logical_and(keep_syn_idx, syn_sel_idx)
+                log.log_assert(
+                    np.all(syn_sel_idx[keep_syn_sel]),
+                    "ERROR: Inconsistent synapse indices to keep!",
+                )
+                syn_sel_idx[keep_syn_sel] = False
+
+                src, src_syn_idx = np.unique(
+                    edges_table.loc[syn_sel_idx, "@source_node"], return_inverse=True
+                )
+                num_src = len(src)
+
+                # Synapse and connection statistics
+                stats_dict["num_syn_kept"] = stats_dict["num_syn_kept"] + [np.sum(keep_syn_sel)]
+                stats_dict["num_conn_kept"] = stats_dict["num_conn_kept"] + [len(keep_ids)]
+            else:
+                # Synapse and connection statistics
+                stats_dict["num_syn_kept"] = stats_dict["num_syn_kept"] + [0]
+                stats_dict["num_conn_kept"] = stats_dict["num_conn_kept"] + [0]
 
             num_new = len(src_new)
 
@@ -371,16 +404,14 @@ class ConnectomeRewiring(Manipulation):
                 syn_sel_idx[syn_del_idx] = False  # Remove to-be-deleted indices from selection
                 stats_dict["num_syn_removed"] = stats_dict["num_syn_removed"] + [
                     np.sum(src_syn_idx >= num_new_reused)
-                ]  # (Synapses)
+                ]
                 stats_dict["num_conn_removed"] = stats_dict["num_conn_removed"] + [
                     num_src - num_new_reused
-                ]  # (Connections)
+                ]
                 src_syn_idx = src_syn_idx[src_syn_idx < num_new_reused]
             else:
-                stats_dict["num_syn_removed"] = stats_dict["num_syn_removed"] + [0]  # (Synapses)
-                stats_dict["num_conn_removed"] = stats_dict["num_conn_removed"] + [
-                    0
-                ]  # (Connections)
+                stats_dict["num_syn_removed"] = stats_dict["num_syn_removed"] + [0]
+                stats_dict["num_conn_removed"] = stats_dict["num_conn_removed"] + [0]
 
             if num_src_to_reuse < num_new:  # Generate new synapses/connections, if needed
                 num_gen_conn = num_new - num_src_to_reuse  # Number of new connections to generate
@@ -419,27 +450,19 @@ class ConnectomeRewiring(Manipulation):
                 # Add new_edges to global new edges table [ignoring duplicate indices]
                 new_edges_list.append(new_edges)
 
-                stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [
-                    new_edges.shape[0]
-                ]  # (Synapses)
-                stats_dict["num_conn_added"] = stats_dict["num_conn_added"] + [
-                    len(src_gen)
-                ]  # (Connections)
+                stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [new_edges.shape[0]]
+                stats_dict["num_conn_added"] = stats_dict["num_conn_added"] + [len(src_gen)]
             else:
-                stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [0]  # (Synapses)
-                stats_dict["num_conn_added"] = stats_dict["num_conn_added"] + [0]  # (Connections)
+                stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [0]
+                stats_dict["num_conn_added"] = stats_dict["num_conn_added"] + [0]
 
             # Assign new source nodes = rewiring of existing connections
             syn_rewire_idx = np.logical_or(syn_rewire_idx, syn_sel_idx)  # [for data logging]
             edges_table.loc[syn_sel_idx, "@source_node"] = src_new[
                 src_syn_idx
             ]  # Source node IDs per connection expanded to synapses
-            stats_dict["num_syn_rewired"] = stats_dict["num_syn_rewired"] + [
-                len(src_syn_idx)
-            ]  # (Synapses)
-            stats_dict["num_conn_rewired"] = stats_dict["num_conn_rewired"] + [
-                len(src_new)
-            ]  # (Connections)
+            stats_dict["num_syn_rewired"] = stats_dict["num_syn_rewired"] + [len(src_syn_idx)]
+            stats_dict["num_conn_rewired"] = stats_dict["num_conn_rewired"] + [len(src_new)]
 
             # Assign new distance-dependent delays (in-place), based on (generative) delay model
             self.assign_delays_from_model(
@@ -642,6 +665,31 @@ class ConnectomeRewiring(Manipulation):
         # ######### #
 
         self.writer.from_pandas(edges_table)
+
+    def _select_sources(self, src_node_ids, p_src, opt_nconn):
+        """Select source neurons with or without optimizing numbers of connections."""
+        if opt_nconn:
+            # Optimizing #connections: Repeat random generation up to OPT_NCONN_MAX_ITER times
+            #                          and keep the one with #connestions closest to average
+
+            # Number of connections on average (=target count)
+            num_conns_avg = np.round(np.sum(p_src)).astype(int)
+
+            # Iterate OPT_NCONN_MAX_ITER times to find optimum
+            new_conn_count = -np.inf
+            for _ in range(OPT_NCONN_MAX_ITER):
+                src_new_sel_tmp = np.random.rand(len(src_node_ids)) < p_src
+                if np.abs(np.sum(src_new_sel_tmp) - num_conns_avg) < np.abs(
+                    new_conn_count - num_conns_avg
+                ):
+                    # Keep closest value among all tries
+                    src_new_sel = src_new_sel_tmp
+                    new_conn_count = np.sum(src_new_sel)
+                if new_conn_count == num_conns_avg:
+                    break  # Optimum found
+        else:  # Just draw once (w/o optimization)
+            src_new_sel = np.random.rand(len(src_node_ids)) < p_src
+        return src_new_sel
 
     def duplicate_synapses(self, syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt):
         """Duplicate num_gen_syn synapse positions on target neuron

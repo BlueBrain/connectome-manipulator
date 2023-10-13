@@ -21,11 +21,12 @@ def compute(
     sel_dest=None,
     per_conn=False,
     skip_empty_groups=False,
+    edges_popul_name=None,
     **_,
 ):
     """Compute mean/std/... values of all synapse properties grouped by given cell property."""
     # Select edge population
-    edges = get_edges_population(circuit)
+    edges = get_edges_population(circuit, edges_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source

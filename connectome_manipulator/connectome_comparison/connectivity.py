@@ -13,10 +13,18 @@ import progressbar
 from connectome_manipulator.access_functions import get_edges_population, get_node_ids
 
 
-def compute(circuit, group_by=None, sel_src=None, sel_dest=None, skip_empty_groups=False, **_):
+def compute(
+    circuit,
+    group_by=None,
+    sel_src=None,
+    sel_dest=None,
+    skip_empty_groups=False,
+    edges_popul_name=None,
+    **_,
+):
     """Compute connectivity grouped by given property."""
     # Select edge population
-    edges = get_edges_population(circuit)
+    edges = get_edges_population(circuit, edges_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source
