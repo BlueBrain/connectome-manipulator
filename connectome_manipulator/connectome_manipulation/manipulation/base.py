@@ -71,7 +71,7 @@ class MorphologyCachingManipulation(Manipulation):
     """An abstract Manipulation with morphology caching
 
     This is a abstract Manipulation class that additionally provides a cache for morphologies,
-    such that they can be reused on different invokations of apply without having to lad them from
+    such that they can be reused on different invokations of apply without having to load them from
     the filesystem.
     """
 

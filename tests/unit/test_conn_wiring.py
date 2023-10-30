@@ -15,6 +15,10 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
 
 
+# SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
+SEC_TYPE_MAP = {nm.AXON: 1, nm.BASAL_DENDRITE: 2, nm.APICAL_DENDRITE: 3}
+
+
 @pytest.fixture
 def manipulation():
     m = Manipulation.get("conn_wiring")
@@ -142,7 +146,7 @@ def test_apply(manipulation):
         else:
             assert False, "Synapse class unknown!"
 
-        # Check synapse position consistency
+        # Check synapse position/type consistency
         syn_pos = res.iloc[i][["afferent_center_x", "afferent_center_y", "afferent_center_z"]]
         sec_id, sec_pos, sec_type = res.iloc[i][
             ["afferent_section_id", "afferent_section_pos", "afferent_section_type"]
@@ -159,7 +163,9 @@ def test_apply(manipulation):
             sec_id = int(
                 sec_id - 1
             )  # IMPORTANT: Section IDs in NeuroM morphology don't include soma, so they need to be shifted by 1 (Soma ID is 0 in edges table)
-            assert sec_type == int(morph.section(sec_id).type), "ERROR: Section type mismatch!"
+            assert (
+                sec_type == SEC_TYPE_MAP[morph.section(sec_id).type]
+            ), "ERROR: Section type mismatch!"
             assert np.all(
                 np.isclose(
                     nm.morphmath.path_fraction_point(morph.section(sec_id).points, sec_pos), syn_pos

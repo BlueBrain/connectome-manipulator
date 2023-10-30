@@ -37,30 +37,8 @@ class ConnectomeWiring(MorphologyCachingManipulation):
     (INH: 0, EXC: 100), and delay (optional) will be generated.
     """
 
-    SYNAPSE_PROPERTIES = [
-        "@target_node",
-        "@source_node",
-        "afferent_section_id",
-        "afferent_section_pos",
-        "afferent_section_type",
-        "afferent_center_x",
-        "afferent_center_y",
-        "afferent_center_z",
-        "syn_type_id",
-        "delay",
-    ]
-    PROPERTY_TYPES = {
-        "@target_node": "int64",
-        "@source_node": "int64",
-        "afferent_section_id": "int32",
-        "afferent_section_pos": "float32",
-        "afferent_section_type": "int16",
-        "afferent_center_x": "float32",
-        "afferent_center_y": "float32",
-        "afferent_center_z": "float32",
-        "syn_type_id": "int16",
-        "delay": "float32",
-    }
+    # SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
+    SEC_TYPE_MAP = {nm.AXON: 1, nm.BASAL_DENDRITE: 2, nm.APICAL_DENDRITE: 3}
 
     @profiler.profileit(name="conn_wiring")
     def apply(
@@ -268,11 +246,10 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             )  # Create mapping from synapses to connections
             num_gen_syn = len(syn_conn_idx)  # Number of synapses to generate
 
-            # Place synapses randomly on soma/dendrite sections
-            # [TODO: Add model for synapse placement??]
+            # Get available dendritic sections (plus soma) to place synapses on
             sec_ind = np.hstack(
                 [
-                    [-1],
+                    [-1],  # [Soma]
                     np.flatnonzero(
                         np.isin(morph.section_types, [nm.BASAL_DENDRITE, nm.APICAL_DENDRITE])
                     ),
@@ -286,23 +263,23 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             off_sel = np.random.rand(len(syn_conn_idx))
             off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
 
-            # Type 0: Soma (1: Axon, 2: Basal, 3: Apical)
+            # Synapse positions & (mapped) section types, computed from section & offset
             type_sel = np.full_like(sec_sel, 0)
-            # Synapse positions, computed from section & offset
             pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
             for idx in np.flatnonzero(sec_sel >= 0):
-                type_sel[idx] = morph.section(sec_sel[idx]).type
+                type_sel[idx] = self.SEC_TYPE_MAP[morph.section(sec_sel[idx]).type]
                 pos_sel[idx] = nm.morphmath.path_fraction_point(
                     morph.section(sec_sel[idx]).points, off_sel[idx]
                 )
-            # syn_type = np.select([src_class[new_edges['@source_node']].to_numpy() == 'INH', src_class[new_edges['@source_node']].to_numpy() == 'EXC'], [np.full(num_gen_syn, 0), np.full(num_gen_syn, 100)]) # INH: 0-99 (Using 0); EXC: >=100 (Using 100)
+
+            # Synapse type assignment [INH: 0-99 (Using 0); EXC: >=100 (Using 100)]
             syn_type = np.select(
                 [
                     src_class[src_new_sel][syn_conn_idx] == "INH",
                     src_class[src_new_sel][syn_conn_idx] == "EXC",
                 ],
                 [np.full(num_gen_syn, 0), np.full(num_gen_syn, 100)],
-            )  # INH: 0-99 (Using 0); EXC: >=100 (Using 100)
+            )
 
             # Assign distance-dependent delays (mtype-specific), based on (generative) delay model (optional)
             # IMPORTANT: Distances for delays are computed in them original coordinate system w/o coordinate transformation!
@@ -323,6 +300,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                     kwargs["delay"] = delay
 
             # IMPORTANT: Section IDs in NeuroM morphology don't include soma, so they need to be shifted by 1 (Soma ID is 0 in edges table)
+            #            The tuple representation (section_id, offset) is used here.
             self.writer.append(
                 source_node_id=src_new[syn_conn_idx],
                 target_node_id=np.full_like(syn_type, tgt),

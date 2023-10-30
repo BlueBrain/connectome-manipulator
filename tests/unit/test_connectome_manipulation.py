@@ -122,7 +122,8 @@ def test_null_manipulation_with_edges(nodes):
 
 
 def test_edges_to_parquet(tmp_path):
-    edges = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json")).edges
+    c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
+    edges = c.edges[c.edges.population_names[0]]
     edges_table = edges.afferent_edges([0, 1], properties=sorted(edges.property_names))
 
     outfile = tmp_path / "test.parquet"

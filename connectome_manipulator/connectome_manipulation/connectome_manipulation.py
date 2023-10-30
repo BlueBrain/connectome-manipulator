@@ -22,10 +22,18 @@ from ..access_functions import get_edges_population, get_nodes_population
 from ..processing import BatchInfo, get_node_splits
 from . import executors
 from .tracker import JobTracker
-from .converters import create_parquet_metadata, parquet_to_sonata, EdgeWriter
+from .converters import (
+    create_parquet_metadata,
+    parquet_to_sonata,
+    EdgeWriter,
+    _SYNAPSE_PROPERTIES,
+    _PROPERTY_TYPES,
+    _ID_COLUMN_MAP,
+)
 from .manipulation import Manipulation
 
 logger = logging.getLogger(__name__)
+_ID_COLUMN_INV_MAP = {_v: _k for _k, _v in _ID_COLUMN_MAP.items()}
 
 
 @dataclass
@@ -124,6 +132,24 @@ def apply_manipulation(edges_table, nodes, job: JobInfo, manip: dict):
     """Apply manipulation to connectome (edges_table) as specified in the manip_config."""
     log.info(f'Applying manipulation "{manip["name"]}" for split {job.split_index}')
     log.info(f'Results will be written to "{job.out_parquet_file}"')
+
+    if edges_table is None:
+        if "syn_props_init" in manip:
+            # Initialize edges table with specified properties + default ones (excluding "edge_type_id" which is for internal use)
+            syn_props_dict = {
+                _ID_COLUMN_INV_MAP.get(_prop, _prop): _PROPERTY_TYPES[_prop]
+                for _prop in _SYNAPSE_PROPERTIES
+                if _prop != "edge_type_id"
+            }
+            syn_props_dict.update(manip["syn_props_init"])
+            edges_table = pd.DataFrame(
+                {_prop: pd.Series(dtype=_type) for _prop, _type in syn_props_dict.items()}
+            )
+    else:
+        log.log_assert(
+            "syn_props_init" not in manip,
+            '"syn_props_init" not supported with existing connectome!',
+        )
 
     with EdgeWriter(job.out_parquet_file, existing_edges=edges_table) as writer:
         for fun, cfg in enumerate(manip["fcts"]):

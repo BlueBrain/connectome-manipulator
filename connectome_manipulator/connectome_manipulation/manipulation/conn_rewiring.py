@@ -2,14 +2,18 @@
 
 Description: Rewiring of existing connectome, based on a given model of connection probability (which can
 optionally be scaled by a global probability scaling factor p_scale; p_scale=1.0 by default)
-Optionally, number of ingoing connections (and #synapses/connection) can be kept the same
-by re-using existing connections/synapses. Otherwise, existing synapses may be deleted or new ones
-created, based on the selected generation method ("duplicate_sample" and "duplicate_randomize"
-supported so far!).
+Optionally, existing connections (#synapses/connection, synapse physiology) can be preserved or reused
+in new connections. Otherwise, existing synapses (and connections) may be deleted or new ones created,
+based on the selected generation method ("sample" or "randomize").
+
+Additional options: Preserving indegrees, reuse existing synapse positions, only adding connections,
+                    only deleting connections
 
 Connection/synapse generation methods (gen_method):
- "duplicate_sample" ... Duplicate existing synapse position & sample (non-morphology-related; w/o delay) property values independently from existing synapses
- "duplicate_randomize" ... Duplicate existing synapse position & randomize (non-morphology-related; w/o delay) property values based on pathway-specific model distributions
+ "sample" ... Reuse or generate synapse positions & sample (non-morphology-related; w/o delay) property
+              values independently from existing synapses
+ "randomize" ... Reuse or generate synapse positions & randomize (non-morphology-related; w/o delay)
+                 property values based on pathway-specific model distributions
 
 Estimation run (optional): By setting estimation_run=True (False by default), an early stopping
  criterion is applied to just estimate the resulting number of connections (on average, i.e.,
@@ -21,10 +25,12 @@ Optimizing #connections: By setting opt_nconn=True (False by default), the numbe
  is done by repeating the random generation up to OPT_NCONN_MAX_ITER times and keeping the instance
  which has #connestions exactly matching or closest to the average.
 
-NOTE: Input edges_table assumed to be sorted by @target_node.
-   Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
+NOTES: Input edges_table assumed to be sorted by @target_node.
+       Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
 """
 
+import libsonata
+import neurom as nm
 import numpy as np
 import pandas as pd
 
@@ -33,21 +39,36 @@ from connectome_manipulator.access_functions import (
     get_node_ids,
     get_enumeration,
 )
-from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
+from connectome_manipulator.connectome_manipulation.manipulation import (
+    MorphologyCachingManipulation,
+)
 from connectome_manipulator.model_building import model_types, conn_prob
 
 OPT_NCONN_MAX_ITER = 1000
 
 
-class ConnectomeRewiring(Manipulation):
+class ConnectomeRewiring(MorphologyCachingManipulation):
     """Rewiring of existing connectome, based on a given model of connection probability.
 
     This can optionally be scaled by a global probability scaling factor p_scale; p_scale=1.0 by default)
-    Optionally, number of ingoing connections (and #synapses/connection) can be kept the same
-    by re-using existing connections/synapses. Otherwise, existing synapses may be deleted or new ones
-    created, based on the selected generation method ("duplicate_sample" and "duplicate_randomize"
-    supported so far!).
+    Optionally, existing connections may be preserved or reused. Otherwise, existing synapses may be deleted
+    or new ones created, based on the selected generation method ("sample" or "randomize").
+    Additional options: Preserving indegrees, reuse existing synapse positions, only adding connections,
+                        only deleting connections
     """
+
+    # SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
+    SEC_TYPE_MAP = {nm.AXON: 1, nm.BASAL_DENDRITE: 2, nm.APICAL_DENDRITE: 3}
+
+    # Afferent morphology-related synapse properties in tuple representation (section_id, offset)
+    PROPS_AFFERENT = [
+        "afferent_section_id",
+        "afferent_section_pos",
+        "afferent_section_type",
+        "afferent_center_x",
+        "afferent_center_y",
+        "afferent_center_z",
+    ]
 
     def __init__(self, nodes, writer, split_index=0, split_total=1):
         """Construct ConnectomeRewiring Manipulation and declare state vars..."""
@@ -77,10 +98,12 @@ class ConnectomeRewiring(Manipulation):
         pathway_specs=None,
         keep_conns=False,
         rewire_mode=None,
+        reuse_pos=True,
+        morph_ext="swc",
     ):
         """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
 
-        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
+        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed.
         """
         # pylint: disable=arguments-differ
         edges_table = self.writer.to_pandas()
@@ -130,15 +153,19 @@ class ConnectomeRewiring(Manipulation):
                 gen_method is None,
                 'No generation method required for "keep_indegree" and "reuse_conns" options!',
             )
+            log.log_assert(
+                reuse_pos,
+                '"reuse_pos" must be enabled when using "keep_indegree" and "reuse_conns" options!',
+            )
         else:
             log.log_assert(
-                gen_method in ["duplicate_sample", "duplicate_randomize"],
-                'Valid generation method required (must be "duplicate_sample" or "duplicate_randomize")!',
+                gen_method in ["sample", "randomize"],
+                'Valid generation method required (must be "sample" or "randomize")!',
             )
 
-        if gen_method == "duplicate_sample" and self.split_total > 1:
+        if gen_method == "sample" and self.split_total > 1:
             log.warning(
-                f'"{gen_method}" method samples only from synapses within same data split! Reduce number of splits to 1 to sample from all synapses!'
+                f'Generation method "{gen_method}" samples only from synapses within same data split! Reduce number of splits to 1 to sample from all synapses!'
             )
 
         if "file" not in prob_model_spec:
@@ -161,8 +188,8 @@ class ConnectomeRewiring(Manipulation):
         if pos_acc is None:
             log.debug("No position mapping model provided")
 
-        # Load connection/synapse properties model [required for "duplicate_randomize" method]
-        if gen_method == "duplicate_randomize":
+        # Load connection/synapse properties model [required for "randomize" generation method]
+        if gen_method == "randomize":
             log.log_assert(
                 props_model_spec is not None,
                 f'Properties model required for generation method "{gen_method}"!',
@@ -227,7 +254,7 @@ class ConnectomeRewiring(Manipulation):
         stats_dict[
             "target_nrn_count_all"
         ] = num_tgt_total  # All target neurons in current split (corresponding to chosen sel_dest)
-        num_tgt = np.round(amount_pct * len(tgt_node_ids) / 100).astype(int)
+        num_tgt = np.round(amount_pct * num_tgt_total / 100).astype(int)
         stats_dict[
             "target_nrn_count_sel"
         ] = num_tgt  # Selected target neurons in current split (based on amount_pct)
@@ -262,10 +289,16 @@ class ConnectomeRewiring(Manipulation):
                 return
 
         log.info(
-            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, rewire_mode={rewire_mode})"
+            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, reuse_pos={reuse_pos}{'' if reuse_pos else ', morph_ext=' + morph_ext}, rewire_mode={rewire_mode})"
         )
 
-        # Init/reset static variables (function attributes) related to duplicate_... methods which need only be initialized once [for better performance]
+        # Load target morphologies, if needed
+        if not reuse_pos:
+            tgt_morphs = self._get_tgt_morphs(morph_ext, libsonata.Selection(tgt_node_ids))
+        else:
+            tgt_morphs = [None] * num_tgt
+
+        # Init/reset static variables (function attributes) related to generation methods which need only be initialized once [for better performance]
         self._reinit(edges_table, syn_class)
         # Index of input connections (before rewiring) [for data logging]
         inp_conns, inp_syn_conn_idx, inp_syn_per_conn = np.unique(
@@ -288,13 +321,17 @@ class ConnectomeRewiring(Manipulation):
             edges_table.shape[0], False
         )  # Global synapse indices to keep track of all rewired synapses [for data logging]
         new_edges_list = []  # New edges list to collect all generated synapses
-        for tidx, tgt in enumerate(tgt_node_ids):
+        for tidx, (tgt, morph) in enumerate(zip(tgt_node_ids, tgt_morphs)):
             syn_sel_idx_tgt = edges_table["@target_node"] == tgt
             syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_src)
 
-            if (keep_indegree and np.sum(syn_sel_idx) == 0) or np.sum(syn_sel_idx_tgt) == 0:
+            if (keep_indegree and np.sum(syn_sel_idx) == 0) or (
+                np.sum(syn_sel_idx_tgt) == 0 and morph is None
+            ):
                 stats_dict["unable_to_rewire_nrn_count"] += 1  # (Neurons)
-                continue  # Nothing to rewire (no synapses on target node)
+                # Nothing to rewire: either keeping indegree zero, or no target synapses exist
+                # that could be rewired or positions reused from (unless morphologies used)
+                continue
 
             # Get target neuron position (incl. position mapping, if provided)
             tgt_pos = conn_prob.get_neuron_positions(
@@ -387,6 +424,8 @@ class ConnectomeRewiring(Manipulation):
                 stats_dict["num_syn_kept"] = stats_dict["num_syn_kept"] + [0]
                 stats_dict["num_conn_kept"] = stats_dict["num_conn_kept"] + [0]
 
+            # Randomize rewiring order of new source neurons
+            src_new = np.random.permutation(src_new)
             num_new = len(src_new)
 
             # Re-use (up to) num_src existing connections (incl. #synapses/connection) for rewiring of (up to) num_new new connections (optional)
@@ -397,7 +436,8 @@ class ConnectomeRewiring(Manipulation):
                 num_src_to_reuse = 0
                 num_new_reused = 0
 
-            if num_src > num_new_reused:  # Delete unused connections/synapses
+            if num_src > num_new_reused:  # Delete unused connections/synapses (randomly)
+                src_syn_idx = self._shuffle_conns(src_syn_idx)
                 syn_del_idx[syn_sel_idx] = (
                     src_syn_idx >= num_new_reused
                 )  # Set global indices of connections to be deleted
@@ -420,34 +460,18 @@ class ConnectomeRewiring(Manipulation):
                 ]  # Split new sources into ones used for newly generated ...
                 src_new = src_new[:num_src_to_reuse]  # ... and existing connections
 
-                if (
-                    gen_method == "duplicate_sample"
-                ):  # Duplicate existing synapse position & sample (non-morphology-related) property values independently from existing synapses
-                    new_edges = self._duplicate_sample_synapses(
-                        src_gen,
-                        tidx,
-                        edges_table,
-                        syn_sel_idx,
-                        syn_sel_idx_tgt,
-                        tgt_node_ids,
-                        delay_model,
-                    )
-                elif (
-                    gen_method == "duplicate_randomize"
-                ):  # Duplicate existing synapse position & randomize (non-morphology-related) property values based on pathway-specific model distributions
-                    new_edges = self._duplicate_randomize_synapses(
-                        src_gen,
-                        edges_table,
-                        syn_sel_idx,
-                        syn_sel_idx_tgt,
-                        tgt,
-                        delay_model,
-                        props_model,
-                    )
-                else:
-                    log.log_assert(False, f"Generation method {gen_method} unknown!")
-
-                # Add new_edges to global new edges table [ignoring duplicate indices]
+                # Create new_edges and add them to global new edges table [ignoring duplicate indices]
+                new_edges = self._generate_edges(
+                    src_gen,
+                    tidx,
+                    tgt_node_ids,
+                    syn_sel_idx_tgt,
+                    edges_table,
+                    gen_method,
+                    props_model,
+                    delay_model,
+                    morph,
+                )
                 new_edges_list.append(new_edges)
 
                 stats_dict["num_syn_added"] = stats_dict["num_syn_added"] + [new_edges.shape[0]]
@@ -465,7 +489,7 @@ class ConnectomeRewiring(Manipulation):
             stats_dict["num_conn_rewired"] = stats_dict["num_conn_rewired"] + [len(src_new)]
 
             # Assign new distance-dependent delays (in-place), based on (generative) delay model
-            self.assign_delays_from_model(
+            self._assign_delays_from_model(
                 delay_model, edges_table, src_new, src_syn_idx, syn_sel_idx
             )
 
@@ -515,7 +539,10 @@ class ConnectomeRewiring(Manipulation):
             syn_new_dupl_idx = np.array(
                 all_new_edges.index
             )  # Index of duplicated synapses [for data logging]
-            max_idx = np.max(edges_table.index)
+            if edges_table.size == 0:
+                max_idx = 0
+            else:
+                max_idx = np.max(edges_table.index)
             all_new_edges.index = range(
                 max_idx + 1, max_idx + 1 + all_new_edges.shape[0]
             )  # Set index to new range, so as to keep track of new edges
@@ -656,12 +683,13 @@ class ConnectomeRewiring(Manipulation):
 
         # [TESTING] #
         # Overflow/value check
-        log.log_assert(np.all(np.abs(edges_table.max()) < 1e9), "Value overflow in edges table!")
-        if "n_rrp_vesicles" in edges_table.columns:
-            log.log_assert(
-                np.all(edges_table["n_rrp_vesicles"] >= 1),
-                "Value error in edges table (n_rrp_vesicles)!",
-            )
+        if edges_table.size > 0:
+            log.log_assert(np.all(edges_table.abs().max() < 1e9), "Value overflow in edges table")
+            if "n_rrp_vesicles" in edges_table.columns:
+                log.log_assert(
+                    np.all(edges_table["n_rrp_vesicles"] >= 1),
+                    "Value error in edges table (n_rrp_vesicles)!",
+                )
         # ######### #
 
         self.writer.from_pandas(edges_table)
@@ -691,22 +719,80 @@ class ConnectomeRewiring(Manipulation):
             src_new_sel = np.random.rand(len(src_node_ids)) < p_src
         return src_new_sel
 
-    def duplicate_synapses(self, syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt):
-        """Duplicate num_gen_syn synapse positions on target neuron
+    def _shuffle_conns(self, syn_conn_idx):
+        """Shuffles assignment of synapses to connections.
 
-        ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
+        e.g. [0, 0, 1, 1, 1, 2] -> [2, 2, 0, 0, 0, 1]
         """
-        # => Unique per connection, so that no duplicated synapses belong to same connection (if possible)!!
-        unique_per_conn_warning = False
-        num_sel = np.sum(syn_sel_idx)
+        conn_map = np.random.permutation(np.max(syn_conn_idx) + 1)
+        return conn_map[syn_conn_idx]
+
+    def _generate_edges(
+        self,
+        src_gen,
+        tidx,
+        tgt_node_ids,
+        syn_sel_idx_tgt,
+        edges_table,
+        gen_method,
+        props_model,
+        delay_model,
+        morph,
+    ):
+        """Generates a new set of edges (=synapses), based on the chosen generation options.
+
+        The generation method, use of morphologies, and delay model must be specified.
+        """
+        tgt = tgt_node_ids[tidx]
+
+        # Create new synapses with pyhsiological parameters
+        if gen_method == "sample":
+            # Sample (non-morphology-related) property values independently from existing synapses
+            new_edges, syn_conn_idx = self._create_synapses_by_sampling(
+                src_gen, tidx, tgt_node_ids, edges_table
+            )
+        elif gen_method == "randomize":
+            # Randomize (non-morphology-related) property values based on pathway-specific model distributions
+            new_edges, syn_conn_idx = self._create_synapses_by_randomization(
+                src_gen, tgt, props_model, edges_table
+            )
+        else:
+            log.log_assert(False, f"Generation method {gen_method} unknown!")
+
+        # Assign synapses to connections from src_gen to tgt
+        new_edges["@source_node"] = src_gen[syn_conn_idx]
+        new_edges["@target_node"] = tgt
+
+        # Fill-in synapse positions (in-place)
+        if morph is None:  # No dendritic morphology loaded => Reuse existing positions
+            # Duplicate synapse positions on target neuron
+            self._reuse_synapse_positions(
+                new_edges, edges_table, syn_sel_idx_tgt, syn_conn_idx, tgt
+            )
+        else:
+            # Randomly generate new synapse positions on target neuron
+            self._generate_synapse_positions(morph, new_edges, syn_conn_idx)
+
+        # Assign distance-dependent delays (in-place), based on (generative) delay model
+        self._assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
+
+        # Restore original data types
+        new_edges = new_edges.astype(edges_table.dtypes)
+        # new_edges = new_edges.astype(edges_table.dtypes[new_edges.columns])  # [ALTERNATIVE: In case of column mismatch!]
+
+        return new_edges
+
+    def _reuse_synapse_positions(self, new_edges, edges_table, syn_sel_idx_tgt, syn_conn_idx, tgt):
+        """Assigns (in-place) duplicate synapse positions on target neuron (w/o accessing dendritic morphologies).
+
+        If possible, synapses will be selected such that no duplicated synapses belong to same connection.
+        Only afferent_... properties following the tuple representation (section_id, offset) will be set.
+        """
+        conns, nsyns = np.unique(syn_conn_idx, return_counts=True)
+        draw_from = np.where(syn_sel_idx_tgt)[0]
         sel_dupl = []
-        conns = np.unique(syn_conn_idx)
-        for cidx in conns:
-            dupl_count = np.sum(syn_conn_idx == cidx)
-            if num_sel > 0:  # Duplicate only synapses of syn_class type
-                draw_from = np.where(syn_sel_idx)[0]
-            else:  # Include all synapses, if no synapses of syn_class type are available
-                draw_from = np.where(syn_sel_idx_tgt)[0]
+        unique_per_conn_warning = False
+        for dupl_count in nsyns:
             if len(draw_from) >= dupl_count:
                 sel_dupl.append(
                     np.random.choice(draw_from, dupl_count, replace=False)
@@ -717,9 +803,6 @@ class ConnectomeRewiring(Manipulation):
                 )  # Random sampling from existing synapses WITH replacement, otherwise
                 unique_per_conn_warning = True
         sel_dupl = np.hstack(sel_dupl)
-        log.log_assert(
-            len(sel_dupl) == num_gen_syn, "ERROR: Wrong number of duplicated synapse positions!"
-        )
 
         if unique_per_conn_warning:
             log.warning(
@@ -736,12 +819,55 @@ class ConnectomeRewiring(Manipulation):
                 )
         # ######### #
 
-        return sel_dupl
+        # Duplicate and assign afferent position properties
+        new_edges[self.PROPS_AFFERENT] = edges_table.iloc[sel_dupl][self.PROPS_AFFERENT].to_numpy()
+
+    def _generate_synapse_positions(self, morph, new_edges, syn_conn_idx):
+        """Assign (in-place) new synapse positions on target neuron (with accessing dendritic morphologies).
+
+        Synapses are randomly (uniformly) placed on soma/dendrite sections.
+        Only afferent_... properties following the tuple representation (section_id, offset) will be set.
+        """
+        # Get available dendritic sections (plus soma) to place synapses on
+        sec_ind = np.hstack(
+            [
+                [-1],  # [Soma]
+                np.flatnonzero(
+                    np.isin(morph.section_types, [nm.BASAL_DENDRITE, nm.APICAL_DENDRITE])
+                ),
+            ]
+        )
+
+        # Randomly choose section indices
+        sec_sel = np.random.choice(sec_ind, len(syn_conn_idx))
+
+        # Randomly choose fractional offset within each section
+        off_sel = np.random.rand(len(syn_conn_idx))
+        off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
+
+        # Synapse positions & (mapped) section types, computed from section & offset
+        type_sel = np.full_like(sec_sel, 0)
+        pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
+        for idx in np.flatnonzero(sec_sel >= 0):
+            type_sel[idx] = self.SEC_TYPE_MAP[morph.section(sec_sel[idx]).type]
+            pos_sel[idx] = nm.morphmath.path_fraction_point(
+                morph.section(sec_sel[idx]).points, off_sel[idx]
+            )
+
+        # Assign afferent position properties
+        # IMPORTANT: Section IDs in NeuroM morphology don't include soma, so they need to be shifted by 1 (Soma ID is 0 in edges table)
+        new_edges["afferent_section_id"] = sec_sel + 1
+        new_edges["afferent_section_pos"] = off_sel
+        new_edges["afferent_section_type"] = type_sel
+        new_edges["afferent_center_x"] = pos_sel[:, 0]
+        new_edges["afferent_center_y"] = pos_sel[:, 1]
+        new_edges["afferent_center_z"] = pos_sel[:, 2]
 
     def _reinit(self, edges_table, syn_class):
-        self.duplicate_sample_synapses_per_mtype_dict = (
-            {}
-        )  # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
+        # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)
+        self.duplicate_sample_synapses_per_mtype_dict = {}
+
+        # Non-morphology-related property selection (to be sampled/randomized)
         self.props_sel = list(
             filter(
                 lambda x: not np.any(
@@ -762,27 +888,22 @@ class ConnectomeRewiring(Manipulation):
                 ),
                 edges_table.columns,
             )
-        )  # Non-morphology-related property selection (to be sampled/randomized)
-        if syn_class == "EXC":
+        )
+
+        # Synapse class selection (EXC or INH)
+        if syn_class == "EXC":  # EXC: >=100
             self.syn_sel_idx_type = edges_table["syn_type_id"] >= 100
-        elif syn_class == "INH":
+        elif syn_class == "INH":  # INH: 0-99
             self.syn_sel_idx_type = edges_table["syn_type_id"] < 100
         else:
             log.log_assert(False, f"Synapse class {syn_class} not supported!")
 
-    def _duplicate_sample_synapses(
-        self,
-        src_gen,
-        tidx,
-        edges_table,
-        syn_sel_idx,
-        syn_sel_idx_tgt,
-        tgt_node_ids,
-        delay_model,
-    ):
-        """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_node_ids[tidx]>, by duplicating existing
+    def _create_synapses_by_sampling(self, src_gen, tidx, tgt_node_ids, edges_table):
+        """Creates new synapses with pyhsiological parameter values by sampling.
 
-        synapse position & sampling (non-morphology-related) property values independently from existing synapses.
+        Works by sampling (non-morphology-related) property values, including numbers of
+        synapses per connection, independently from existing synapses.
+        All other properties will be initialized as zero (to be filled in later).
         """
         # Sample #synapses/connection from other existing synapses targetting neurons of the same mtype (or layer) as tgt (incl. tgt)
         tgt = tgt_node_ids[tidx]
@@ -835,16 +956,14 @@ class ConnectomeRewiring(Manipulation):
         syn_conn_idx = np.concatenate(
             [[i] * n for i, n in enumerate(num_syn_per_conn)]
         )  # Create mapping from synapses to connections
-        num_gen_syn = len(syn_conn_idx)  # Number of synapses to generate
 
-        # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-        sel_dupl = self.duplicate_synapses(
-            syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt
-        )
-        new_edges = edges_table.iloc[sel_dupl].copy()
+        # Initialize new edges table with zeros (preserving data types)
+        new_edges = pd.DataFrame(
+            np.zeros((len(syn_conn_idx), len(edges_table.columns))), columns=edges_table.columns
+        ).astype(edges_table.dtypes)
 
         # Sample (non-morphology-related) property values independently from other existing synapses targetting neurons of the same mtype as tgt (incl. tgt)
-        # => Assume identical (non-morphology-related) property values for synapses belonging to same connection (incl. delay, but this will (optionally) be re-assigned)!!
+        # => Assume identical (non-morphology-related) property values for synapses belonging to same connection
         for p in self.props_sel:
             new_edges[p] = (
                 edges_table.loc[syn_sel_idx_mtype, p]
@@ -852,28 +971,14 @@ class ConnectomeRewiring(Manipulation):
                 .to_numpy()[syn_conn_idx]
             )
 
-        # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
-        new_edges["@source_node"] = src_gen[syn_conn_idx]
+        return new_edges, syn_conn_idx
 
-        # Assign distance-dependent delays (in-place), based on (generative) delay model (optional)
-        self.assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
+    def _create_synapses_by_randomization(self, src_gen, tgt, props_model, edges_table):
+        """Creates new synapses with pyhsiological parameter values by randomization.
 
-        return new_edges
-
-    def _duplicate_randomize_synapses(
-        self,
-        src_gen,
-        edges_table,
-        syn_sel_idx,
-        syn_sel_idx_tgt,
-        tgt_id,
-        delay_model,
-        props_model,
-    ):
-        """Method to generate new synapses from source neurons <src_gen> to target neuron <tgt_id>
-
-        Works by duplicating existing synapse position & randomizing (non-morphology-related) properties based
-        on pathway-specific model distributions.
+        Works by randomly drawing (non-morphology-related) property values, including
+        numbers of synapses per connection, from pathway-specific model distributions.
+        All other properties will be initialized as zero (to be filled in later).
         """
         log.log_assert(
             np.all(np.isin(self.props_sel, props_model.get_prop_names())),
@@ -881,34 +986,26 @@ class ConnectomeRewiring(Manipulation):
         )
         # Generate new synapse properties based on properties model
         src_mtypes = self.nodes[0].get(src_gen, properties="mtype").to_numpy()
-        tgt_mtype = self.nodes[1].get(tgt_id, properties="mtype")
+        tgt_mtype = self.nodes[1].get(tgt, properties="mtype")
         new_syn_props = [props_model.apply(src_type=s, tgt_type=tgt_mtype) for s in src_mtypes]
         num_syn_per_conn = [syn.shape[0] for syn in new_syn_props]
         syn_conn_idx = np.concatenate(
             [[i] * n for i, n in enumerate(num_syn_per_conn)]
         )  # Create mapping from synapses to connections
-        num_gen_syn = len(syn_conn_idx)  # Total number of generated synapses
 
-        # Duplicate num_gen_syn synapse positions on target neuron ['efferent_...' properties will no longer be consistent with actual source neuron's axon morphology!]
-        sel_dupl = self.duplicate_synapses(
-            syn_sel_idx, syn_sel_idx_tgt, syn_conn_idx, num_gen_syn, tgt_id
-        )
-        new_edges = edges_table.iloc[sel_dupl].copy()
+        # Initialize new edges table with zeros (preserving data types)
+        new_edges = pd.DataFrame(
+            np.zeros((len(syn_conn_idx), len(edges_table.columns))), columns=edges_table.columns
+        ).astype(edges_table.dtypes)
 
-        # Assign new synapse values for non-morphology-related properties
+        # Assign non-morphology-related property values
         new_edges[self.props_sel] = pd.concat(new_syn_props, ignore_index=True)[
             self.props_sel
         ].to_numpy()
 
-        # Assign num_gen_syn synapses to num_gen_conn connections from src_gen to tgt
-        new_edges["@source_node"] = src_gen[syn_conn_idx]
+        return new_edges, syn_conn_idx
 
-        # Assign distance-dependent delays (in-place), based on (generative) delay model
-        self.assign_delays_from_model(delay_model, new_edges, src_gen, syn_conn_idx)
-
-        return new_edges
-
-    def assign_delays_from_model(
+    def _assign_delays_from_model(
         self, delay_model, edges_table, src_new, src_syn_idx, syn_sel_idx=None
     ):
         """Assign new distance-dependent delays, drawn from truncated normal distribution, to new synapses within edges_table (in-place)."""

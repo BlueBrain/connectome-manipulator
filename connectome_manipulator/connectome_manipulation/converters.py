@@ -162,11 +162,12 @@ class EdgeWriter:
             self._batches_size = 0
             self._total_edges += len(table)
             log.debug("Writing %d edges to disk, total of %d edges", len(table), self._total_edges)
-            if not self._writer:
-                log.log_assert(not self._path.exists(), "Can't append to open file")
-                log.debug("Opening %s to write", self._path)
-                self._writer = pq.ParquetWriter(self._path, table.schema)
-            self._writer.write_table(table)
+            if len(table) > 0:  # Only write file if any edges exist
+                if not self._writer:
+                    log.log_assert(not self._path.exists(), "Can't append to open file")
+                    log.debug("Opening %s to write", self._path)
+                    self._writer = pq.ParquetWriter(self._path, table.schema)
+                self._writer.write_table(table)
 
     def to_pandas(self):
         """Return the buffer as a Pandas DataFrame"""
@@ -193,6 +194,11 @@ def create_parquet_metadata(parquet_path, nodes):
 
     [Modified from: https://bbpgitlab.epfl.ch/hpc/circuit-building/spykfunc/-/blob/main/src/spykfunc/functionalizer.py#L328-354]
     """
+    parquet_file_list = glob.glob(os.path.join(parquet_path, "*.parquet"))
+    if len(parquet_file_list) == 0:
+        log.warning("No .parquet files exist, no metadata created!")
+        return None  # No metadata if no .parquet files exist
+
     schema = pq.ParquetDataset(parquet_path, use_legacy_dataset=False).schema
     if schema.metadata:
         metadata = {k.decode(): v.decode() for k, v in schema.metadata.items()}
