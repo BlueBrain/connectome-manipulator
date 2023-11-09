@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ from mock import Mock, patch
 from numpy.testing import assert_array_equal
 from scipy.ndimage import gaussian_filter
 from scipy.spatial import distance_matrix
+from voxcell import VoxelData
 
 from utils import TEST_DATA_DIR, setup_tempdir
 import connectome_manipulator.model_building.conn_prob as test_module
@@ -37,7 +39,9 @@ def test_extract():
             patched.assert_called()
 
     order = "fake"
-    with pytest.raises(AssertionError, match=f"Order-{order} data extraction not supported!"):
+    with pytest.raises(
+        AssertionError, match=re.escape(f"Order-{order} data extraction not supported!")
+    ):
         test_module.extract(circuit, order)
 
 
@@ -56,7 +60,9 @@ def test_build():
             patched.assert_called()
 
     order = "fake"
-    with pytest.raises(AssertionError, match=f"Order-{order} model building not supported!"):
+    with pytest.raises(
+        AssertionError, match=re.escape(f"Order-{order} model building not supported!")
+    ):
         test_module.build(order)
 
 
@@ -76,7 +82,7 @@ def test_plot():
 
     order = "fake"
     with pytest.raises(
-        AssertionError, match=f"Order-{order} data/model visualization not supported!"
+        AssertionError, match=re.escape(f"Order-{order} data/model visualization not supported!")
     ):
         test_module.plot(order)
 
@@ -87,13 +93,13 @@ def test_load_pos_mapping_model():
     with setup_tempdir(__name__) as tempdir:
         filepath = os.path.join(tempdir, "fake.json")
 
-        with pytest.raises(AssertionError, match="Position mapping model file not found!"):
+        with pytest.raises(
+            AssertionError, match=re.escape("Position mapping model file not found!")
+        ):
             test_module.load_pos_mapping_model(filepath)
 
         # Create dummy position mapping model
-        pos_model = model_types.PosMapModel(
-            pos_table=pd.DataFrame(np.random.rand(10, 3), columns=["x", "y", "z"])
-        )
+        pos_model = model_types.PosMapModel(pos_table=pd.DataFrame(np.random.rand(10, 3)))
         pos_model.save_model(
             os.path.split(filepath)[0], os.path.splitext(os.path.split(filepath)[1])[0]
         )
@@ -101,21 +107,165 @@ def test_load_pos_mapping_model():
         test_module.load_pos_mapping_model(filepath)
 
 
-def test_get_neuron_positions():
+def test_get_neuron_positions_by_id():
     functions = [
         lambda x: x + 0.1,
         lambda x: x * 2,
         lambda x: x**3,
     ]
 
-    res = test_module.get_neuron_positions(functions, range(3))
+    res = test_module.get_neuron_positions_by_id(functions, range(3))
     assert_array_equal(res, [0.1, 2, 8])
 
-    res = test_module.get_neuron_positions(functions, [np.arange(3)] * 3)
+    res = test_module.get_neuron_positions_by_id(functions, [np.arange(3)] * 3)
     assert_array_equal(res, [[0.1, 1.1, 2.1], [0, 2, 4], [0, 1, 8]])
 
-    res = test_module.get_neuron_positions(lambda x: x + 1, range(3))
+    res = test_module.get_neuron_positions_by_id(lambda x: x + 1, range(3))
     assert_array_equal(res, range(1, 4))
+
+
+def test_get_neuron_positions():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
+    nodes = [circuit.nodes["nodeA"]] * 2  # Src/tgt populations
+    # Permute node IDs, so that src/tgt are different
+    np.random.seed(0)
+    src_ids = np.random.permutation(nodes[0].ids())
+    tgt_ids = np.random.permutation(nodes[1].ids())
+
+    # Case 1: No access function, no voxel map => Should correspond to node positions
+    res = test_module.get_neuron_positions(nodes, [src_ids, tgt_ids], pos_acc=None, vox_map=None)
+    assert_array_equal(nodes[0].positions(src_ids), res[0])
+    assert_array_equal(nodes[1].positions(tgt_ids), res[1])
+
+    # Case 2: Position access through PosMapModel (no voxel map) => Should correspond to mapped positions
+    src_pos_table = pd.DataFrame(np.random.rand(len(src_ids), 3))
+    tgt_pos_table = pd.DataFrame(np.random.rand(len(tgt_ids), 3))
+    src_pos_model = model_types.PosMapModel(pos_table=src_pos_table)
+    tgt_pos_model = model_types.PosMapModel(pos_table=tgt_pos_table)
+    src_pos_acc = lambda gids: src_pos_model.apply(gids=gids)
+    tgt_pos_acc = lambda gids: tgt_pos_model.apply(gids=gids)
+
+    res = test_module.get_neuron_positions(
+        nodes, [src_ids, tgt_ids], pos_acc=[src_pos_acc, tgt_pos_acc], vox_map=None
+    )
+    assert_array_equal(src_pos_table.loc[src_ids], res[0])
+    assert_array_equal(tgt_pos_table.loc[tgt_ids], res[1])
+
+    # Case 3: Position access through voxel map (no access function) => Should correspond to voxel positions
+    src_vox_map = VoxelData.load_nrrd(os.path.join(TEST_DATA_DIR, "xy_map_lin.nrrd"))
+    tgt_vox_map = VoxelData.load_nrrd(os.path.join(TEST_DATA_DIR, "xy_map_ones.nrrd"))
+
+    res = test_module.get_neuron_positions(
+        nodes, [src_ids, tgt_ids], pos_acc=None, vox_map=[src_vox_map, tgt_vox_map]
+    )
+    assert_array_equal(src_vox_map.lookup(nodes[0].positions(src_ids).to_numpy()), res[0])
+    assert_array_equal(tgt_vox_map.lookup(nodes[1].positions(tgt_ids).to_numpy()), res[1])
+
+    # Case 4: Both PosMapModel and voxel map provided => Must fail, not supported
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Voxel map not supported when providing position access functions!"),
+    ):
+        res = test_module.get_neuron_positions(
+            nodes,
+            [src_ids, tgt_ids],
+            pos_acc=[src_pos_acc, tgt_pos_acc],
+            vox_map=[src_vox_map, tgt_vox_map],
+        )
+
+
+def test_get_pos_mapping_fcts():
+    # Case 1: No mapping provided => Must return None's
+    res = test_module.get_pos_mapping_fcts(pos_map_file=None)
+    assert res[0] is None  # pos_acc
+    assert res[1] is None  # vox_map
+
+    # Case 2: Position mapping model .json file(s) => Must return pos_acc, but no vox_map
+    with setup_tempdir(__name__) as tempdir:
+        # Create dummy position mapping models
+        pos_tables = []
+        nids = 10
+        np.random.seed(0)
+        for i in range(2):
+            _pos_tab = pd.DataFrame(np.random.rand(10, 3), index=i * nids + np.arange(nids))
+            pos_model = model_types.PosMapModel(pos_table=_pos_tab)
+            pos_model.save_model(tempdir, f"dummy_pos_map{i}")
+            pos_tables.append(_pos_tab)
+
+        # (a) Single src/tgt file
+        res = test_module.get_pos_mapping_fcts(
+            pos_map_file=os.path.join(tempdir, "dummy_pos_map0.json")
+        )
+        assert res[1] is None  # vox_map
+        assert_array_equal(pos_tables[0].to_numpy(), res[0][0](pos_tables[0].index))  # src
+        assert_array_equal(pos_tables[0].to_numpy(), res[0][1](pos_tables[0].index))  # tgt
+
+        # (b) Separate src/tgt files
+        res = test_module.get_pos_mapping_fcts(
+            pos_map_file=[os.path.join(tempdir, f"dummy_pos_map{i}.json") for i in range(2)]
+        )
+        assert res[1] is None  # vox_map
+        assert_array_equal(pos_tables[0].to_numpy(), res[0][0](pos_tables[0].index))  # src
+        assert_array_equal(pos_tables[1].to_numpy(), res[0][1](pos_tables[1].index))  # tgt
+
+    # Case 3: Voxel map .nrrd file(s) => Must return vox_map, but no pos_acc
+
+    # (a) Single src/tgt file
+    vox_file = os.path.join(TEST_DATA_DIR, "xy_map_lin.nrrd")
+    vox_map = VoxelData.load_nrrd(vox_file)
+    res = test_module.get_pos_mapping_fcts(pos_map_file=vox_file)
+    assert res[0] is None  # pos_acc
+    assert_array_equal(vox_map.raw, res[1][0].raw)  # src
+    assert_array_equal(vox_map.bbox, res[1][0].bbox)
+    assert_array_equal(vox_map.raw, res[1][1].raw)  # tgt
+    assert_array_equal(vox_map.bbox, res[1][1].bbox)
+
+    # (b) Separate src/tgt files
+    src_vox_file = os.path.join(TEST_DATA_DIR, "xy_map_lin.nrrd")
+    tgt_vox_file = os.path.join(TEST_DATA_DIR, "xy_map_ones.nrrd")
+    src_vox_map = VoxelData.load_nrrd(src_vox_file)
+    tgt_vox_map = VoxelData.load_nrrd(tgt_vox_file)
+    res = test_module.get_pos_mapping_fcts(pos_map_file=[src_vox_file, tgt_vox_file])
+    assert res[0] is None  # pos_acc
+    assert_array_equal(src_vox_map.raw, res[1][0].raw)  # src
+    assert_array_equal(src_vox_map.bbox, res[1][0].bbox)
+    assert_array_equal(tgt_vox_map.raw, res[1][1].raw)  # tgt
+    assert_array_equal(tgt_vox_map.bbox, res[1][1].bbox)
+
+    # Case 4: Invalid file(s) => Must fail
+
+    # (a) Single src/tgt file with wrong extension
+    with pytest.raises(
+        AssertionError, match=re.escape("Position mapping file error (must be .json or .nrrd)!")
+    ):
+        res = test_module.get_pos_mapping_fcts(pos_map_file="dummy.xyz")
+
+    # (b) Separate src/tgt files with wrong extension
+    with pytest.raises(
+        AssertionError, match=re.escape("Position mapping file error (must be .json or .nrrd)!")
+    ):
+        res = test_module.get_pos_mapping_fcts(pos_map_file=["dummy1.xyz", "dummy2.xyz"])
+
+    # (c) Separate src/tgt files with valid but different extensions
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Same file type for source/target position mappings required!"),
+    ):
+        res = test_module.get_pos_mapping_fcts(pos_map_file=["dummy1.json", "dummy2.nrrd"])
+
+    # (d) Single file provided as list
+    with pytest.raises(
+        AssertionError, match=re.escape("Two position mapping files (source/target) expected!")
+    ):
+        res = test_module.get_pos_mapping_fcts(pos_map_file=["dummy1.json"])
+
+    # (e) More than two separte files provided
+    with pytest.raises(
+        AssertionError, match=re.escape("Two position mapping files (source/target) expected!")
+    ):
+        res = test_module.get_pos_mapping_fcts(
+            pos_map_file=["dummy1.json", "dummy2.json", "dummy3.json"]
+        )
 
 
 # NOT USED ANY MORE
@@ -624,7 +774,7 @@ def test_extract_4th_order():
         ntgt = len(tgt_sel)
 
         src_pos = nodes[0].positions(src_sel)
-        tgt_pos = nodes[0].positions(tgt_sel)
+        tgt_pos = nodes[1].positions(tgt_sel)
         offmat = np.array(
             [
                 [
@@ -687,7 +837,7 @@ def test_extract_4th_order():
             assert np.array_equal(res["count_all"], all_cnt)
             assert np.all(
                 [
-                    np.array_equal(res[k], off_bins[i])
+                    np.allclose(res[k], off_bins[i])
                     for i, k in enumerate(["dx_bins", "dy_bins", "dz_bins"])
                 ]
             )
@@ -825,7 +975,7 @@ def test_extract_4th_order_reduced():
             assert np.array_equal(res["count_conn"], conn_cnt)
             assert np.array_equal(res["count_all"], all_cnt)
             assert np.all(
-                [np.array_equal(res[k], off_bins[i]) for i, k in enumerate(["dr_bins", "dz_bins"])]
+                [np.allclose(res[k], off_bins[i]) for i, k in enumerate(["dr_bins", "dz_bins"])]
             )
             assert res["src_cell_count"] == nsrc
             assert res["tgt_cell_count"] == ntgt
@@ -1017,7 +1167,7 @@ def test_extract_5th_order():
             )
             assert np.all(
                 [
-                    np.array_equal(res[k], off_bins[i])
+                    np.allclose(res[k], off_bins[i])
                     for i, k in enumerate(["dx_bins", "dy_bins", "dz_bins"])
                 ]
             )
@@ -1232,7 +1382,7 @@ def test_extract_5th_order_reduced():
             assert np.array_equal(res["count_all"], all_cnt)
             assert np.array_equal(res["z_bins"], pos_bins)
             assert np.all(
-                [np.array_equal(res[k], off_bins[i]) for i, k in enumerate(["dr_bins", "dz_bins"])]
+                [np.allclose(res[k], off_bins[i]) for i, k in enumerate(["dr_bins", "dz_bins"])]
             )
             assert res["src_cell_count"] == nsrc
             assert res["tgt_cell_count"] == ntgt

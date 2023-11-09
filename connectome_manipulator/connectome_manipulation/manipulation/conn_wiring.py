@@ -18,6 +18,7 @@ from connectome_manipulator.access_functions import (
     get_attribute,
     get_node_ids,
     get_enumeration,
+    get_node_positions,
 )
 from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
 from connectome_manipulator.connectome_manipulation.manipulation import (
@@ -59,6 +60,8 @@ class ConnectomeWiring(MorphologyCachingManipulation):
 
         => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
         => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
+        => Position model file (pos_map_file) can be passed as model file (.json) or voxel data file (.nrrd);
+           one or two files for src/tgt nodes may be provided
         """
         # pylint: disable=arguments-differ
         assert len(kwargs) == 0
@@ -121,10 +124,8 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 delay_model = None
                 log.debug("No delay model provided")
 
-            # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
-            _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
-            if pos_acc is None:
-                log.debug("No position mapping model provided")
+            # Load source/taget position mappings (optional; two types of mappings supported)
+            pos_mappings = conn_prob.get_pos_mapping_fcts(pos_map_file)
 
             # Determine source/target nodes for wiring
             src_node_ids = get_node_ids(self.nodes[0], sel_src)
@@ -135,32 +136,18 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
             tgt_mtypes = get_enumeration(self.nodes[1], "mtype", tgt_node_ids)
 
-            _src_pop = self.nodes[0]._population  # pylint: disable=protected-access
-            _src_sel = libsonata.Selection(src_node_ids)
-            raw_src_pos = np.column_stack(
-                (
-                    _src_pop.get_attribute("x", _src_sel),
-                    _src_pop.get_attribute("y", _src_sel),
-                    _src_pop.get_attribute("z", _src_sel),
-                )
-            )  # Raw src positions required for delay computations
-
-            if pos_acc:  # Position mapping provided
-                # FIXME: this is going to be VERY SLOW!
-                # Get neuron positions (incl. position mapping)
-                src_pos = conn_prob.get_neuron_positions(pos_acc, [src_node_ids])[0]
-                tgt_pos = conn_prob.get_neuron_positions(pos_acc, [tgt_node_ids])[0]
+            # Get source/target node positions (optionally: two types of mappings)
+            src_pos, tgt_pos = conn_prob.get_neuron_positions(
+                self.nodes,
+                [src_node_ids, tgt_node_ids],
+                pos_acc=pos_mappings[0],
+                vox_map=pos_mappings[1],
+            )
+            # ...and source positions w/o mapping (required for delays)
+            if all(_map is None for _map in pos_mappings):
+                raw_src_pos = src_pos
             else:
-                src_pos = raw_src_pos
-                _tgt_pop = self.nodes[1]._population  # pylint: disable=protected-access
-                _tgt_sel = libsonata.Selection(tgt_node_ids)
-                tgt_pos = np.column_stack(
-                    (
-                        _tgt_pop.get_attribute("x", _tgt_sel),
-                        _tgt_pop.get_attribute("y", _tgt_sel),
-                        _tgt_pop.get_attribute("z", _tgt_sel),
-                    )
-                )
+                raw_src_pos, _ = get_node_positions(self.nodes[0], src_node_ids)
 
             log.info(
                 f"Generating afferent connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest})"
@@ -214,9 +201,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
                 log_time = new_time
 
             # Determine conn. prob. of all source nodes to be connected with target node
-            tgt_pos = tgt_positions[
-                tidx : tidx + 1, :
-            ]  # Get neuron positions (incl. position mapping, if provided)
+            tgt_pos = tgt_positions[tidx : tidx + 1, :]
             p_src = p_model.apply(
                 src_pos=src_positions,
                 tgt_pos=tgt_pos,

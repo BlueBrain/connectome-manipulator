@@ -16,10 +16,15 @@ import progressbar
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import curve_fit
 from scipy.sparse import csr_matrix
+from voxcell import VoxelData
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
-from connectome_manipulator.access_functions import get_node_ids, get_edges_population
+from connectome_manipulator.access_functions import (
+    get_node_ids,
+    get_edges_population,
+    get_node_positions,
+)
 
 JET = plt.cm.get_cmap("jet")
 HOT = plt.cm.get_cmap("hot")
@@ -44,12 +49,11 @@ def extract(
     node_ids_src = get_node_ids(src_nodes, sel_src)
     node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
 
-    if not kwargs.get("pos_map_file") is None:
+    if map_file := kwargs.get("pos_map_file") is not None:
         log.log_assert(
             (src_nodes.name == tgt_nodes.name)
-            or (src_nodes.ids().min() > tgt_nodes.ids().max())
-            or (src_nodes.ids().max() < tgt_nodes.ids().min()),
-            "ERROR: Position mapping only supported for same source/taget node population or non-overlapping id ranges!",
+            or (isinstance(map_file, list) and len(map_file) == 2),
+            f'Separate source/target position mappings required for different node populations "{src_nodes.name}" and "{tgt_nodes.name}"!',
         )
 
     if sample_size is None or sample_size <= 0:
@@ -163,6 +167,56 @@ def pos_accessor(pos_map, gids):
         return pos_map.apply(gids=gids)
 
 
+def get_pos_mapping_fcts(pos_map_file):
+    """Get access functions to one or two (src/tgt) position mappings from model (.json) or voxel data (.nrrd) file(s)."""
+
+    def get_mapping(file):
+        """Returns single mapping from .json or .nrrd file."""
+        pos_acc = None
+        vox_map = None
+        if str.lower(os.path.splitext(file)[-1]) == ".json":
+            _, pos_acc = load_pos_mapping_model(file)  # Model access
+        elif str.lower(os.path.splitext(file)[-1]) == ".nrrd":
+            vox_map = VoxelData.load_nrrd(file)  # Direct access to voxel data
+            log.info(f"Loading position mapping (voxel data) from {file}")
+            log.log_assert(vox_map.ndim == 3, "3D voxel data required!")
+        else:
+            log.log_assert(False, "Position mapping file error (must be .json or .nrrd)!")
+        return pos_acc, vox_map
+
+    if pos_map_file is None:
+        pos_acc_src = pos_acc_tgt = None
+        vox_map_src = vox_map_tgt = None
+    elif isinstance(pos_map_file, list):
+        log.log_assert(
+            len(pos_map_file) == 2, "Two position mapping files (source/target) expected!"
+        )
+        log.log_assert(
+            str.lower(os.path.splitext(pos_map_file[0])[-1])
+            == str.lower(os.path.splitext(pos_map_file[1])[-1]),
+            "Same file type for source/target position mappings required!",
+        )
+        pos_acc_src, vox_map_src = get_mapping(pos_map_file[0])
+        pos_acc_tgt, vox_map_tgt = get_mapping(pos_map_file[1])
+    else:  # Same mapping for src/tgt
+        pos_acc_src, vox_map_src = get_mapping(pos_map_file)
+        pos_acc_tgt = pos_acc_src
+        vox_map_tgt = vox_map_src
+    if pos_acc_src is None and pos_acc_tgt is None:
+        pos_acc = None
+    else:
+        pos_acc = [pos_acc_src, pos_acc_tgt]
+    if vox_map_src is None and vox_map_tgt is None:
+        vox_map = None
+    else:
+        vox_map = [vox_map_src, vox_map_tgt]
+
+    if pos_acc is None and vox_map is None:
+        log.debug("No position mapping provided")
+
+    return pos_acc, vox_map
+
+
 def load_pos_mapping_model(pos_map_file):
     """Load a position mapping model from file (incl. access function)."""
     if pos_map_file is None:
@@ -181,8 +235,31 @@ def load_pos_mapping_model(pos_map_file):
     return pos_map, pos_acc
 
 
-def get_neuron_positions(pos_fct, node_ids_list):
-    """Get neuron positions (using position access/mapping function) [NOTE: node_ids_list should be list of node_ids lists!]."""
+def get_neuron_positions(nodes, node_ids, pos_acc=None, vox_map=None):
+    """Get neuron positions, optionally using a position mapping.
+
+    Two types of mappings are supported:
+    - pos_acc: Position access function indexed by node ID
+    - vox_map: Voxel map accessed by node position
+    """
+    if pos_acc:  # Position mapping model provided
+        nrn_pos = get_neuron_positions_by_id(pos_acc, node_ids)
+        log.log_assert(
+            vox_map is None, "Voxel map not supported when providing position access functions!"
+        )
+    else:
+        nrn_pos = [
+            get_node_positions(nodes[i], node_ids[i], vox_map[i] if vox_map else None)[1]
+            for i in range(len(nodes))
+        ]
+    return nrn_pos
+
+
+def get_neuron_positions_by_id(pos_fct, node_ids_list):
+    """Get neuron positions indexed by node ID (using position access/mapping function).
+
+    node_ids_list should be list of node_ids lists!
+    """
     if not isinstance(pos_fct, list):
         pos_fct = [pos_fct for i in node_ids_list]
     else:
@@ -399,10 +476,10 @@ def extract_2nd_order(
     **_,
 ):
     """Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons."""
-    # Get neuron positions (incl. position mapping, if provided)
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
-        [n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids]
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
     )
 
     # Compute distance matrix
@@ -682,16 +759,14 @@ def extract_3rd_order(
     **_,
 ):
     """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
-    # Get neuron positions (incl. position mapping, if provided)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos_raw, tgt_nrn_pos_raw = get_neuron_positions(
-        [n.positions for n in nodes], [src_node_ids, tgt_node_ids]
-    )  # Raw positions w/o mapping
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
-    if pos_acc is None:
-        src_nrn_pos = src_nrn_pos_raw
-        tgt_nrn_pos = tgt_nrn_pos_raw
-    else:
-        src_nrn_pos, tgt_nrn_pos = get_neuron_positions(pos_acc, [src_node_ids, tgt_node_ids])
+        nodes, [src_node_ids, tgt_node_ids], None, None
+    )
+    src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
+    )
 
     # Compute distance matrix
     if no_dist_mapping:  # Don't use position mapping for computing distances
@@ -1041,10 +1116,10 @@ def extract_4th_order(
     **_,
 ):
     """Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons."""
-    # Get neuron positions (incl. position mapping, if provided)
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
-        [n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids]
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
     )
 
     # Compute dx/dy/dz offset matrices
@@ -1431,10 +1506,10 @@ def extract_4th_order_reduced(
     **_,
 ):
     """Extract offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons."""
-    # Get neuron positions (incl. position mapping, if provided)
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
-        [n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids]
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
     )
 
     # Compute dr/dz offset matrices
@@ -1681,10 +1756,10 @@ def extract_5th_order(
     **_,
 ):
     """Extract position-dependent connection probability (5th order) from a sample of pairs of neurons."""
-    # Get neuron positions (incl. position mapping, if provided)
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
-        [n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids]
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
     )
 
     # Compute PRE position & POST-PRE offset matrices
@@ -2221,10 +2296,10 @@ def extract_5th_order_reduced(
 ):
     """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
     # pylint: disable=W0613
-    # Get neuron positions (incl. position mapping, if provided)
-    _, pos_acc = load_pos_mapping_model(pos_map_file)
+    # Get source/target neuron positions (optionally: two types of mappings)
+    pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
-        [n.positions for n in nodes] if pos_acc is None else pos_acc, [src_node_ids, tgt_node_ids]
+        nodes, [src_node_ids, tgt_node_ids], pos_acc, vox_map
     )
 
     # Compute PRE position & POST-PRE offset matrices

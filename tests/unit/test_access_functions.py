@@ -2,8 +2,8 @@ import os
 
 import numpy as np
 from numpy.testing import assert_array_equal
-
 from bluepysnap import Circuit
+from voxcell import VoxelData
 
 from utils import TEST_DATA_DIR
 import connectome_manipulator.access_functions as test_module
@@ -32,17 +32,41 @@ def test_get_node_ids():
             assert_array_equal(ids, ref_ids)
 
 
-def get_edges_population():
+def test_get_edges_population():
     circuit = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     popul_names = circuit.edges.population_names
 
     # Check selecting single (default) population
-    edges = test_module.get_edges_population()
+    edges = test_module.get_edges_population(circuit)
     assert edges is circuit.edges[popul_names[0]]
 
+    # Check returned population name
+    edges, pname = test_module.get_edges_population(circuit, return_popul_name=True)
+    assert edges is circuit.edges[popul_names[0]]
+    assert pname == popul_names[0]
+
     # Check selecting population by name (in case of single population)
-    edges = test_module.get_edges_population(popul_names[0])
+    edges = test_module.get_edges_population(circuit, popul_names[0])
     assert edges is circuit.edges[popul_names[0]]
 
     # Check selecting population by name (in case of multiple populations)
-    # TODO
+    # (Not implemented: Would require test circuit with multiple populations)
+
+
+def test_get_node_positions():
+    circuit = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
+    nodes = circuit.nodes[circuit.nodes.population_names[0]]
+    np.random.seed(0)
+    node_ids = np.random.permutation(nodes.ids())
+    ref_pos = nodes.positions(node_ids).to_numpy()
+
+    # Case 1: No voxel map provided
+    res = test_module.get_node_positions(nodes, node_ids, vox_map=None)
+    assert_array_equal(ref_pos, res[0])  # raw_pos
+    assert_array_equal(ref_pos, res[1])  # pos
+
+    # Case 2: Voxel map provided
+    vox_map = VoxelData.load_nrrd(os.path.join(TEST_DATA_DIR, "xy_map_lin.nrrd"))
+    res = test_module.get_node_positions(nodes, node_ids, vox_map=vox_map)
+    assert_array_equal(ref_pos, res[0])  # raw_pos
+    assert_array_equal(vox_map.lookup(ref_pos), res[1])  # pos

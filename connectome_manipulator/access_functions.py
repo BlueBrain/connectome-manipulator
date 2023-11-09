@@ -249,3 +249,25 @@ def get_edges_population(circuit, popul_name=None, return_popul_name=False):
         return edges, popul_name
     else:
         return edges
+
+
+def get_node_positions(nodes, node_ids, vox_map=None):
+    """Return x/y/z positions of list of nodes, optionally mapped using VoxelData map."""
+    _pop = nodes._population  # pylint: disable=protected-access
+    _sel = libsonata.Selection(node_ids)
+    raw_pos = np.column_stack(
+        (
+            _pop.get_attribute("x", _sel),
+            _pop.get_attribute("y", _sel),
+            _pop.get_attribute("z", _sel),
+        )
+    )
+    if vox_map:  # Apply voxel map
+        pos = vox_map.lookup(raw_pos)
+        log.log_assert(
+            not np.any(pos == vox_map.OUT_OF_BOUNDS),
+            "Out of bounds error in mapped positions from voxel data!",
+        )
+    else:  # No voxel mapping
+        pos = raw_pos
+    return raw_pos, pos

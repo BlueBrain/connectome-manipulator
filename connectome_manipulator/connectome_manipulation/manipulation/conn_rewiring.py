@@ -38,6 +38,7 @@ from connectome_manipulator import log, profiler
 from connectome_manipulator.access_functions import (
     get_node_ids,
     get_enumeration,
+    get_node_positions,
 )
 from connectome_manipulator.connectome_manipulation.manipulation import (
     MorphologyCachingManipulation,
@@ -104,6 +105,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
 
         => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed.
+        => Position model file (pos_map_file) can be passed as model file (.json) or voxel data file (.nrrd);
+           one or two files for src/tgt nodes may be provided
         """
         # pylint: disable=arguments-differ
         edges_table = self.writer.to_pandas()
@@ -183,10 +186,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         delay_model = model_types.AbstractModel.init_model(delay_model_spec)
         log.debug(f'Loaded delay model of type "{delay_model.__class__.__name__}"')
 
-        # Load position mapping model (optional) => [NOTE: SRC AND TGT NODES MUST BE INCLUDED WITHIN SAME POSITION MAPPING MODEL]
-        _, pos_acc = conn_prob.load_pos_mapping_model(pos_map_file)
-        if pos_acc is None:
-            log.debug("No position mapping model provided")
+        # Load source/taget position mappings (optional; two types of mappings supported)
+        pos_mappings = conn_prob.get_pos_mapping_fcts(pos_map_file)
 
         # Load connection/synapse properties model [required for "randomize" generation method]
         if gen_method == "randomize":
@@ -242,11 +243,6 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             else np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] < 100),
             "Synapse class error!",
         )
-        src_pos = conn_prob.get_neuron_positions(
-            self.nodes[0].positions if pos_acc is None else pos_acc, [src_node_ids]
-        )[
-            0
-        ]  # Get neuron positions (incl. position mapping, if provided)
 
         # Only select target nodes that are actually in current split of edges_table
         tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, split_ids)
@@ -288,8 +284,12 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                 self.writer.from_pandas(edges_table)
                 return
 
-        log.info(
-            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, reuse_pos={reuse_pos}{'' if reuse_pos else ', morph_ext=' + morph_ext}, rewire_mode={rewire_mode})"
+        # Get source/target node positions (optionally: two types of mappings)
+        src_pos, tgt_pos = conn_prob.get_neuron_positions(
+            self.nodes,
+            [src_node_ids, tgt_node_ids],
+            pos_acc=pos_mappings[0],
+            vox_map=pos_mappings[1],
         )
 
         # Load target morphologies, if needed
@@ -297,6 +297,10 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             tgt_morphs = self._get_tgt_morphs(morph_ext, libsonata.Selection(tgt_node_ids))
         else:
             tgt_morphs = [None] * num_tgt
+
+        log.info(
+            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, reuse_pos={reuse_pos}{'' if reuse_pos else ', morph_ext=' + morph_ext}, rewire_mode={rewire_mode})"
+        )
 
         # Init/reset static variables (function attributes) related to generation methods which need only be initialized once [for better performance]
         self._reinit(edges_table, syn_class)
@@ -333,16 +337,11 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                 # that could be rewired or positions reused from (unless morphologies used)
                 continue
 
-            # Get target neuron position (incl. position mapping, if provided)
-            tgt_pos = conn_prob.get_neuron_positions(
-                self.nodes[1].positions if pos_acc is None else pos_acc, [[tgt]]
-            )[0]
-
             # Determine conn. prob. of all source nodes to be connected with target node
             p_src = (
                 p_model.apply(
                     src_pos=src_pos,
-                    tgt_pos=tgt_pos,
+                    tgt_pos=tgt_pos[tidx : tidx + 1, :],
                     src_type=get_enumeration(self.nodes[0], "mtype", src_node_ids),
                     tgt_type=get_enumeration(self.nodes[1], "mtype", [tgt]),
                     src_nid=src_node_ids,
@@ -1020,7 +1019,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         # Determine distance from source neuron (soma) to synapse on target neuron
         # IMPORTANT: Distances for delays are computed in them original coordinate system w/o coordinate transformation!
-        src_new_pos = self.nodes[0].positions(src_new).to_numpy()
+        src_new_pos, _ = get_node_positions(self.nodes[0], src_new)
         # Synapse position on post-synaptic dendrite
         syn_pos = edges_table.loc[
             syn_sel_idx, ["afferent_center_x", "afferent_center_y", "afferent_center_z"]
