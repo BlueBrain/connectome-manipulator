@@ -52,6 +52,13 @@ def app(verbose):
     help="Number of blocks, overwrites value in config file",
 )
 @click.option(
+    "--target-payload",
+    required=False,
+    default=20_000_000_000,
+    type=int,
+    help="Number of gid-gid pairs to consider for one block.  Supersedes splits when a parquet based configuration is used",
+)
+@click.option(
     "--parallel",
     required=False,
     is_flag=True,
@@ -74,6 +81,7 @@ def manipulate_connectome(
     convert_to_sonata,
     overwrite_edges,
     splits,
+    target_payload,
     parallel,
     parallel_arg,
 ):
@@ -97,6 +105,7 @@ def manipulate_connectome(
         convert_to_sonata=convert_to_sonata,
         overwrite_edges=overwrite_edges,
         splits=splits,
+        target_payload=target_payload,
         parallel=parallel,
     )
 

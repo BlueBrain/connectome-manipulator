@@ -36,7 +36,6 @@ The connectome manipulation pipeline is illustrated in Figure 1 and consists of 
 * __Connectome manipulator__\
   Depending on the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA file. All manipulations are separately implemented in sub-modules and can be easily extended.\
   Details can be found in the corresponding README file: [/pipeline/connectome_manipulation/README.md](connectome_manipulator/connectome_manipulation/)
-
 * __Model building__\
   Depending on the config, builds a model from a given connectome and writes the model to a file to be loaded and used by some manipulations requiring a model (e.g., model-based rewiring based on given connection probability model). All models are separately implemented in sub-modules and can be easily extended.\
   Details can be found in the corresponding README file: [/pipeline/model_building/README.md](connectome_manipulator/model_building/)
@@ -161,6 +160,9 @@ Options:
                                   False]
   --splits INTEGER                Number of blocks, overwrites value in config
                                   file
+  --target-payload INTEGER        Number of gid-gid pairs to consider for one block.
+                                  Supersedes splits when a parquet based configuration
+                                  is used  [default: 20000000000]
   --parallel                      Run using a parallel DASK job scheduler  [default:
                                   False]
   -a, --parallel-arg TEXT         Overwrite the arguments for the Dask Client with
@@ -179,11 +181,20 @@ connectome-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1
 Running in parallel (with Dask) you can use the `parallel-manipulator` executable that
 will set up Dask automatically (and switch the `--parallel` flag to default to `True`,
 too):
+```
+srun --nodes 10 --tasks-per-node=2 --cpus-per-task=20 --constraint=clx --mem=0 \
+    parallel-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json --profile
+```
+*Please note that this feature will require at least 4 MPI ranks*. Dask will use 2 ranks
+to manage the distributed cluster.
+We recommend to use a high number for `--cpus-per-task` to create Dask workers that will
+be able to process a lot of data in parallel.
 
-```
-srun dplace parallel-manipulator manipulate-connectome wiring_config_v3__whole_brain__ER_1.json \
-    --profile --splits=5000
-```
+When processing with `parallel-manipulator`, one may pass the flag `--target-payload` to
+determine how big the individual workload for each process should be. The default value of
+20e9 was determined empirically to run on the whole mouse brain with 75 million neurons.
+We recommend to use this value as a starting point and scale it up or down to achieve the
+desired runtime characteristics.
 
 ### Profiling the code
 
