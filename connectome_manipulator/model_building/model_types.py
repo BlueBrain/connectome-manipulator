@@ -7,6 +7,7 @@ import sys
 import json
 import numpy as np
 import pandas as pd
+import scipy.sparse as sps
 from scipy.interpolate import interpn
 from scipy.optimize import fsolve
 from scipy.sparse import csc_matrix
@@ -547,7 +548,10 @@ class ConnPropsModel(AbstractModel):
     param_names = ["src_types", "tgt_types", "prop_stats"]
     param_defaults = {}
     data_names = []
-    input_names = ["src_type", "tgt_type"]
+    input_names = ["src_type", "tgt_type", "n_syn"]
+    # Notes:
+    # n_syn is optional; it must be provided if no N_SYN_PER_CONN_NAME property is specified
+    # If N_SYN_PER_CONN_NAME property is specified but n_syn is provided, n_syn will be used
 
     # Required attributes for given distributions
     distribution_attributes = {
@@ -587,7 +591,10 @@ class ConnPropsModel(AbstractModel):
         log.log_assert(isinstance(self.prop_stats, dict), '"prop_stats" dictionary required!')
         self.prop_stats = dict_conv(self.prop_stats)  # Convert dict to basic data types
         self.prop_names = list(self.prop_stats.keys())
-        log.log_assert(N_SYN_PER_CONN_NAME in self.prop_names, f'"{N_SYN_PER_CONN_NAME}" missing')
+        if N_SYN_PER_CONN_NAME in self.prop_names:
+            self.has_nsynconn = True
+        else:
+            self.has_nsynconn = False
         log.log_assert(
             all(isinstance(self.prop_stats[p], dict) for p in self.prop_names),
             "Property statistics dictionary required!",
@@ -873,15 +880,25 @@ class ConnPropsModel(AbstractModel):
 
         return drawn_values
 
-    def get_model_output(self, src_type, tgt_type):  # pylint: disable=arguments-differ
+    def get_model_output(self, src_type, tgt_type, n_syn=None):  # pylint: disable=arguments-differ
         """Draw property values for one connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
         syn_props = [p for p in self.prop_names if p != N_SYN_PER_CONN_NAME]
-        n_syn = self.draw(N_SYN_PER_CONN_NAME, src_type, tgt_type, 1)[0]
+        if n_syn is None:
+            log.log_assert(self.has_nsynconn, f'"{N_SYN_PER_CONN_NAME}" missing')
+            n_syn = self.draw(N_SYN_PER_CONN_NAME, src_type, tgt_type, 1)[0]
+        else:
+            log.log_assert(n_syn > 0, '"n_syn" must be at least 1!')
 
         df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
         for p in syn_props:
             df[p] = self.draw(p, src_type, tgt_type, n_syn)
         return df
+
+    def apply(self, **kwargs):
+        """Apply the model. Overwrite to set default."""
+        if "n_syn" not in kwargs:
+            kwargs["n_syn"] = None
+        return super().apply(**kwargs)
 
     def __str__(self):
         """Return model string describing the model."""
@@ -907,7 +924,8 @@ class ConnPropsModel(AbstractModel):
             )
             for p in self.prop_names
         }  # Extract distribution data types
-        model_str = f"{self.__class__.__name__}\n"
+        model_str = f"{self.__class__.__name__}"
+        model_str = model_str + f" ({'with' if self.has_nsynconn else 'w/o'} #syn/conn)\n"
         model_str = (
             model_str
             + f"  Connection/synapse property distributions between {len(self.src_types)}x{len(self.tgt_types)} M-types:\n"
@@ -1053,11 +1071,12 @@ class ConnProb2ndOrderComplexExpModel(AbstractModel):
             log.log_assert(0.0 <= self.dist_scale <= 1.0, '"dist_scale" must be between 0 and 1!')
             log.log_assert(self.dist_exp >= 0.0, '"dist_exp" must be non-negative!')
             test_distance = 1000.0
-            log.log_assert(
-                self.exp_fct(test_distance, 1.0, self.prox_exp, self.prox_exp_pow)
-                < self.exp_fct(test_distance, 1.0, self.dist_exp, 1.0),
-                f"Proximal exponential must decay faster than distal exponential ({self.get_param_dict()})!",
-            )
+            if self.exp_fct(test_distance, 1.0, self.prox_exp, self.prox_exp_pow) >= self.exp_fct(
+                test_distance, 1.0, self.dist_exp, 1.0
+            ):
+                log.warning(
+                    f"Proximal exponential decays slower than distal exponential ({self.get_param_dict()})!"
+                )
 
     @staticmethod
     def exp_fct(distance, scale, exponent, exp_power=1.0):
@@ -1259,16 +1278,18 @@ class ConnProb3rdOrderComplexExpModel(AbstractModel):
                 'Bipolar coordinate "bip_coord" out of range!',
             )
             test_distance = 1000.0
-            log.log_assert(
-                self.exp_fct(test_distance, 1.0, self.prox_exp_P, self.prox_exp_pow_P)
-                < self.exp_fct(test_distance, 1.0, self.dist_exp_P, 1.0),
-                f"Proximal (P) exponential must decay faster than distal (P) exponential ({self.get_param_dict()})!",
-            )
-            log.log_assert(
-                self.exp_fct(test_distance, 1.0, self.prox_exp_N, self.prox_exp_pow_N)
-                < self.exp_fct(test_distance, 1.0, self.dist_exp_N, 1.0),
-                f"Proximal (N) exponential must decay faster than distal (N) exponential ({self.get_param_dict()})!",
-            )
+            if self.exp_fct(
+                test_distance, 1.0, self.prox_exp_P, self.prox_exp_pow_P
+            ) >= self.exp_fct(test_distance, 1.0, self.dist_exp_P, 1.0):
+                log.warning(
+                    f"Proximal (P) exponential decays slower than distal (P) exponential ({self.get_param_dict()})!"
+                )
+            if self.exp_fct(
+                test_distance, 1.0, self.prox_exp_N, self.prox_exp_pow_N
+            ) >= self.exp_fct(test_distance, 1.0, self.dist_exp_N, 1.0):
+                log.warning(
+                    f"Proximal (N) exponential decays slower than distal (N) exponential ({self.get_param_dict()})!"
+                )
 
     @staticmethod
     def exp_fct(distance, scale, exponent, exp_power=1.0):
@@ -1916,21 +1937,23 @@ class ConnProb5thOrderLinInterpnReducedModel(AbstractModel):
         return model_str
 
 
-class ConnProbAdjModel(AbstractModel):
-    """Deterministic connection probability model, defined by an adjacency matrix:
+class LookupTableModel(AbstractModel):
+    """Generic model to access any (sparse) information based on source and target neuron IDs.
 
-    - Adjacency matrix must be boolean and in sparse CSC format
-      (stored as data frame with 'row_ind' and 'col_ind' columns)
-    - Size of adjacency matrix must match selected src/dest neuron selections
-      (stored as data frames with 'src_node_ids' and 'tgt_node_ids')
-    - Returns deterministic connection probability (0.0 or 1.0) for given source/target neuron IDs
-    - Can optionally store inverted connectivity (i.e., True...no connection, False...connection)
+    This model can be used for adjacency matrices (bool), deterministic connection
+    probabilities (float), specific #syn/conn (int), etc.
+    - Data are internally stored as sparse matrix in CSC format
+      (initialized from data frame with 'row_ind', 'col_ind', and 'value' columns)
+    - Size of that matrix matches selected src/dest neuron selections
+      (initialized from data frames with 'src_node_ids' and 'tgt_node_ids')
+    - Returns (deterministic) value (always float) for given source/target neuron IDs
+      (or 0.0 if no value is stored)
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
-    param_names = ["inverted"]
-    param_defaults = {"inverted": False}
-    data_names = ["src_nodes_table", "tgt_nodes_table", "adj_table"]
+    param_names = []
+    param_defaults = {}
+    data_names = ["src_nodes_table", "tgt_nodes_table", "lookup_table"]
     input_names = ["src_nid", "tgt_nid"]
 
     def __init__(self, **kwargs):
@@ -1957,24 +1980,20 @@ class ConnProbAdjModel(AbstractModel):
         )
 
         log.log_assert(
-            self.adj_table.shape[1] == 2,
-            "Data frame with 2 columns (row_ind, col_ind) required!",
+            self.lookup_table.shape[1] == 3,
+            "Data frame with 3 columns (row_ind, col_ind, value) required!",
         )
-        self.adj_mat = csc_matrix(
+        self.lut_mat = csc_matrix(
             (
-                [True] * self.adj_table.shape[0],
-                (self.adj_table["row_ind"], self.adj_table["col_ind"]),
+                self.lookup_table["value"],
+                (self.lookup_table["row_ind"], self.lookup_table["col_ind"]),
             ),
             shape=(len(self.src_nodes_table), len(self.tgt_nodes_table)),
         )
-        log.log_assert(
-            isinstance(self.inverted, bool),
-            "Inverted flag must be boolean!",
-        )
 
-    def get_adj_matrix(self):
-        """Return adjacency matrix."""
-        return self.adj_mat
+    def get_lookup_table(self):
+        """Return underlying (sparse) LUT matrix."""
+        return self.lut_mat
 
     def get_src_nids(self):
         """Return source node IDs stored in this model."""
@@ -1984,15 +2003,103 @@ class ConnProbAdjModel(AbstractModel):
         """Return target node IDs stored in this model."""
         return self.tgt_node_ids
 
+    def get_model_output(self, src_nid, tgt_nid):  # pylint: disable=arguments-differ
+        """Return LUT values of size <#src x #tgt> as given by underlying LUT matrix."""
+        src_sel = self.src_idx_table.loc[src_nid].values
+        tgt_sel = self.tgt_idx_table.loc[tgt_nid].values
+        mat_sel = self.lut_mat[:, tgt_sel][src_sel, :].toarray()
+        return mat_sel
+
+    def __str__(self):
+        """Return model string describing the model."""
+        model_str = f"{self.__class__.__name__}"
+        model_str = model_str + "\n  " + self.lut_mat.__repr__()
+        if len(self.lut_mat.data) > 0:
+            range_str = f"{self.lut_mat.data.min()}"
+            if self.lut_mat.data.max() > self.lut_mat.data.min():
+                range_str = range_str + f"..{self.lut_mat.data.max()}"
+        else:
+            range_str = "None"
+        model_str = model_str + "\n  Value range: " + range_str
+        model_str = model_str + f" (dtype: {self.lut_mat.dtype})"
+        return model_str
+
+    @staticmethod
+    def init_from_sparse_matrix(matrix, src_node_ids, tgt_node_ids):
+        """Model initialization from sparse matrix."""
+        log.log_assert(sps.issparse(matrix), "Matrix must be in sparse format!")
+        log.log_assert(matrix.shape[0] == len(src_node_ids), "Source node IDs mismatch!")
+        log.log_assert(matrix.shape[1] == len(tgt_node_ids), "Target node IDs mismatch!")
+
+        src_nodes_table = pd.DataFrame(src_node_ids, columns=["src_node_ids"])
+        tgt_nodes_table = pd.DataFrame(tgt_node_ids, columns=["tgt_node_ids"])
+        matrix = matrix.tocoo()  # Convert to COO, for easy access to row/col and data!!
+        lookup_table = pd.DataFrame(
+            {"row_ind": matrix.row, "col_ind": matrix.col, "value": matrix.data}
+        )
+
+        return LookupTableModel(
+            src_nodes_table=src_nodes_table,
+            tgt_nodes_table=tgt_nodes_table,
+            lookup_table=lookup_table,
+        )
+
+
+class ConnProbAdjModel(AbstractModel):
+    """Deterministic connection probability model, defined by an adjacency matrix (internally stored as LookupTableModel):
+
+    - Adjacency matrix represented as boolean matrix in sparse CSC format
+      (initialized from data frame with 'row_ind' and 'col_ind' columns)
+    - Size of adjacency matrix matches selected src/dest neuron selections
+      (initialized from data frames with 'src_node_ids' and 'tgt_node_ids')
+    - Returns deterministic connection probability (0.0 or 1.0) for given source/target neuron IDs
+    - Can optionally store inverted connectivity (i.e., True...no connection, False...connection)
+    """
+
+    # Names of model inputs, parameters and data frames which are part of this model
+    param_names = ["inverted"]
+    param_defaults = {"inverted": False}
+    data_names = ["src_nodes_table", "tgt_nodes_table", "adj_table"]
+    input_names = ["src_nid", "tgt_nid"]
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        log.log_assert(
+            isinstance(self.inverted, bool),
+            "Inverted flag must be boolean!",
+        )
+
+        # Init internal LUT
+        lookup_table = self.adj_table.copy()
+        lookup_table["value"] = [True] * lookup_table.shape[0]
+        self.lut = LookupTableModel(
+            src_nodes_table=self.src_nodes_table,
+            tgt_nodes_table=self.tgt_nodes_table,
+            lookup_table=lookup_table,
+        )
+
+    def get_adj_matrix(self):
+        """Return adjacency matrix."""
+        return self.lut.get_lookup_table()
+
+    def get_src_nids(self):
+        """Return source node IDs stored in this model."""
+        return self.lut.src_node_ids
+
+    def get_tgt_nids(self):
+        """Return target node IDs stored in this model."""
+        return self.lut.tgt_node_ids
+
     def is_inverted(self):
         """Return if connectivity is stored inverted."""
         return self.inverted
 
     def get_model_output(self, src_nid, tgt_nid):  # pylint: disable=arguments-differ
         """Return deterministic connection probabilities (0.0 or 1.0) of size <#src x #tgt> as given by adjacency matrix."""
-        src_sel = self.src_idx_table.loc[src_nid].values
-        tgt_sel = self.tgt_idx_table.loc[tgt_nid].values
-        adj_sel = self.adj_mat[:, tgt_sel][src_sel, :].toarray()
+        adj_sel = self.lut.get_model_output(src_nid, tgt_nid)
         if self.inverted:
             return np.logical_not(adj_sel).astype(float)
         else:
@@ -2005,5 +2112,85 @@ class ConnProbAdjModel(AbstractModel):
         else:
             inv_str = ""
         model_str = f"{inv_str}{self.__class__.__name__}\n"
-        model_str = model_str + "  " + self.adj_mat.__repr__()
+        model_str = model_str + "  " + self.lut.get_lookup_table().__repr__()
+        return model_str
+
+
+class PropsTableModel(AbstractModel):
+    """Generic model to store any/multiple (edge) properties based on source and target neuron IDs.
+
+    e.g., this model can be used for providing synapse positions, etc.
+    - Data are initialized and internally stored as data frame with properties as columns
+    - Source/target node IDs must be provided as @source_node/@target_node columns
+    """
+
+    # Names of model inputs, parameters and data frames which are part of this model
+    param_names = []
+    param_defaults = {}
+    data_names = ["props_table"]
+    input_names = ["src_nid", "tgt_nid", "prop_names", "num_sel"]
+    # Notes: "prop_names" is optional; if not provided, all properties will be returned
+    #        "num_sel" is optional; if not provided, all entries will be returned; otherwise, only the first num_sel
+
+    def __init__(self, **kwargs):
+        """Model initialization."""
+        super().__init__(**kwargs)
+
+        # Check parameters
+        log.log_assert("@source_node" in self.props_table.columns, "@source_node column required!")
+        log.log_assert("@target_node" in self.props_table.columns, "@target_node column required!")
+        self.property_names = np.setdiff1d(
+            self.props_table.columns, ["@source_node", "@target_node"]
+        ).tolist()
+        log.log_assert(len(self.property_names) > 0, "Properties missing!")
+        log.log_assert(self.props_table.size > 0, "Properties table empty!")
+
+    def get_property_names(self):
+        """Return property names."""
+        return self.property_names
+
+    def get_src_nids(self):
+        """Return (unique) source node IDs stored in this model."""
+        return np.unique(self.props_table["@source_node"])
+
+    def get_tgt_nids(self):
+        """Return (unique) target node IDs stored in this model."""
+        return np.unique(self.props_table["@target_node"])
+
+    def get_src_tgt_counts(self):
+        """Return (unique) source/target node ID pairs and counts stored in this model."""
+        return np.unique(
+            self.props_table[["@source_node", "@target_node"]], axis=0, return_counts=True
+        )
+
+    def get_model_output(
+        self, src_nid, tgt_nid, prop_names=None, num_sel=None
+    ):  # pylint: disable=arguments-differ
+        """Return property values of given source/target node IDs."""
+        src_sel = np.isin(self.props_table["@source_node"], src_nid)
+        tgt_sel = np.isin(self.props_table["@target_node"], tgt_nid)
+        if prop_names is None:
+            prop_names = self.property_names
+        tab = self.props_table[prop_names].loc[np.logical_and(src_sel, tgt_sel)]
+        if num_sel is None:
+            return tab
+        else:
+            log.log_assert(
+                0 <= num_sel <= tab.shape[0], "Selected number of elements out of range!"
+            )
+            return tab[:num_sel]
+
+    def apply(self, **kwargs):
+        """Apply the model. Overwrite to set default."""
+        if "prop_names" not in kwargs:
+            kwargs["prop_names"] = None
+        if "num_sel" not in kwargs:
+            kwargs["num_sel"] = None
+        return super().apply(**kwargs)
+
+    def __str__(self):
+        """Return model string describing the model."""
+        model_str = f"{self.__class__.__name__}"
+        model_str = model_str + f"\n  Properties: {self.property_names}"
+        model_str = model_str + f"\n  Entries: {self.props_table.shape[0]}"
         return model_str

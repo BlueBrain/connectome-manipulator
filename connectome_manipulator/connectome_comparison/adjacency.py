@@ -96,11 +96,11 @@ def plot(
         assert vmin == 0, "ERROR: Plot range including 0 required!"
         cmap = "hot_r"  # Regular colormap [color at 0 should be white (not actually drawn), to match figure background!]
 
-    conns = np.array(res_dict["data"].nonzero()).T
-    col_idx = res_dict["data"].data
+    mat = res_dict["data"].tocoo()  # Convert to COO, for easy access to row/col and data!!
+    col_idx = mat.data
     plt.scatter(
-        conns[:, 1],
-        conns[:, 0],
+        mat.col,
+        mat.row,
         marker=",",
         s=0.1,
         edgecolors="none",

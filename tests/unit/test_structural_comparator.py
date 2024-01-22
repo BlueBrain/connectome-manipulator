@@ -58,12 +58,6 @@ def test_results_diff():
 
     assert_equal(test_module.results_diff(res_dict1, res_dict2), expected_dict)
 
-    # Not sure if it is necessary to test these this carefully
-    with pytest.raises(AssertionError, match="Results keys mismatch!"):
-        res_dict3 = res_dict2.copy()
-        del res_dict3["data"]
-        test_module.results_diff(res_dict1, res_dict3)
-
     with pytest.raises(AssertionError, match="Results type mismatch!"):
         res_dict3 = res_dict2.copy()
         res_dict3["data"] = "will fail"

@@ -511,15 +511,16 @@ def plot(
                 and len(syns_per_conn_data["hist"][sidx, tidx]) > 0
             )
             else 0
-            for sidx in range(len(m_types[0]))
+            for tidx in range(len(m_types[1]))
         ]
-        for tidx in range(len(m_types[1]))
+        for sidx in range(len(m_types[0]))
     ]
     max_pathways = np.where(
         np.array(conn_counts) == np.max(conn_counts)
     )  # Select pathway(s) with maximum number of connections (i.e., most robust statistics)
     sidx, tidx = [
-        max_pathways[i][0] for i in range(len(max_pathways))
+        max_pathways[0][0],
+        max_pathways[1][0],
     ]  # Select first of these pathways for plotting
     src, tgt = [m_types[0][sidx], m_types[1][tidx]]
     for pidx, p in enumerate(prop_names):

@@ -2,8 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+import re
 from numpy.testing import assert_array_equal
-from scipy.sparse import csc_matrix
+from scipy.sparse import coo_matrix, csc_matrix
 
 from utils import setup_tempdir, TEST_DATA_DIR
 import connectome_manipulator.model_building.model_types as test_module
@@ -188,6 +189,40 @@ def test_ConnPropsModel():
 
         with pytest.raises(KeyError, match="WRONG_TYPE"):
             props = model.apply(src_type="WRONG_TYPE", tgt_type="WRONG_TYPE")
+
+        # Check with #synapses externally provided (overwriting internal N_syn)
+        nsyn_ext = 10
+        props = model.apply(
+            src_type="L4_MC", tgt_type="L4_MC", n_syn=nsyn_ext
+        )  # Single connection with nsyn synapses
+        assert props.shape[0] == nsyn_ext  # Number of synapses per connection
+        assert len(np.unique(props["conductance"])) == 1  # No variation within connection
+
+        # Check model w/o #syn/conn provided
+        model_dict = {
+            "model": "ConnPropsModel",
+            "src_types": ["L4_MC"],
+            "tgt_types": ["L4_MC"],
+            "prop_stats": {
+                "conductance": {
+                    "L4_MC": {
+                        "L4_MC": {
+                            "type": "normal",
+                            "mean": cond_mean,
+                            "std": cond_std,
+                            "shared_within": True,
+                            "dtype": "float",
+                        }
+                    }
+                },
+            },
+        }
+        model = test_module.AbstractModel.model_from_dict(model_dict)
+        with pytest.raises(AssertionError, match=re.escape('"n_syn_per_conn" missing')):
+            props = model.apply(src_type="L4_MC", tgt_type="L4_MC")
+        props = model.apply(src_type="L4_MC", tgt_type="L4_MC", n_syn=N_syn)
+        assert props.shape[0] == N_syn  # Number of synapses per connection
+        assert len(np.unique(props["conductance"])) == 1  # No variation within connection
 
         # Check properties across connection
         model_dict = {
@@ -608,3 +643,155 @@ def test_ConnProbAdjModel():
                     for k in model.get_data_dict().keys()
                 ]
             )
+
+
+def test_LookupTableModel():
+    np.random.seed(999)
+    with setup_tempdir(__name__) as tempdir:
+        # Define (random) LUT matrix
+        src_node_ids = np.arange(5, 20)
+        tgt_node_ids = np.arange(50, 100)
+        src_nodes_table = pd.DataFrame(src_node_ids, columns=["src_node_ids"])
+        tgt_nodes_table = pd.DataFrame(tgt_node_ids, columns=["tgt_node_ids"])
+        mat = np.random.rand(len(src_node_ids), len(tgt_node_ids))
+        mat[mat < 0.5] = 0  # Make sparse
+        mat_coo = coo_matrix(mat, shape=(len(src_node_ids), len(tgt_node_ids)))
+        lookup_table = pd.DataFrame(
+            {"row_ind": mat_coo.row, "col_ind": mat_coo.col, "value": mat_coo.data}
+        )
+
+        # Init. model
+        model = test_module.LookupTableModel(
+            src_nodes_table=src_nodes_table,
+            tgt_nodes_table=tgt_nodes_table,
+            lookup_table=lookup_table,
+        )
+
+        # Check model
+        assert_array_equal(src_node_ids, model.get_src_nids())
+        assert_array_equal(tgt_node_ids, model.get_tgt_nids())
+        assert_array_equal(mat, model.lut_mat.todense())
+        assert_array_equal(mat, model.apply(src_nid=src_node_ids, tgt_nid=tgt_node_ids))
+
+        ## Check load/save
+        model_name = "LookupTableModel_TEST"
+        model.save_model(tempdir, model_name)
+        model2 = test_module.AbstractModel.model_from_file(
+            os.path.join(tempdir, model_name + ".json")
+        )
+        assert model.get_param_dict() == model2.get_param_dict()
+        assert sorted(model.get_data_dict().keys()) == sorted(model2.get_data_dict().keys())
+        assert np.all(
+            [
+                np.array_equal(model.get_data_dict()[k], model2.get_data_dict()[k])
+                for k in model.get_data_dict().keys()
+            ]
+        )
+
+        # Check (static) init from sparse matrix
+        with pytest.raises(AssertionError, match=re.escape("Matrix must be in sparse format")):
+            model = test_module.LookupTableModel.init_from_sparse_matrix(
+                mat, src_node_ids, tgt_node_ids
+            )
+        model = test_module.LookupTableModel.init_from_sparse_matrix(
+            mat_coo.tocsc(), src_node_ids, tgt_node_ids
+        )
+        assert_array_equal(src_node_ids, model.get_src_nids())
+        assert_array_equal(tgt_node_ids, model.get_tgt_nids())
+        assert_array_equal(mat, model.lut_mat.todense())
+        assert_array_equal(mat, model.apply(src_nid=src_node_ids, tgt_nid=tgt_node_ids))
+
+
+def test_PropsTableModel():
+    np.random.seed(999)
+    with setup_tempdir(__name__) as tempdir:
+        pnames = ["a", "b", "c", "d", "e"]
+        ptab = pd.DataFrame(np.random.rand(20, 5), columns=pnames)
+        id_max = ptab.shape[0] >> 2
+        id_offs = [5, 10]  # Source/target offsets
+
+        ## Init model
+        with pytest.raises(AssertionError, match=re.escape("@source_node column required!")):
+            model = test_module.PropsTableModel(props_table=ptab)
+        ptab["@source_node"] = np.random.randint(id_max, size=ptab.shape[0]) + id_offs[0]
+        with pytest.raises(AssertionError, match=re.escape("@target_node column required!")):
+            model = test_module.PropsTableModel(props_table=ptab)
+        ptab["@target_node"] = np.random.randint(id_max, size=ptab.shape[0]) + id_offs[1]
+        model = test_module.PropsTableModel(props_table=ptab)
+
+        ## Check model
+        # (a) Check node IDs
+        src_nids = np.unique(ptab["@source_node"])
+        tgt_nids = np.unique(ptab["@target_node"])
+        assert_array_equal(src_nids, model.get_src_nids())
+        assert_array_equal(tgt_nids, model.get_tgt_nids())
+        conns, cnts = model.get_src_tgt_counts()
+        ref_conns, ref_cnts = np.unique(
+            ptab[["@source_node", "@target_node"]], axis=0, return_counts=True
+        )
+        assert_array_equal(conns, ref_conns)
+        assert_array_equal(cnts, ref_cnts)
+        assert_array_equal(model.get_property_names(), pnames)
+
+        # (b) Check model access (single node IDs)
+        for sid in src_nids:
+            for tid in tgt_nids:
+                ref_tab = ptab[
+                    np.logical_and(ptab["@source_node"] == sid, ptab["@target_node"] == tid)
+                ][pnames]
+                assert_array_equal(model.apply(src_nid=sid, tgt_nid=tid), ref_tab)
+
+        # (c) Check model access (multiple node IDs)
+        for sid in src_nids:
+            ref_tab = ptab[
+                np.logical_and(ptab["@source_node"] == sid, np.isin(ptab["@target_node"], tgt_nids))
+            ][pnames]
+            assert_array_equal(model.apply(src_nid=sid, tgt_nid=tgt_nids), ref_tab)
+        for tid in tgt_nids:
+            ref_tab = ptab[
+                np.logical_and(np.isin(ptab["@source_node"], src_nids), ptab["@target_node"] == tid)
+            ][pnames]
+            assert_array_equal(model.apply(src_nid=src_nids, tgt_nid=tid), ref_tab)
+        ref_tab = ptab[pnames]
+        assert_array_equal(model.apply(src_nid=src_nids, tgt_nid=tgt_nids), ref_tab)
+
+        # (d) Check model access (single properties)
+        for p in pnames:
+            assert_array_equal(
+                model.apply(src_nid=src_nids, tgt_nid=tgt_nids, prop_names=[p]), ptab[[p]]
+            )
+
+        # (e) Check model access (full table, including @source/target_node)
+        assert_array_equal(
+            model.apply(src_nid=src_nids, tgt_nid=tgt_nids, prop_names=ptab.columns), ptab
+        )
+
+        # (f) Check model access (selected number of entries)
+        for _n in [-1, 2 * ptab.shape[0]]:  # => Assertion error
+            with pytest.raises(
+                AssertionError, match=re.escape("Selected number of elements out of range!")
+            ):
+                model.apply(src_nid=src_nids, tgt_nid=tgt_nids, num_sel=_n)
+        assert model.apply(src_nid=src_nids, tgt_nid=tgt_nids, num_sel=0).size == 0
+        assert_array_equal(
+            model.apply(src_nid=src_nids, tgt_nid=tgt_nids, num_sel=ptab.shape[0]), ptab[pnames]
+        )
+        for _n in range(1, ptab.shape[0], 5):
+            assert_array_equal(
+                model.apply(src_nid=src_nids, tgt_nid=tgt_nids, num_sel=_n), ptab[pnames][:_n]
+            )
+
+        ## Check load/save
+        model_name = "PropsTableModel_TEST"
+        model.save_model(tempdir, model_name)
+        model2 = test_module.AbstractModel.model_from_file(
+            os.path.join(tempdir, model_name + ".json")
+        )
+        assert model.get_param_dict() == model2.get_param_dict()
+        assert sorted(model.get_data_dict().keys()) == sorted(model2.get_data_dict().keys())
+        assert np.all(
+            [
+                np.array_equal(model.get_data_dict()[k], model2.get_data_dict()[k])
+                for k in model.get_data_dict().keys()
+            ]
+        )

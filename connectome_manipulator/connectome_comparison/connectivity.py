@@ -45,7 +45,7 @@ def compute(
         else:
             assert isinstance(
                 sel_dest, dict
-            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with pathway selection
+            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
         if (
             skip_empty_groups
         ):  # Take only group property values that exist within given src/tgt selection
@@ -59,11 +59,11 @@ def compute(
             src_group_values = sorted(src_nodes.property_values(group_by))
             tgt_group_values = sorted(tgt_nodes.property_values(group_by))
         src_group_sel = [
-            {group_by: src_group_values[idx], **sel_src} for idx in range(len(src_group_values))
-        ]
+            {**sel_src, group_by: src_group_values[idx]} for idx in range(len(src_group_values))
+        ]  # group_by will overwrite selection in case group property also exists in selection!
         tgt_group_sel = [
-            {group_by: tgt_group_values[idx], **sel_dest} for idx in range(len(tgt_group_values))
-        ]
+            {**sel_dest, group_by: tgt_group_values[idx]} for idx in range(len(tgt_group_values))
+        ]  # group_by will overwrite selection in case group property also exists in selection!
 
     print(
         f"INFO: Computing connectivity (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups)",
@@ -71,6 +71,8 @@ def compute(
     )
 
     syn_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))  # Mean
+    syn_table_std = np.zeros((len(src_group_sel), len(tgt_group_sel)))  # Std
+    syn_table_sem = np.zeros((len(src_group_sel), len(tgt_group_sel)))  # SEM
     syn_table_min = np.zeros((len(src_group_sel), len(tgt_group_sel)))  # Min
     syn_table_max = np.zeros((len(src_group_sel), len(tgt_group_sel)))  # Max
     p_table = np.zeros((len(src_group_sel), len(tgt_group_sel)))
@@ -91,6 +93,8 @@ def compute(
                 post_count = len(post_ids)
 
                 syn_table[idx_pre, idx_post] = np.mean(scounts)
+                syn_table_std[idx_pre, idx_post] = np.std(scounts)
+                syn_table_sem[idx_pre, idx_post] = np.std(scounts) / np.sqrt(ccount)
                 syn_table_min[idx_pre, idx_post] = np.min(scounts)
                 syn_table_max[idx_pre, idx_post] = np.max(scounts)
                 p_table[idx_pre, idx_post] = 100.0 * ccount / (pre_count * post_count)
@@ -102,6 +106,16 @@ def compute(
 
     return {
         "nsyn_conn": {"data": syn_table, "name": syn_table_name, "unit": "Mean " + syn_table_unit},
+        "nsyn_conn_std": {
+            "data": syn_table_std,
+            "name": syn_table_name,
+            "unit": "Std of " + syn_table_unit,
+        },
+        "nsyn_conn_sem": {
+            "data": syn_table_sem,
+            "name": syn_table_name,
+            "unit": "SEM of " + syn_table_unit,
+        },
         "nsyn_conn_min": {
             "data": syn_table_min,
             "name": syn_table_name,
@@ -138,8 +152,9 @@ def plot(
         plt.xlabel(f"Postsynaptic {group_by}")
         plt.ylabel(f"Presynaptic {group_by}")
 
+    n_grp = np.maximum(len(common_dict["src_group_values"]), len(common_dict["tgt_group_values"]))
+    font_size = max(13 - n_grp / 6, 1)  # Font scaling
     if len(common_dict["src_group_values"]) > 0:
-        font_size = max(13 - len(common_dict["src_group_values"]) / 6, 1)  # Font scaling
         plt.yticks(
             range(len(common_dict["src_group_values"])),
             common_dict["src_group_values"],
@@ -152,7 +167,6 @@ def plot(
             rot_x = 90
         else:
             rot_x = 0
-        font_size = max(13 - len(common_dict["tgt_group_values"]) / 6, 1)  # Font scaling
         plt.xticks(
             range(len(common_dict["tgt_group_values"])),
             common_dict["tgt_group_values"],

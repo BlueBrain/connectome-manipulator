@@ -176,10 +176,17 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
         selection = None
         for sel_k, sel_v in sel_group.items():
             if sel_k in enumeration_names:
-                sel_idx = pop.enumeration_values(sel_k).index(sel_v)
-                sel_prop = pop.get_enumeration(sel_k, sel_ids) == sel_idx
+                if isinstance(sel_v, list):  # Merge multiple selections
+                    sel_idx = [pop.enumeration_values(sel_k).index(_v) for _v in sel_v]
+                    sel_prop = np.isin(pop.get_enumeration(sel_k, sel_ids), sel_idx)
+                else:  # Single selection
+                    sel_idx = pop.enumeration_values(sel_k).index(sel_v)
+                    sel_prop = pop.get_enumeration(sel_k, sel_ids) == sel_idx
             else:
-                sel_prop = pop.get_attribute(sel_k, sel_ids) == sel_v
+                if isinstance(sel_v, list):  # Merge multiple selections
+                    sel_prop = np.isin(pop.get_attribute(sel_k, sel_ids), sel_v)
+                else:  # Single selection
+                    sel_prop = pop.get_attribute(sel_k, sel_ids) == sel_v
             if selection is None:
                 selection = sel_prop
             else:
@@ -195,7 +202,10 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
 
         if node_set is not None:
             log.log_assert(isinstance(node_set, str), "Node set must be a string!")
-            gids = np.intersect1d(gids, nodes.ids(node_set))
+            if selection is None:  # Nothing else selected
+                gids = nodes.ids(node_set)
+            else:  # Otherwise, intersect with selection
+                gids = np.intersect1d(gids, nodes.ids(node_set))
     else:
         gids = nodes.ids(sel_spec)
         if split_ids is not None:

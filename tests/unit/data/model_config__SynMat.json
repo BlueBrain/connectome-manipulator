@@ -1,0 +1,12 @@
+{
+  "data_keys": [
+    "src_nodes_table",
+    "tgt_nodes_table",
+    "lookup_table"
+  ],
+  "model": "LookupTableModel",
+  "__version_info__": {
+    "python": "3.10.8 (main, Mar  3 2023, 08:18:43) [GCC 12.2.0]",
+    "pandas": "2.0.2"
+  }
+}

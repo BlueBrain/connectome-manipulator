@@ -3,6 +3,7 @@ import os
 import morphio
 import neurom as nm
 import numpy as np
+from numpy.testing import assert_array_equal
 import pandas as pd
 
 from bluepysnap import Circuit
@@ -46,6 +47,10 @@ def test_apply(manipulation):
         TEST_DATA_DIR, f"model_config__ConnProps.json"
     )  # Deterministic connection properties model w/o variation
     props_model = model_types.AbstractModel.model_from_file(props_model_file)
+    props_model_file2 = os.path.join(
+        TEST_DATA_DIR, f"model_config__ConnPropsNoNSynConn.json"
+    )  # Deterministic connection properties model w/o variation, w/o #syn/conn
+    props_model2 = model_types.AbstractModel.model_from_file(props_model_file2)
 
     assert not np.all(
         np.diff(edges_table["@target_node"]) >= 0
@@ -204,6 +209,16 @@ def test_apply(manipulation):
             adj_mat[np.where(src_ids == _s)[0], np.where(tgt_ids == _t)[0]] = True
         return adj_mat
 
+    def get_syn(edges_table, src_ids, tgt_ids):
+        """Extract synaptome matrix from edges table"""
+        conns, counts = np.unique(
+            edges_table[["@source_node", "@target_node"]], axis=0, return_counts=True
+        )
+        syn_mat = np.zeros((len(src_ids), len(tgt_ids)), dtype=int)
+        for (_s, _t), _c in zip(conns, counts):
+            syn_mat[np.where(src_ids == _s)[0], np.where(tgt_ids == _t)[0]] = _c
+        return syn_mat
+
     def check_adj(res, edges_table, nodes, syn_class, compare_to="ref"):
         """Check adj. matrices (excl. tgt nodes w/o any original synapses; excl. autapses)"""
         _src = nodes[0].ids({"synapse_class": syn_class})
@@ -341,13 +356,11 @@ def test_apply(manipulation):
         )
         res = writer.to_pandas()
 
-        # Selected columns excluding unused efferent/segment/surface properties, which are not generated and set to zero
+        # Selected columns excluding unused efferent/spine_length properties, which are not duplicated (syn_pos_mode="reuse" by default) and set to zero
         eff_props = [_col for _col in edges_table.columns if "efferent_" in _col]
-        seg_props = [_col for _col in edges_table.columns if "_segment" in _col]
-        surf_props = [_col for _col in edges_table.columns if "_surface" in _col]
-        cols_unused = eff_props + seg_props + surf_props + ["spine_length"]
+        cols_unused_reuse = eff_props + ["spine_length"]
         col_sel = np.setdiff1d(
-            edges_table.columns, ["@source_node", "@target_node", "delay"] + cols_unused
+            edges_table.columns, ["@source_node", "@target_node", "delay"] + cols_unused_reuse
         )
 
         check_indegree(edges_table, res, nodes)  # Check keep_indegree option
@@ -356,7 +369,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_sampling(edges_table, res, col_sel)  # Check sampling method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
 
         ## (c) W/o keeping indegree & w/o reusing connections ("sample" method)
         with EdgeWriter(None, existing_edges=edges_table.copy()) as writer:
@@ -385,7 +398,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_sampling(edges_table, res, col_sel)  # Check sampling method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
 
         ## (d) W/o keeping indegree & w/o reusing connections ("sample" method & block-based processing)
         split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
@@ -419,7 +432,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_sampling(edges_table, res, col_sel)  # Check sampling method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
 
         ## (e) W/o keeping indegree & w/o reusing connections ("randomize" method)
         writer = EdgeWriter(None, edges_table.copy())
@@ -450,7 +463,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_randomization(edges_table, res, props_model)  # Check randomization method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
 
         ## (f) W/o keeping indegree & w/o reusing connections ("randomize" method & block-based processing)
         split_ids_list = [tgt_ids[: len(tgt_ids) >> 1], tgt_ids[len(tgt_ids) >> 1 :]]
@@ -486,7 +499,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_randomization(edges_table, res, props_model)  # Check randomization method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
 
         # Case 4: Keeping indegree & add/delete only => NOT POSSIBLE!
         pct = 100.0
@@ -860,9 +873,16 @@ def test_apply(manipulation):
 
         morphio.set_maximum_warnings(1)  # Suppress repeated "Warning: zero diameter in file"
 
+        eff_props = [_col for _col in edges_table.columns if "efferent_" in _col]
+        seg_props = [_col for _col in edges_table.columns if "_segment" in _col]
+        surf_props = [_col for _col in edges_table.columns if "_surface" in _col]
+        cols_unused_all = (
+            eff_props + seg_props + surf_props + ["spine_length"]
+        )  # W/o reusing positions, more columns will be unused
         aff_props = [_col for _col in edges_table.columns if "afferent_" in _col]
         col_sel = np.setdiff1d(
-            edges_table.columns, ["@source_node", "@target_node", "delay"] + cols_unused + aff_props
+            edges_table.columns,
+            ["@source_node", "@target_node", "delay"] + cols_unused_all + aff_props,
         )
 
         def check_syn_pos(res, nodes, syn_class):
@@ -918,7 +938,7 @@ def test_apply(manipulation):
             amount_pct=pct,
             keep_indegree=False,
             reuse_conns=False,
-            reuse_pos=False,
+            syn_pos_mode="random",
             gen_method="sample",
             props_model_spec=None,
             pos_map_file=None,
@@ -936,7 +956,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_sampling(edges_table, res, col_sel)  # Check sampling method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
         check_syn_pos(res, nodes, syn_class)  # Check synapse positions
 
         ## (b) W/o keeping indegree & w/o reusing connections ("sample" method & block-based processing)
@@ -955,7 +975,7 @@ def test_apply(manipulation):
                 amount_pct=pct,
                 keep_indegree=False,
                 reuse_conns=False,
-                reuse_pos=False,
+                syn_pos_mode="random",
                 gen_method="sample",
                 props_model_spec=None,
                 pos_map_file=None,
@@ -974,7 +994,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_sampling(edges_table, res, col_sel)  # Check sampling method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
         check_syn_pos(res, nodes, syn_class)  # Check synapse positions
 
         ## (c) W/o keeping indegree & w/o reusing connections ("randomize" method)
@@ -989,7 +1009,7 @@ def test_apply(manipulation):
             amount_pct=pct,
             keep_indegree=False,
             reuse_conns=False,
-            reuse_pos=False,
+            syn_pos_mode="random",
             gen_method="randomize",
             props_model_spec={"file": props_model_file},
             pos_map_file=None,
@@ -1007,7 +1027,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_randomization(edges_table, res, props_model)  # Check randomization method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
         check_syn_pos(res, nodes, syn_class)  # Check synapse positions
 
         ## (d) W/o keeping indegree & w/o reusing connections ("randomize" method & block-based processing)
@@ -1026,7 +1046,7 @@ def test_apply(manipulation):
                 amount_pct=pct,
                 keep_indegree=False,
                 reuse_conns=False,
-                reuse_pos=False,
+                syn_pos_mode="random",
                 gen_method="randomize",
                 props_model_spec={"file": props_model_file},
                 pos_map_file=None,
@@ -1045,7 +1065,7 @@ def test_apply(manipulation):
         )  # Check that non-selected connections unchanged
         check_randomization(edges_table, res, props_model)  # Check randomization method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
         check_syn_pos(res, nodes, syn_class)  # Check synapse positions
 
         # Case 12: Wiring an empty connectome from scratch
@@ -1064,7 +1084,7 @@ def test_apply(manipulation):
             amount_pct=pct,
             keep_indegree=False,
             reuse_conns=False,
-            reuse_pos=True,
+            syn_pos_mode="reuse",
             gen_method="randomize",
             props_model_spec={"file": props_model_file},
             pos_map_file=None,
@@ -1084,7 +1104,7 @@ def test_apply(manipulation):
             amount_pct=pct,
             keep_indegree=True,
             reuse_conns=False,
-            reuse_pos=False,
+            syn_pos_mode="random",
             gen_method="randomize",
             props_model_spec={"file": props_model_file},
             pos_map_file=None,
@@ -1110,13 +1130,11 @@ def test_apply(manipulation):
                 amount_pct=pct,
                 keep_indegree=False,
                 reuse_conns=False,
-                reuse_pos=False,
+                syn_pos_mode="random",
                 gen_method="sample",
                 props_model_spec=None,
                 pos_map_file=None,
             )
-            res = writer.to_pandas()
-        assert edges_table_empty.equals(res), "ERROR: Edges not empty!"
 
         ## (d) Wiring from scratch => All-to-all connectivity
         writer = EdgeWriter(None, edges_table_empty.copy())
@@ -1130,7 +1148,7 @@ def test_apply(manipulation):
             amount_pct=pct,
             keep_indegree=False,
             reuse_conns=False,
-            reuse_pos=False,
+            syn_pos_mode="random",
             gen_method="randomize",
             props_model_spec={"file": props_model_file},
             pos_map_file=None,
@@ -1142,5 +1160,220 @@ def test_apply(manipulation):
         )  # Check all-to-all connectivity
         check_randomization(edges_table, res, props_model)  # Check randomization method
         check_delay(res, nodes, syn_class, delay_model)  # Check synaptic delays
-        check_zero(res, cols_unused, nodes, syn_class)  # Check unused columns
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
         check_syn_pos(res, nodes, syn_class)  # Check synapse positions
+
+        # Case 14: Deterministic rewiring with actual adj. matrix and synaptome provided
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMat.json")
+        syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMatRnd.json")
+        syn_model = model_types.AbstractModel.init_model({"file": syn_model_file})
+
+        ## (a) Provide synaptome model, #syn/conn from ConnPropsModel ignored
+        #      => Adjacency should be unchanged, but #syn/conn from synaptome
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            gen_method="randomize",
+            props_model_spec={"file": props_model_file},
+            nsynconn_model_spec={"file": syn_model_file},
+        )
+        res = writer.to_pandas()
+        assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+        check_adj(res, edges_table, nodes, syn_class, compare_to="ref")
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
+        src_ids_sel = nodes[0].ids({"synapse_class": syn_class})
+        res_syn = get_syn(res, src_ids_sel, tgt_ids)  # synaptome
+        assert_array_equal(res_syn, syn_model.apply(src_nid=src_ids_sel, tgt_nid=tgt_ids))
+
+        ## (b) Provide synaptome model & ConnPropsModel w/o #syn/conn
+        #      => Adjacency should be unchanged, but #syn/conn from synaptome
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            gen_method="randomize",
+            props_model_spec={"file": props_model_file2},
+            nsynconn_model_spec={"file": syn_model_file},
+        )
+        res = writer.to_pandas()
+        assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+        check_adj(res, edges_table, nodes, syn_class, compare_to="ref")
+        check_zero(res, cols_unused_reuse, nodes, syn_class)  # Check unused columns
+        src_ids_sel = nodes[0].ids({"synapse_class": syn_class})
+        res_syn = get_syn(res, src_ids_sel, tgt_ids)  # synaptome
+        assert_array_equal(res_syn, syn_model.apply(src_nid=src_ids_sel, tgt_nid=tgt_ids))
+
+        ## (c) Provide ConnPropsModel w/o #syn/conn, but no synaptome => Assertion error
+        with pytest.raises(
+            AssertionError,
+            match=re.escape("#Syn/conn model required when using a properties model w/o nsynconn!"),
+        ):
+            writer = EdgeWriter(None, edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
+                syn_class=syn_class,
+                prob_model_spec={"file": prob_model_file},
+                delay_model_spec={"file": delay_model_file},
+                amount_pct=pct,
+                keep_indegree=False,
+                reuse_conns=False,
+                keep_conns=False,
+                gen_method="randomize",
+                props_model_spec={"file": props_model_file2},
+            )
+
+        ## (d) Provide empty synaptome model => Assertion error
+        with pytest.raises(AssertionError, match=re.escape('"n_syn" must be at least 1!')):
+            syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMatEmpty.json")
+            writer = EdgeWriter(None, edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
+                syn_class=syn_class,
+                prob_model_spec={"file": prob_model_file},
+                delay_model_spec={"file": delay_model_file},
+                amount_pct=pct,
+                keep_indegree=False,
+                reuse_conns=False,
+                keep_conns=False,
+                gen_method="randomize",
+                props_model_spec={"file": props_model_file},
+                nsynconn_model_spec={"file": syn_model_file},
+            )
+
+        # Case 15: Deterministic rewiring with actual adj. matrix and new synapse positions externally provided
+        pct = 100.0
+        prob_model_file = os.path.join(TEST_DATA_DIR, "model_config__AdjMat.json")
+        syn_pos_file = os.path.join(TEST_DATA_DIR, "model_config__SynPosTable.json")
+        syn_pos = model_types.AbstractModel.init_model({"file": syn_pos_file})
+
+        def check_pos(syn_pos, res, nodes, syn_class, ref_count=None):
+            """Check synapse positions loaded from external table."""
+            src_ids_sel = nodes[0].ids({"synapse_class": syn_class})
+            res_conns, res_counts = np.unique(
+                res.loc[
+                    np.isin(res["@source_node"], src_ids_sel), ["@source_node", "@target_node"]
+                ],
+                axis=0,
+                return_counts=True,
+            )
+            if ref_count is not None:
+                assert np.all(res_counts == ref_count), "ERROR: Ref synapse count mismatch!"
+            aff_props = [f"afferent_section_{_p}" for _p in ["id", "pos", "type"]] + [
+                f"afferent_center_{_p}" for _p in ["x", "y", "z"]
+            ]
+            ref_pos = pd.concat(
+                [
+                    syn_pos.apply(
+                        src_nid=_conn[0], tgt_nid=_conn[1], num_sel=ref_count, prop_names=aff_props
+                    )
+                    for _conn in res_conns
+                ]
+            )
+            res_pos = pd.concat(
+                [
+                    res.loc[
+                        np.logical_and(
+                            res["@source_node"] == _conn[0], res["@target_node"] == _conn[1]
+                        ),
+                        aff_props,
+                    ]
+                    for _conn in res_conns
+                ]
+            )
+            assert_array_equal(res_pos.to_numpy(), ref_pos.to_numpy())
+
+        # (a) Generate 10 synapses per connection => Assertion error since not enough positions provided
+        syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMatTen.json")
+
+        with pytest.raises(
+            AssertionError, match=re.escape("Selected number of elements out of range!")
+        ):
+            writer = EdgeWriter(None, edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
+                syn_class=syn_class,
+                prob_model_spec={"file": prob_model_file},
+                delay_model_spec={"file": delay_model_file},
+                amount_pct=pct,
+                keep_indegree=False,
+                reuse_conns=False,
+                keep_conns=False,
+                syn_pos_mode="external",
+                gen_method="randomize",
+                props_model_spec={"file": props_model_file2},
+                nsynconn_model_spec={"file": syn_model_file},
+                syn_pos_model_spec={"file": syn_pos_file},
+            )
+
+        # (b) Only generate 1 synapse per connection => First pos from table must be loaded
+        syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMatOne.json")
+        syn_model = model_types.AbstractModel.init_model({"file": syn_model_file})
+
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            syn_pos_mode="external",
+            gen_method="randomize",
+            props_model_spec={"file": props_model_file2},
+            nsynconn_model_spec={"file": syn_model_file},
+            syn_pos_model_spec={"file": syn_pos_file},
+        )
+        res = writer.to_pandas()
+        assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+        check_adj(res, edges_table, nodes, syn_class, compare_to="ref")
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
+        src_ids_sel = nodes[0].ids({"synapse_class": syn_class})
+        res_syn = get_syn(res, src_ids_sel, tgt_ids)  # synaptome
+        assert res_syn.max() == 1
+        assert_array_equal(res_syn, syn_model.apply(src_nid=src_ids_sel, tgt_nid=tgt_ids))
+        check_pos(syn_pos, res, nodes, syn_class, ref_count=1)
+
+        # (c) Use exact synaptome => Full pos table must be loaded
+        syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMat.json")
+        syn_model = model_types.AbstractModel.init_model({"file": syn_model_file})
+
+        writer = EdgeWriter(None, edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
+            syn_class=syn_class,
+            prob_model_spec={"file": prob_model_file},
+            delay_model_spec={"file": delay_model_file},
+            amount_pct=pct,
+            keep_indegree=False,
+            reuse_conns=False,
+            keep_conns=False,
+            syn_pos_mode="external",
+            gen_method="randomize",
+            props_model_spec={"file": props_model_file2},
+            nsynconn_model_spec={"file": syn_model_file},
+            syn_pos_model_spec={"file": syn_pos_file},
+        )
+        res = writer.to_pandas()
+        assert not edges_table.equals(res), "ERROR: Edges tables should not be equal!"
+        check_adj(res, edges_table, nodes, syn_class, compare_to="ref")
+        check_zero(res, cols_unused_all, nodes, syn_class)  # Check unused columns
+        src_ids_sel = nodes[0].ids({"synapse_class": syn_class})
+        res_syn = get_syn(res, src_ids_sel, tgt_ids)  # synaptome
+        assert_array_equal(res_syn, syn_model.apply(src_nid=src_ids_sel, tgt_nid=tgt_ids))
+        check_pos(syn_pos, res, nodes, syn_class)

@@ -1,0 +1,435 @@
+{
+  "src_types": [
+    "L4_MC",
+    "L4_PC",
+    "L5_PC"
+  ],
+  "tgt_types": [
+    "L4_MC",
+    "L4_PC",
+    "L5_PC"
+  ],
+  "prop_stats": {
+    "conductance_scale_factor": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "conductance": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "decay_time": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "depression_time": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "facilitation_time": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "n_rrp_vesicles": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3,
+          "dtype": "int"
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6,
+          "dtype": "int"
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9,
+          "dtype": "int"
+        }
+      }
+    },
+    "syn_type_id": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3,
+          "dtype": "int"
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6,
+          "dtype": "int"
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7,
+          "dtype": "int"
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8,
+          "dtype": "int"
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9,
+          "dtype": "int"
+        }
+      }
+    },
+    "u_hill_coefficient": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    },
+    "u_syn": {
+      "L4_MC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 1.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 2.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 3.0
+        }
+      },
+      "L4_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 4.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 5.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 6.0
+        }
+      },
+      "L5_PC": {
+        "L4_MC": {
+          "type": "constant",
+          "mean": 7.0
+        },
+        "L4_PC": {
+          "type": "constant",
+          "mean": 8.0
+        },
+        "L5_PC": {
+          "type": "constant",
+          "mean": 9.0
+        }
+      }
+    }
+  },
+  "data_keys": [],
+  "model": "ConnPropsModel",
+  "__version_info__": {
+    "python": "3.7.4 (default, Feb  1 2020, 05:57:20) \n[GCC 8.3.0]",
+    "jsonpickle": "2.1.0",
+    "pandas": "1.2.5"
+  }
+}

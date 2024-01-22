@@ -61,11 +61,11 @@ def compute(
             src_group_values = sorted(src_nodes.property_values(group_by))
             tgt_group_values = sorted(tgt_nodes.property_values(group_by))
         src_group_sel = [
-            {group_by: src_group_values[idx], **sel_src} for idx in range(len(src_group_values))
-        ]
+            {**sel_src, group_by: src_group_values[idx]} for idx in range(len(src_group_values))
+        ]  # group_by will overwrite selection in case group property also exists in selection!
         tgt_group_sel = [
-            {group_by: tgt_group_values[idx], **sel_dest} for idx in range(len(tgt_group_values))
-        ]
+            {**sel_dest, group_by: tgt_group_values[idx]} for idx in range(len(tgt_group_values))
+        ]  # group_by will overwrite selection in case group property also exists in selection!
 
     print(
         f"INFO: Extracting synapse properties (group_by={group_by}, sel_src={sel_src}, sel_dest={sel_dest}, N={len(src_group_values)}x{len(tgt_group_values)} groups, per_conn={per_conn})",
@@ -136,8 +136,9 @@ def plot(
         plt.xlabel(f"Postsynaptic {group_by}")
         plt.ylabel(f"Presynaptic {group_by}")
 
+    n_grp = np.maximum(len(common_dict["src_group_values"]), len(common_dict["tgt_group_values"]))
+    font_size = max(13 - n_grp / 6, 1)  # Font scaling
     if len(common_dict["src_group_values"]) > 0:
-        font_size = max(13 - len(common_dict["src_group_values"]) / 6, 1)  # Font scaling
         plt.yticks(
             range(len(common_dict["src_group_values"])),
             common_dict["src_group_values"],
@@ -150,7 +151,6 @@ def plot(
             rot_x = 90
         else:
             rot_x = 0
-        font_size = max(13 - len(common_dict["tgt_group_values"]) / 6, 1)  # Font scaling
         plt.xticks(
             range(len(common_dict["tgt_group_values"])),
             common_dict["tgt_group_values"],

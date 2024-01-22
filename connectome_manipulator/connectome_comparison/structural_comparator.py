@@ -35,9 +35,12 @@ def compute_results(circuit, comp_dict):
 
 
 def results_diff(res_dict1, res_dict2):
-    """Computes difference between two results data sets [recursively iterates through all sub-dicts to find 'data' entries; all other entries must be equal]."""
-    res_keys = sorted(res_dict1.keys())
-    assert np.array_equal(res_keys, sorted(res_dict2.keys())), "ERROR: Results keys mismatch!"
+    """Computes difference between two results data sets [recursively iterates through all sub-dicts to find 'data' entries; all other entries must be equal or will be removed]."""
+    res_keys = np.intersect1d(list(res_dict1.keys()), list(res_dict2.keys()))
+    for _k in np.setdiff1d(list(res_dict1.keys()), res_keys):
+        del res_dict1[_k]
+    for _k in np.setdiff1d(list(res_dict2.keys()), res_keys):
+        del res_dict2[_k]
     assert np.all(
         [isinstance(res_dict1[k], type(res_dict2[k])) for k in res_keys]
     ), "ERROR: Results type mismatch!"

@@ -40,6 +40,8 @@ def build(adj_mat, src_node_ids, tgt_node_ids, inverted=False, **_):
     log.log_assert(
         adj_mat.format.lower() == "csc", "ERROR: Adjacency matrix in CSC format required!"
     )
+    log.log_assert(adj_mat.shape[0] == len(src_node_ids), "ERROR: Source nodes mismatch!")
+    log.log_assert(adj_mat.shape[1] == len(tgt_node_ids), "ERROR: Target nodes mismatch!")
 
     # Prepare data frames
     src_nodes_table = pd.DataFrame(src_node_ids, columns=["src_node_ids"])
