@@ -36,18 +36,6 @@ def compute(
         src_group_sel = [sel_src]
         tgt_group_sel = [sel_dest]
     else:
-        if sel_src is None:
-            sel_src = {}
-        else:
-            assert isinstance(
-                sel_src, dict
-            ), "ERROR: Source node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
-        if sel_dest is None:
-            sel_dest = {}
-        else:
-            assert isinstance(
-                sel_dest, dict
-            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with pathway selection
         if (
             skip_empty_groups
         ):  # Take only group property values that exist within given src/tgt selection
@@ -60,6 +48,20 @@ def compute(
         else:  # Keep all group property values, even if not present in given src/tgt selection, to get the full matrix
             src_group_values = sorted(src_nodes.property_values(group_by))
             tgt_group_values = sorted(tgt_nodes.property_values(group_by))
+
+        if sel_src is None:
+            sel_src = {}
+        else:
+            assert isinstance(
+                sel_src, dict
+            ), "ERROR: Source node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
+        if sel_dest is None:
+            sel_dest = {}
+        else:
+            assert isinstance(
+                sel_dest, dict
+            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with pathway selection
+
         src_group_sel = [
             {**sel_src, group_by: src_group_values[idx]} for idx in range(len(src_group_values))
         ]  # group_by will overwrite selection in case group property also exists in selection!

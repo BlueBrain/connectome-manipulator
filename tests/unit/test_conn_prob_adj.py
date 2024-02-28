@@ -11,6 +11,7 @@ from scipy.sparse import csc_matrix
 
 from utils import TEST_DATA_DIR, setup_tempdir
 import connectome_manipulator.model_building.conn_prob_adj as test_module
+from connectome_manipulator.access_functions import get_connections
 from connectome_manipulator.model_building import model_types
 
 
@@ -29,7 +30,7 @@ def test_extract():
     src_ids = nodes[0].ids(sel_src)
     tgt_ids = nodes[1].ids(sel_tgt)
 
-    conns = list(edges.iter_connections(source=src_ids, target=tgt_ids))
+    conns = get_connections(edges, src_ids, tgt_ids)
     adj_mat = np.zeros((len(src_ids), len(tgt_ids)), dtype=bool)
     for _s, _t in conns:
         adj_mat[np.where(src_ids == _s)[0], np.where(tgt_ids == _t)[0]] = True

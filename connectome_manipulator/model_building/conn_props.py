@@ -505,12 +505,14 @@ def plot(
     # Plot data vs. model: Distribution histogram examples (generative model) + AUC
     conn_counts = [
         [
-            np.sum(syns_per_conn_data["hist"][sidx, tidx][0])
-            if (
-                hasattr(syns_per_conn_data["hist"][sidx, tidx], "__iter__")
-                and len(syns_per_conn_data["hist"][sidx, tidx]) > 0
+            (
+                np.sum(syns_per_conn_data["hist"][sidx, tidx][0])
+                if (
+                    hasattr(syns_per_conn_data["hist"][sidx, tidx], "__iter__")
+                    and len(syns_per_conn_data["hist"][sidx, tidx]) > 0
+                )
+                else 0
             )
-            else 0
             for tidx in range(len(m_types[1]))
         ]
         for sidx in range(len(m_types[0]))

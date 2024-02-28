@@ -24,6 +24,7 @@ from connectome_manipulator.access_functions import (
     get_node_ids,
     get_edges_population,
     get_node_positions,
+    get_connections,
 )
 
 JET = plt.cm.get_cmap("jet")
@@ -290,7 +291,7 @@ def extract_dependent_p_conn(
     )
 
     # Extract adjacency
-    conns = np.array(list(edges.iter_connections(source=src_node_ids, target=tgt_node_ids)))
+    conns = get_connections(edges, src_node_ids, tgt_node_ids)
     if len(conns) > 0:
         adj_mat = csr_matrix(
             (np.full(conns.shape[0], True), conns.T.tolist()),
@@ -324,9 +325,11 @@ def extract_dependent_p_conn(
                 dep_sel,
                 np.logical_and(
                     dep_matrices[dim] >= lower,
-                    (dep_matrices[dim] < upper)
-                    if idx[dim] < num_bins[dim] - 1
-                    else (dep_matrices[dim] <= upper),
+                    (
+                        (dep_matrices[dim] < upper)
+                        if idx[dim] < num_bins[dim] - 1
+                        else (dep_matrices[dim] <= upper)
+                    ),
                 ),
             )  # Including last edge
         sidx, tidx = np.nonzero(dep_sel)

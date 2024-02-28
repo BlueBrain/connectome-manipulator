@@ -1,5 +1,7 @@
 # Structural comparisons overview
 
+Comparing two connectomes in terms of connectivity or synaptic properties.
+
 | File | Description | Example |
 | :-- | :-- | :-- |
 | __[/adjacency.py](adjacency.py)__ | __Adjacency matrix__ <br> Connectivity between pairs of pre-/postsynaptic neurons <br> Optionally: <br> Numbers of synapses per connection | ![Adjacency matrix](../../doc/source/images/struct_comp_adjacency.png "Adjacency matrix") |

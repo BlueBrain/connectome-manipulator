@@ -1,4 +1,5 @@
 """Test Dask auxiliary functions"""
+
 from connectome_manipulator.processing import BatchInfo
 
 

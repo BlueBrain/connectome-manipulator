@@ -10,7 +10,11 @@ Description: Structural comparison of two connectomes in terms of adjacency matr
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.sparse import csc_matrix
-from connectome_manipulator.access_functions import get_edges_population, get_node_ids
+from connectome_manipulator.access_functions import (
+    get_edges_population,
+    get_node_ids,
+    get_connections,
+)
 
 
 def compute(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
@@ -54,19 +58,7 @@ def compute(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
         flush=True,
     )
 
-    #     pbar = progressbar.ProgressBar()
-    #     for post_idx in pbar(range(len(tgt_node_ids))):
-    #         post_gid = tgt_node_ids[post_idx]
-    #         conns = np.array(list(edges.iter_connections(target=post_gid, return_edge_count=True)))
-    #         if len(conns) > 0:
-    #             idx = src_gid_to_idx(conns[:, 0])
-    #             count_matrix[idx[idx >= 0], tgt_gid_to_idx(post_gid)] = conns[idx >= 0, 2]
-
-    conns = np.array(
-        list(
-            edges.iter_connections(source=src_node_ids, target=tgt_node_ids, return_edge_count=True)
-        )
-    )
+    conns = get_connections(edges, src_node_ids, tgt_node_ids, with_nsyn=True)
     if len(conns) == 0:  # No connections, creating empty matrix
         count_matrix = csc_matrix((len(src_node_ids), len(tgt_node_ids)), dtype=int)
     else:

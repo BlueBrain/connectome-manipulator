@@ -1,4 +1,5 @@
 """Collection of function for flexible nodes/edges access, to be used by model building and manipulation operations"""
+
 from pathlib import Path
 
 import numpy as np
@@ -14,7 +15,7 @@ from connectome_manipulator import log
 
 def property_names(nodes):
     """Get all property names for a population"""
-    population = nodes._population  # pylint: disable=protected-access
+    population = nodes.to_libsonata
     return set(population.attribute_names) | set(
         add_dynamic_prefix(population.dynamics_attribute_names)
     )
@@ -27,7 +28,7 @@ def _ids_to_ranges(ids):
 
 def get_nodes(nodes, selection=None):
     """Get a pandas table of all nodes and their properties, optionally narrowed by a selection"""
-    population = nodes._population  # pylint: disable=protected-access
+    population = nodes.to_libsonata
     categoricals = population.enumeration_names
 
     if selection is None:
@@ -60,7 +61,7 @@ def get_morphology_paths(nodes, selection, morpho_helper, extension="swc"):
         morpho_helper: a bluepysnap MorphoHelper instance
         extension (str): expected filetype extension of the morph file.
     """
-    morpho_dir = morpho_helper._get_morph_dir(extension)  # pylint: disable=protected-access
+    morpho_dir = morpho_helper.get_morphology_dir(extension)
     result = get_nodes(nodes, selection)
     return [Path(morpho_dir, f"{name}.{extension}") for name in result[Node.MORPHOLOGY]]
 
@@ -115,7 +116,7 @@ def orientations(nodes, node_sel=None):
 
 def get_enumeration_list(pop, column):
     """Takes a node population and column name and returns a list to values."""
-    raw_pop = pop._population  # pylint: disable=protected-access
+    raw_pop = pop.to_libsonata
     if column in raw_pop.enumeration_names:
         return raw_pop.enumeration_values(column)
     return sorted(np.unique(raw_pop.get_attribute(column, raw_pop.select_all())))
@@ -123,7 +124,7 @@ def get_enumeration_list(pop, column):
 
 def get_enumeration_map(pop, column):
     """Takes a node population and column name and returns a dictionary that maps values to indices."""
-    raw_pop = pop._population  # pylint: disable=protected-access
+    raw_pop = pop.to_libsonata
     if column in raw_pop.enumeration_names:
         return {key: idx for idx, key in enumerate(raw_pop.enumeration_values(column))}
     return {
@@ -136,13 +137,13 @@ def get_enumeration_map(pop, column):
 
 def get_attribute(pop, column, ids):
     """Get the attribute values for `column` from population `pop` for node IDs `ids`."""
-    raw_pop = pop._population  # pylint: disable=protected-access
+    raw_pop = pop.to_libsonata
     return raw_pop.get_attribute(column, libsonata.Selection(ids))
 
 
 def get_enumeration(pop, column, ids=None):
     """Get the raw enumeration values for `column` from population `pop` for node IDs `ids`."""
-    raw_pop = pop._population  # pylint: disable=protected-access
+    raw_pop = pop.to_libsonata
     if ids is None:
         ids = raw_pop.select_all()
     else:
@@ -163,7 +164,7 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
     split_ids ... Node IDs to filter the selection by, either as an array or a
                   libsonata.Selection
     """
-    pop = nodes._population  # pylint: disable=protected-access
+    pop = nodes.to_libsonata
     enumeration_names = pop.enumeration_names
     if split_ids is None:
         sel_ids = pop.select_all()
@@ -263,7 +264,7 @@ def get_edges_population(circuit, popul_name=None, return_popul_name=False):
 
 def get_node_positions(nodes, node_ids, vox_map=None):
     """Return x/y/z positions of list of nodes, optionally mapped using VoxelData map."""
-    _pop = nodes._population  # pylint: disable=protected-access
+    _pop = nodes.to_libsonata
     _sel = libsonata.Selection(node_ids)
     raw_pos = np.column_stack(
         (
@@ -281,3 +282,12 @@ def get_node_positions(nodes, node_ids, vox_map=None):
     else:  # No voxel mapping
         pos = raw_pos
     return raw_pos, pos
+
+
+def get_connections(edges, pre_ids, post_ids, with_nsyn=False):
+    """Returns connections between given src/tgt node IDs, optionally incl. #synapses per connection."""
+    it_conns = edges.iter_connections(pre_ids, post_ids, return_edge_count=with_nsyn)
+    conns = np.array(
+        [([_c.id for _c in _conn[:2]] + list(_conn[2:])) for _conn in it_conns]
+    )  # Resolve src/tgt IDs
+    return conns

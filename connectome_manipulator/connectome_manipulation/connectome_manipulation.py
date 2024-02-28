@@ -4,6 +4,7 @@
 - Applies manipulation(s) to the connectome, as specified by the manipulation config dict
 - Writes back the manipulated connectome to a SONATA edges file, together with a new circuit config
 """
+
 import copy
 import os
 from dataclasses import dataclass

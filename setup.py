@@ -31,7 +31,7 @@ setup(
     },
     license="BBP-internal-confidential",
     install_requires=[
-        "bluepysnap>=1.0.5",  # 1.0.5 does not pickle cached properties
+        "bluepysnap>=3.0.1",
         "numpy",
         "pandas",
         "progressbar",

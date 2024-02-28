@@ -1299,9 +1299,7 @@ def test_apply(manipulation):
         # (a) Generate 10 synapses per connection => Assertion error since not enough positions provided
         syn_model_file = os.path.join(TEST_DATA_DIR, "model_config__SynMatTen.json")
 
-        with pytest.raises(
-            AssertionError, match=re.escape("Selected number of elements out of range!")
-        ):
+        with pytest.raises(ValueError):
             writer = EdgeWriter(None, edges_table.copy())
             manipulation(nodes, writer).apply(
                 tgt_ids,

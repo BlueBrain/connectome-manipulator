@@ -1,4 +1,5 @@
 """A module implementing several executor wrappers"""
+
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta

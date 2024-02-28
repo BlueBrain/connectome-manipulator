@@ -23,7 +23,7 @@ class ConnectomeExtraction(Manipulation):
     """
 
     @profiler.profileit(name="conn_extraction")
-    def apply(self, edges_table, split_ids, target_name=None, node_sets_file=None):
+    def apply(self, split_ids, target_name=None, node_sets_file=None):
         """Extraction of a cell target as given by target_name
 
         Extraction keeping only connections within that target (empty connectome if no target_name provided).
@@ -31,9 +31,11 @@ class ConnectomeExtraction(Manipulation):
         the cell target is not part of the circuit's intrinsic node sets.
         """
         # pylint: disable=arguments-differ
+        edges_table = self.writer.to_pandas()
         if target_name is None:
             log.info("No target name provided, returning empty connectome!")
-            return edges_table.loc[[]].copy()
+            self.writer.from_pandas(edges_table.loc[[]].copy())
+            return
 
         # Load cell targets
         assert (
@@ -80,4 +82,4 @@ class ConnectomeExtraction(Manipulation):
         )
         # ################# #
 
-        return edges_table_manip
+        self.writer.from_pandas(edges_table_manip)

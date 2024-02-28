@@ -93,9 +93,11 @@ def extract(
     for idx in pbar(range(num_bins)):
         d_sel = np.logical_and(
             src_tgt_dist >= dist_bins[idx],
-            (src_tgt_dist < dist_bins[idx + 1])
-            if idx < num_bins - 1
-            else (src_tgt_dist <= dist_bins[idx + 1]),
+            (
+                (src_tgt_dist < dist_bins[idx + 1])
+                if idx < num_bins - 1
+                else (src_tgt_dist <= dist_bins[idx + 1])
+            ),
         )  # Including last edge
         dist_count[idx] = np.sum(d_sel)
         if dist_count[idx] > 0:

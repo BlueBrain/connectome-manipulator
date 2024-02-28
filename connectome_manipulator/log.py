@@ -1,4 +1,5 @@
 """Customized logging"""
+
 from time import strftime
 import logging
 import os

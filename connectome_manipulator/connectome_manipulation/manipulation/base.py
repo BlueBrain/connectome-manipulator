@@ -3,6 +3,7 @@
 Description: This module contains the Manipulation abstract base class of which all manipulation
 classes must inherit and implement its methods.
 """
+
 from abc import ABCMeta, abstractmethod
 import inspect
 import os.path

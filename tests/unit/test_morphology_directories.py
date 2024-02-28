@@ -1,4 +1,5 @@
 """Test that alternate morphologies work."""
+
 import os
 import pytest
 import bluepysnap

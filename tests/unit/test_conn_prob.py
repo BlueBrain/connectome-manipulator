@@ -268,61 +268,6 @@ def test_get_pos_mapping_fcts():
         )
 
 
-# NOT USED ANY MORE
-# def test_compute_dist_matrix():
-#     src_pos = get_random_pos_matrix()
-#     tgt_pos = get_random_pos_matrix()
-
-#     # add one pos from src_pos to make sure there's a nan
-#     tgt_pos = np.vstack((tgt_pos, src_pos[-1]))
-
-#     expected = np.array([[np.sqrt(np.sum((t - s) ** 2)) for t in tgt_pos] for s in src_pos])
-#     expected[expected == 0] = np.nan
-
-#     res = test_module.compute_dist_matrix(src_pos, tgt_pos)
-#     assert_array_equal(res, expected)
-
-
-# NOT USED ANY MORE
-# def test_compute_bip_matrix():
-#     src_pos = get_random_pos_matrix()
-#     tgt_pos = get_random_pos_matrix()
-
-#     expected = np.array([[t - s for t in tgt_pos[:, 2]] for s in src_pos[:, 2]])
-
-#     # basically what np.sign does:
-#     expected[expected < 0] = -1
-#     expected[expected > 0] = 1
-
-#     res = test_module.compute_bip_matrix(src_pos, tgt_pos)
-#     assert_array_equal(res, expected)
-
-
-# NOT USED ANY MORE
-# def test_compute_offset_matrices():
-#     src_pos = get_random_pos_matrix()
-#     tgt_pos = get_random_pos_matrix()
-
-#     # transpose the axis (x, y, z) as the first dimension
-#     expected = [[t - s for t in tgt_pos] for s in src_pos]
-#     expected = np.transpose(expected, (2, 0, 1))
-
-#     res = test_module.compute_offset_matrices(src_pos, tgt_pos)
-#     assert_array_equal(res, expected)
-
-
-# NOT USED ANY MORE
-# def test_compute_position_matrices():
-#     src_pos = get_random_pos_matrix()
-#     tgt_pos = get_random_pos_matrix()
-
-#     expected = [src_pos for _ in range(len(tgt_pos))]
-#     expected = np.transpose(expected, (2, 1, 0))
-
-#     res = test_module.compute_position_matrices(src_pos, tgt_pos)
-#     assert_array_equal(res, expected)
-
-
 def test_extract_dependant_p_conn():
     c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = c.edges[c.edges.population_names[0]]
@@ -392,32 +337,6 @@ def test_extract_dependant_p_conn():
         res_p_conn[np.isfinite(res_p_conn)],
         res_count_conn[res_count_all > 0] / res_count_all[res_count_all > 0],
     ), "ERROR: Connection probability mismatch!"
-
-
-#     # NOTE by chrpok on 08/06/2022:
-#     #  -edges must contain specific edges population
-#     #  -input ids must be of type np.array
-#
-#     # NOTE by herttuai on 08/10/2021:
-#     # These calls are exactly like those in test_conn_prob.py:211
-#     # So I expect test_conn_prob.extract_1st_order to fail, too.
-#     # I am not sure how this function is supposed to work.
-#
-#     with pytest.raises(ValueError):
-#         # NOTE by herttuai on 08/10/2021:
-#         # This throws a ValueError like: "invalid literal for int() with base 10: 'nodeA'".
-#         # The failing line is:
-#         #     test_conn_prob.py:175
-#         #
-#         # Has the iter_connections changed meanwhile?
-#         res = test_module.extract_dependent_p_conn(src_ids, tgt_ids, edges, [], [])
-#
-#     with pytest.raises(TypeError):
-#         # NOTE by herttuai on 08/10/2021:
-#         # This raises TypeError like: "only integer scalar arrays can be converted to a scalar index".
-#         # The failing line is:
-#         #     test_conn_prob.py:192
-#         res = test_module.extract_dependent_p_conn(np.array([0]), np.array([0]), edges, [], [])
 
 
 def test_get_value_ranges():

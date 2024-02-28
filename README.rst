@@ -1,4 +1,4 @@
-connectome_manipulator
+Connectome-Manipulator
 ======================
 
 A tool to perform structural manipulations on a SONATA circuit connectome
@@ -7,10 +7,10 @@ A tool to perform structural manipulations on a SONATA circuit connectome
 Installation
 ------------
 
-.. Replace this text by proper installation instructions.
+pip install .
 
 
 Examples
 --------
 
-.. Provide here some examples on how this software can be used.
+To be found under /examples

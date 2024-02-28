@@ -1,4 +1,5 @@
 """Auxiliary classes to process many nodes split into chunks"""
+
 from dataclasses import dataclass
 from functools import reduce
 from operator import and_

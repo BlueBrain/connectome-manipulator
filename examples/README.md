@@ -1,0 +1,9 @@
+# Examples
+
+The following example notebooks demonstrate important use cases of the _Connectome-Manipulator_ framework:
+
+- <u>Example 1</u>: To be added...
+
+- <u>Example 2</u>: To be added...
+
+- ...

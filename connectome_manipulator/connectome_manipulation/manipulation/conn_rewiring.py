@@ -269,22 +269,24 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         )  # All source neurons (corresponding to chosen sel_src and syn_class)
         syn_sel_idx_src = np.isin(edges_table["@source_node"], src_node_ids)
         log.log_assert(
-            np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] >= 100)
-            if syn_class == "EXC"
-            else np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] < 100),
+            (
+                np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] >= 100)
+                if syn_class == "EXC"
+                else np.all(edges_table.loc[syn_sel_idx_src, "syn_type_id"] < 100)
+            ),
             "Synapse class error!",
         )
 
         # Only select target nodes that are actually in current split of edges_table
         tgt_node_ids = get_node_ids(self.nodes[1], sel_dest, split_ids)
         num_tgt_total = len(tgt_node_ids)
-        stats_dict[
-            "target_nrn_count_all"
-        ] = num_tgt_total  # All target neurons in current split (corresponding to chosen sel_dest)
+        stats_dict["target_nrn_count_all"] = (
+            num_tgt_total  # All target neurons in current split (corresponding to chosen sel_dest)
+        )
         num_tgt = np.round(amount_pct * num_tgt_total / 100).astype(int)
-        stats_dict[
-            "target_nrn_count_sel"
-        ] = num_tgt  # Selected target neurons in current split (based on amount_pct)
+        stats_dict["target_nrn_count_sel"] = (
+            num_tgt  # Selected target neurons in current split (based on amount_pct)
+        )
         tgt_sel = np.random.permutation([True] * num_tgt + [False] * (num_tgt_total - num_tgt))
         if num_tgt_total > 0:
             tgt_node_ids = tgt_node_ids[tgt_sel]  # Select subset of neurons (keeping order)
@@ -381,9 +383,9 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                 * p_scale
             )
             p_src[np.isnan(p_src)] = 0.0  # Exclude invalid values
-            p_src[
-                src_node_ids == tgt
-            ] = 0.0  # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
+            p_src[src_node_ids == tgt] = (
+                0.0  # Exclude autapses [ASSUMING node IDs are unique across src/tgt node populations!]
+            )
 
             # Currently existing sources for given target node
             src, src_syn_idx = np.unique(
@@ -539,9 +541,11 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                 "output_conn_count_sel_avg",
             ]
             stat_str = [
-                f"      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}"
-                if isinstance(v, list) and len(v) > 0
-                else f"      {k}: {v}"
+                (
+                    f"      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}"
+                    if isinstance(v, list) and len(v) > 0
+                    else f"      {k}: {v}"
+                )
                 for k, v in stats_dict.items()
                 if k in stat_sel
             ]
@@ -622,9 +626,11 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         # Log statistics
         stat_str = [
-            f"      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}"
-            if isinstance(v, list) and len(v) > 0
-            else f"      {k}: {v}"
+            (
+                f"      {k}: COUNT {len(v)}, MEAN {np.mean(v):.2f}, MIN {np.min(v)}, MAX {np.max(v)}, SUM {np.sum(v)}"
+                if isinstance(v, list) and len(v) > 0
+                else f"      {k}: {v}"
+            )
             for k, v in stats_dict.items()
         ]
         log.debug("STATISTICS:\n%s", "\n".join(stat_str))
@@ -912,12 +918,16 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             f"afferent_center_{_p}" for _p in ["x", "y", "z"]
         ]
 
+        # Load synapse positions from model (order is arbitrary!)
+        syn_pos = syn_pos_model.apply(
+            src_nid=src_gen, tgt_nid=tgt, prop_names=["@source_node"] + prop_names
+        ).set_index("@source_node")
+
+        # Assign positions to source nodes
         for sid in src_gen:  # List of source node IDs
             conn_sel = new_edges["@source_node"] == sid
-            syn_pos = syn_pos_model.apply(
-                src_nid=sid, tgt_nid=tgt, prop_names=prop_names, num_sel=np.sum(conn_sel)
-            )
-            new_edges.loc[conn_sel, prop_names] = syn_pos.to_numpy()
+            n_sel = np.sum(conn_sel)
+            new_edges.loc[conn_sel, prop_names] = syn_pos.loc[[sid]].to_numpy()[:n_sel, :]
 
     def _reinit(self, edges_table, syn_class):
         # Dict to keep computed values per target m-type (instead of re-computing them for each target neuron)

@@ -156,21 +156,29 @@ def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no c
             ).astype(float)
             all_data = all_data[np.isfinite(all_data)]
             plot_range = [
-                -np.percentile(-all_data[all_data < 0], range_prctile)
-                if np.any(all_data < 0)
-                else 0.0,
-                np.percentile(all_data[all_data > 0], range_prctile)
-                if np.any(all_data > 0)
-                else 0.0,
+                (
+                    -np.percentile(-all_data[all_data < 0], range_prctile)
+                    if np.any(all_data < 0)
+                    else 0.0
+                ),
+                (
+                    np.percentile(all_data[all_data > 0], range_prctile)
+                    if np.any(all_data > 0)
+                    else 0.0
+                ),
             ]  # Common plot range
             diff_data = get_flattened_data(res_dicts[-1][res_sel]["data"])
             plot_range_diff = max(
-                np.percentile(diff_data[diff_data > 0], range_prctile)
-                if np.any(diff_data > 0)
-                else 0.0,
-                np.percentile(-diff_data[diff_data < 0], range_prctile)
-                if np.any(diff_data < 0)
-                else 0.0,
+                (
+                    np.percentile(diff_data[diff_data > 0], range_prctile)
+                    if np.any(diff_data > 0)
+                    else 0.0
+                ),
+                (
+                    np.percentile(-diff_data[diff_data < 0], range_prctile)
+                    if np.any(diff_data < 0)
+                    else 0.0
+                ),
             )  # Diff plot range
             if plot_range_diff == 0.0:
                 plot_range_diff = 1.0  # Arbitrary range needed for symmetric plotting around 0.0 in case of zero difference

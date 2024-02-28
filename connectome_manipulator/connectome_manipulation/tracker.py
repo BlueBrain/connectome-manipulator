@@ -1,4 +1,5 @@
 """Module to facilitate easier job management"""
+
 from contextlib import contextmanager
 from pathlib import Path
 from .. import log, utils, profiler

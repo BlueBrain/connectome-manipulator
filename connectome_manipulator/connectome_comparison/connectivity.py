@@ -10,7 +10,11 @@ between the two connectomes, are then plotted by means of the plot() function.
 import matplotlib.pyplot as plt
 import numpy as np
 import progressbar
-from connectome_manipulator.access_functions import get_edges_population, get_node_ids
+from connectome_manipulator.access_functions import (
+    get_edges_population,
+    get_node_ids,
+    get_connections,
+)
 
 
 def compute(
@@ -34,18 +38,6 @@ def compute(
         src_group_sel = [sel_src]
         tgt_group_sel = [sel_dest]
     else:
-        if sel_src is None:
-            sel_src = {}
-        else:
-            assert isinstance(
-                sel_src, dict
-            ), "ERROR: Source node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
-        if sel_dest is None:
-            sel_dest = {}
-        else:
-            assert isinstance(
-                sel_dest, dict
-            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
         if (
             skip_empty_groups
         ):  # Take only group property values that exist within given src/tgt selection
@@ -58,6 +50,20 @@ def compute(
         else:  # Keep all group property values, even if not present in given src/tgt selection, to get the full matrix
             src_group_values = sorted(src_nodes.property_values(group_by))
             tgt_group_values = sorted(tgt_nodes.property_values(group_by))
+
+        if sel_src is None:
+            sel_src = {}
+        else:
+            assert isinstance(
+                sel_src, dict
+            ), "ERROR: Source node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
+        if sel_dest is None:
+            sel_dest = {}
+        else:
+            assert isinstance(
+                sel_dest, dict
+            ), "ERROR: Target node selection must be a dict or empty!"  # Otherwise, it cannot be merged with group selection
+
         src_group_sel = [
             {**sel_src, group_by: src_group_values[idx]} for idx in range(len(src_group_values))
         ]  # group_by will overwrite selection in case group property also exists in selection!
@@ -83,8 +89,7 @@ def compute(
             sel_post = tgt_group_sel[idx_post]
             pre_ids = get_node_ids(src_nodes, sel_pre)
             post_ids = get_node_ids(tgt_nodes, sel_post)
-            it_conn = edges.iter_connections(pre_ids, post_ids, return_edge_count=True)
-            conns = np.array(list(it_conn))
+            conns = get_connections(edges, pre_ids, post_ids, with_nsyn=True)
 
             if conns.size > 0:
                 scounts = conns[:, 2]  # Synapse counts per connection

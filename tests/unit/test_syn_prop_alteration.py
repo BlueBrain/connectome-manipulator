@@ -1,18 +1,25 @@
-import os
-
 import numpy as np
+import os
 import pandas as pd
+import pytest
 
 from bluepysnap import Circuit
 
-import pytest
-import re
 from utils import TEST_DATA_DIR
-from connectome_manipulator.model_building import model_types
-import connectome_manipulator.connectome_manipulation.syn_prop_alteration as test_module
+from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
+from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
+from connectome_manipulator import log
 
 
-def test_apply():
+@pytest.fixture
+def manipulation():
+    m = Manipulation.get("syn_prop_alteration")
+    return m
+
+
+def test_apply(manipulation):
+    log.setup_logging()  # To have data logging in a defined state
+
     c = Circuit(os.path.join(TEST_DATA_DIR, "circuit_sonata.json"))
     edges = c.edges[c.edges.population_names[0]]
     nodes = [edges.source, edges.target]
@@ -20,17 +27,21 @@ def test_apply():
     tgt_ids = nodes[1].ids()
     edges_table = edges.afferent_edges(tgt_ids, properties=edges.property_names)
 
-    aux_dict = {"N_split": 1, "split_ids": tgt_ids}
-
     # Case 1: Check prop_sel
+    ## (a) Invalid selection
+    for prop_sel in ["@source_node", "@target_node"]:
+        with pytest.raises(AssertionError):
+            writer = EdgeWriter(None, existing_edges=edges_table.copy())
+            manipulation(nodes, writer).apply(tgt_ids, prop_sel, {})
+
+    ## (b) Valid selection
     pct = 100.0
     new_value = {"mode": "setval", "value": -1.0}
-    for prop_sel in ["u_syn", "n_rrp_vesicles", "delay", "afferent_section_pos", "@source_node"]:
+    for prop_sel in ["u_syn", "n_rrp_vesicles", "delay", "afferent_section_pos"]:
         props_nonsel = np.setdiff1d(edges_table.columns, prop_sel)
-        res = test_module.apply(
-            edges_table.copy(),
-            nodes,
-            aux_dict,
+        writer = EdgeWriter(None, existing_edges=edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
             prop_sel,
             new_value,
             sel_src=None,
@@ -38,6 +49,8 @@ def test_apply():
             syn_filter=None,
             amount_pct=pct,
         )
+        res = writer.to_pandas()
+
         assert edges_table[props_nonsel].equals(
             res[props_nonsel]
         ), "ERROR: Non-selected property values changed!"
@@ -50,10 +63,9 @@ def test_apply():
     props_nonsel = np.setdiff1d(edges_table.columns, prop_sel)
     new_value = {"mode": "setval", "value": -1.0}
     for pct in np.linspace(0, 100, 6):
-        res = test_module.apply(
-            edges_table.copy(),
-            nodes,
-            aux_dict,
+        writer = EdgeWriter(None, existing_edges=edges_table.copy())
+        manipulation(nodes, writer).apply(
+            tgt_ids,
             prop_sel,
             new_value,
             sel_src=None,
@@ -61,6 +73,8 @@ def test_apply():
             syn_filter=None,
             amount_pct=pct,
         )
+        res = writer.to_pandas()
+
         assert edges_table[props_nonsel].equals(
             res[props_nonsel]
         ), "ERROR: Non-selected property values changed!"
@@ -77,10 +91,9 @@ def test_apply():
         for tgt_class in ["EXC", "INH"]:
             sel_src = {"synapse_class": src_class}
             sel_dest = {"synapse_class": tgt_class}
-            res = test_module.apply(
-                edges_table.copy(),
-                nodes,
-                aux_dict,
+            writer = EdgeWriter(None, existing_edges=edges_table.copy())
+            manipulation(nodes, writer).apply(
+                tgt_ids,
                 prop_sel,
                 new_value,
                 sel_src=sel_src,
@@ -88,6 +101,8 @@ def test_apply():
                 syn_filter=None,
                 amount_pct=pct,
             )
+            res = writer.to_pandas()
+
             assert edges_table[props_nonsel].equals(
                 res[props_nonsel]
             ), "ERROR: Non-selected property values changed!"
@@ -105,10 +120,9 @@ def test_apply():
     # Case 4: Check syn_filter
     filt_prop = "n_rrp_vesicles"
     filt_val = [2, 3]
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -116,6 +130,8 @@ def test_apply():
         syn_filter={filt_prop: filt_val},
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -130,10 +146,9 @@ def test_apply():
     # Case 5: Check modes
     ## (a) Constant value
     new_value = {"mode": "setval", "value": -1.0}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -141,6 +156,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -150,10 +167,9 @@ def test_apply():
 
     ## (b) Scaling factor
     new_value = {"mode": "scale", "factor": -1.0}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -161,6 +177,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -170,10 +188,9 @@ def test_apply():
 
     ## (c) Shuffling across synapses
     new_value = {"mode": "shuffle"}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -181,6 +198,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -190,10 +209,9 @@ def test_apply():
 
     ## (d) Random value (constant)
     new_value = {"mode": "randval", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -201,6 +219,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -210,10 +230,9 @@ def test_apply():
 
     ## (e) Random scaling factor (constant)
     new_value = {"mode": "randscale", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -221,6 +240,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -230,10 +251,9 @@ def test_apply():
 
     ## (f) Random additive value (constant)
     new_value = {"mode": "randadd", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -241,6 +261,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -251,10 +273,9 @@ def test_apply():
     # Case 5: Check range
     ## (a) Lower bound
     new_value = {"mode": "scale", "factor": -1.0, "range": [0.0, 1.0]}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -262,6 +283,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"
@@ -271,10 +294,9 @@ def test_apply():
 
     ## (b) Upper bound
     new_value = {"mode": "scale", "factor": 100.0, "range": [0.0, 1.0]}
-    res = test_module.apply(
-        edges_table.copy(),
-        nodes,
-        aux_dict,
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
         prop_sel,
         new_value,
         sel_src=None,
@@ -282,6 +304,8 @@ def test_apply():
         syn_filter=None,
         amount_pct=pct,
     )
+    res = writer.to_pandas()
+
     assert edges_table[props_nonsel].equals(
         res[props_nonsel]
     ), "ERROR: Non-selected property values changed!"

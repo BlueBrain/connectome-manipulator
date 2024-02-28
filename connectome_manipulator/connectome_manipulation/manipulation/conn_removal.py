@@ -8,6 +8,7 @@ that mask will be considered for removal (in addition to the other selecion crit
 Such connection mask (.npz file) must be given as sparse adjacency matrix in CSC format,
 exactly matching the size of the selected src/dest neurons and indexed in increasing order.
 """
+
 import os
 
 import numpy as np
@@ -33,7 +34,6 @@ class ConnectomeRemoval(Manipulation):
     @profiler.profileit(name="conn_removal")
     def apply(
         self,
-        edges_table,
         split_ids,
         sel_src=None,
         sel_dest=None,
@@ -49,6 +49,7 @@ class ConnectomeRemoval(Manipulation):
         gids_src = get_node_ids(self.nodes[0], sel_src)
         gids_dest = get_node_ids(self.nodes[1], sel_dest)
 
+        edges_table = self.writer.to_pandas()
         syn_sel_idx = np.logical_and(
             np.isin(edges_table["@source_node"], gids_src),
             np.isin(edges_table["@target_node"], gids_dest),
@@ -123,7 +124,10 @@ class ConnectomeRemoval(Manipulation):
         syn_idx_remove = np.isin(syn_conn_idx, conn_idx_remove)
 
         if min_syn_per_conn is not None and max_syn_per_conn is not None:
-            syn_per_conn_info = f"with {min_syn_per_conn}-{max_syn_per_conn} syns/conn "
+            if min_syn_per_conn == max_syn_per_conn:
+                syn_per_conn_info = f"with {min_syn_per_conn} syns/conn "
+            else:
+                syn_per_conn_info = f"with {min_syn_per_conn}-{max_syn_per_conn} syns/conn "
         elif min_syn_per_conn is None and max_syn_per_conn is not None:
             syn_per_conn_info = f"with max {max_syn_per_conn} syns/conn "
         elif min_syn_per_conn is not None and max_syn_per_conn is None:
@@ -137,4 +141,4 @@ class ConnectomeRemoval(Manipulation):
         syn_sel_idx[syn_sel_idx] = syn_idx_remove  # Set actual indices of connections to be removed
         edges_table_manip = edges_table[~syn_sel_idx].copy()
 
-        return edges_table_manip
+        self.writer.from_pandas(edges_table_manip)
