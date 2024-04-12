@@ -1,0 +1,112 @@
+{
+  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/structural_comparator",
+  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/structural_comparator",
+  "circuits": {
+    "0": {
+      "circuit_config": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data/circuit_config.json",
+      "circuit_name": "Original"
+    },
+    "1": {
+      "circuit_config": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/circuits/SSCx_NullManip/circuit_config.json",
+      "circuit_name": "NullManip"
+    }
+  },
+  "plot_types": [
+    {
+      "name": "Adjacency_Hex0",
+      "fct": {
+        "source": "adjacency",
+        "kwargs": {
+          "sel_src": {
+            "node_set": "hex0"
+          },
+          "sel_dest": {
+            "node_set": "hex0"
+          }
+        }
+      },
+      "res_sel": [
+        "adj",
+        "adj_cnt"
+      ],
+      "range_prctile": 95,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "ConnPerLayer_Hex0EE",
+      "fct": {
+        "source": "connectivity",
+        "kwargs": {
+          "group_by": "layer",
+          "skip_empty_groups": false,
+          "sel_src": {
+            "node_set": "hex0",
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "node_set": "hex0",
+            "synapse_class": "EXC"
+          }
+        }
+      },
+      "res_sel": [
+        "nsyn_conn",
+        "conn_prob"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "PropsPerLayer_Hex0EE",
+      "fct": {
+        "source": "properties",
+        "kwargs": {
+          "group_by": "layer",
+          "skip_empty_groups": false,
+          "sel_src": {
+            "node_set": "hex0",
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "node_set": "hex0",
+            "synapse_class": "EXC"
+          },
+          "fct": "np.mean"
+        }
+      },
+      "res_sel": [
+        "conductance",
+        "decay_time",
+        "delay",
+        "depression_time",
+        "facilitation_time",
+        "n_rrp_vesicles",
+        "syn_type_id",
+        "u_syn"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    }
+  ]
+}

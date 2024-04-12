@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Manipulation name: conn_removal
 
 Description: Remove percentage of randomly selected connections (i.e., all synapses per connection)

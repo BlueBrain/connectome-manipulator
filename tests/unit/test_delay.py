@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 import os
 import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal

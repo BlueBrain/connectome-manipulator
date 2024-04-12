@@ -1,0 +1,11 @@
+Christoph Pokorny (maintainer)
+Matthias Wolf (maintainer)
+Omar Awile
+Eleftherios Zisis
+Luc Dominic Grosheintz-Laval
+Jorge Blanco Alonso
+Fernando Pereira
+Michael Gevaert
+Joni Herttuainen
+Michael W. Reimann (contributor)
+Kerem Kurban (contributor)

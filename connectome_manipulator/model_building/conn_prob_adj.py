@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Module for building deterministic connection probability models based on adjacency matrices, consisting of three basic functions:
 
 - extract(...): Extracts adjacency matrix between neurons

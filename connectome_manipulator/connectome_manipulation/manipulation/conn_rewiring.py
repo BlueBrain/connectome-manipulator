@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Manipulation name: conn_rewiring
 
 Description: Rewiring of existing connectome, based on a given model of connection probability (which can

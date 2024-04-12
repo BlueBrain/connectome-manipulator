@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Null manipulator - does not do anything"""
 
 from connectome_manipulator import log

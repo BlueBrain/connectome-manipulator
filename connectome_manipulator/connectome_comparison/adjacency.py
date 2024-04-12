@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Connectome comparison name: adjacency
 
 Description: Structural comparison of two connectomes in terms of adjacency matrices for selected pathways

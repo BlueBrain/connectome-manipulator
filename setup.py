@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 import importlib.util
 from setuptools import setup, find_packages
 
@@ -18,10 +23,9 @@ VERSION = module.__version__
 
 setup(
     name="connectome-manipulator",
-    author="Christoph Pokorny",
-    author_email="christoph.pokorny@epfl.ch",
+    author="Blue Brain Project, EPFL",
     version=VERSION,
-    description="A tool to perform structural manipulations on a SONATA circuit connectome",
+    description="A connectome manipulation framework for SONATA circuits",
     long_description=README,
     long_description_content_type="text/x-rst",
     url="https://bbpgitlab.epfl.ch/conn/structural/connectome_manipulator.git",
@@ -29,7 +33,7 @@ setup(
         "Tracker": "https://bbpteam.epfl.ch/project/issues/projects/SSCXDIS/issues",
         "Source": "https://bbpgitlab.epfl.ch/conn/structural/connectome_manipulator.git",
     },
-    license="BBP-internal-confidential",
+    license="Apache-2",
     install_requires=[
         "bluepysnap>=3.0.1",
         "numpy",
@@ -55,7 +59,7 @@ setup(
         ]
     },
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "Programming Language :: Python",
@@ -64,6 +68,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
 )

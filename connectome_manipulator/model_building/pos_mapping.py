@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Module for building position mapping model, consisting of three basic functions:
 
 - extract(...): Extracts position mapping from atlas space to flat space of a given nodes population

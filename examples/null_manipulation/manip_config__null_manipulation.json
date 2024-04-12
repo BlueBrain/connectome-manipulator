@@ -1,0 +1,13 @@
+{
+  "circuit_config": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data/circuit_config.json",
+  "seed": 3210,
+  "manip": {
+    "name": "NullManip",
+    "fcts": [
+      {
+        "source": "null_manipulation",
+        "model_config": {}
+      }
+    ]
+  }
+}

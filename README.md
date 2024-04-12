@@ -1,27 +1,51 @@
 # Connectome-Manipulator
 
+A connectome manipulation framework for SONATA circuits
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+
+## Table of contents
+
+1. [Introduction](#introduction)
+2. [Install](#install)
+3. [Framework overview](#framework-overview)
+    - [Main components](#main-components)
+    - [Operation principle of the "connectome manipulator"](#operation-principle-of-the-connectome-manipulator)
+4. [How to run](#how-to-run)
+    - [Connectome manipulation or building](#connectome-manipulation-or-building)
+    - [Model building](#model-building)
+    - [Structural comparison](#structural-comparison)
+5. [Examples](#examples)
+6. [Citation](#citation)
+7. [Publications that use or mention Connectome-Manipulator](#publications-that-use-or-mention-connectome-manipulator)
+    - [Scientific papers that use Connectome-Manipulator](#scientific-papers-that-use-connectome-manipulator)
+    - [Posters that use Connectome-Manipulator](#posters-that-use-connectome-manipulator)
+8. [Funding & Acknowledgment](#funding-acknowledgment)
+
+
+## Introduction
+
 An important way to study cortical function _in silico_ lies in manipulations that are impossible to perform _in vivo_ and _in vitro_. The purpose of the _Connectome-Manipulator_ is to provide a general framework to apply and study various types of structural manipulations of a circuit connectome. The framework allows for rapid connectome manipulations of biophysically detailed network models in [SONATA](https://github.com/AllenInstitute/sonata/blob/master/docs/SONATA_DEVELOPER_GUIDE.md) format, the standard for large-scale network models. Manipulations can be targeted to entire models, specific sub-networks, or even single neurons, ranging from insertion or removal of specific motifs to complete rewiring based on stochastic connectivity models at various levels of complexity.
 Important use cases include wiring a connectome from scratch in a biologically realistic way based on given features of connectivity, rewiring an existing connectome while preserving certain aspects of connectivity, and transplanting specific connectivity characteristics from one connectome to another. The resulting connectomes can be readily simulated using any simulator supporting SONATA, allowing systematic and reproducible characterization of causal effects of manipulations on network activity.
 
-## Installation
+
+## Install
 
 ~~~
 pip install .
 ~~~
 
 All dependencies declared in `setup.py` and are available from [PyPI](https://pypi.org/).
-One (optional) dependency, `parquet-converters`, must be installed separately.
+One (optional) dependency, `parquet-converters`, must be installed separately. Another optional dependency, `mpi4py`, is required for parallel processing, i.e., to run `parallel-manipulator`.
 
 > <u>Notes</u>:
 > - The Python library [Blue Brain SNAP](https://github.com/BlueBrain/snap) is used to access SONATA circuits.
 
-## Examples
 
-Examples can be found in the Jupyter notebooks listed [here](examples/README.md).
+## Framework overview
 
-## Further information
-
-### Framework overview
+### Main components
 
 The _Connectome-Manipulator_ framework is illustrated in Figure 1 and consists of the following main components:
 
@@ -64,7 +88,7 @@ As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are di
 > - By default, all .parquet files will be deleted after successfull completion, i.e., after the manipulated SONATA connectome file has been generated. Optionally, these temporary .parquet files can be kept as well.
 
 
-### How to run
+## How to run
 
 ~~~
 Usage: connectome-manipulator [OPTIONS] COMMAND [ARGS]...
@@ -82,7 +106,7 @@ Commands:
   manipulate-connectome  Manipulate or build a circuit's connectome.
 ~~~
 
-#### Connectome manipulation or building
+### Connectome manipulation or building
 
 ~~~
 Usage: connectome-manipulator manipulate-connectome [OPTIONS] CONFIG
@@ -129,7 +153,7 @@ Please note that this feature will require at least 4 MPI ranks. Dask will use 2
 When processing with `parallel-manipulator`, one may pass the flag `--target-payload` to determine how big the individual workload for each process should be. The default value of 20e9 was determined empirically to run on the whole mouse brain with 75 million neurons. We recommend to use this value as a starting point and scale it up or down to achieve the desired runtime characteristics.
 
 
-#### Model building
+### Model building
 
 ~~~
 Usage: connectome-manipulator build-model [OPTIONS] CONFIG
@@ -143,7 +167,7 @@ Options:
 ~~~
 
 
-#### Structural comparison
+### Structural comparison
 
 ~~~
 Usage: connectome-manipulator compare-connectomes [OPTIONS] CONFIG
@@ -159,24 +183,52 @@ Options:
 ~~~
 
 
+## Examples
+
+Examples can be found in the Jupyter notebooks listed [here](examples/README.md).
+
+
 ## Citation
 
-If you use this software, kindly use the following BibTeX entry for citation:
+If you use this software, we kindly ask you to cite the following publication:
+
+Pokorny et al. (2024). A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations. In prep.
 
 ```
 @article {pokorny2024,
-    author = {Christoph Pokorny and TO B. ADDED and Michael W. Reimann},
-    title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
-    year = {2024},
-    doi = {},
-    URL = {},
-    publisher = {Cold Spring Harbor Laboratory},
-    journal = {bioRxiv}
+author = {Christoph Pokorny and others},
+title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
+year = {In prep.},
+doi = {},
+URL = {},
+publisher = {},
+journal = {}
 }
 ```
 
-## Acknowledgements & Funding
+## Publications that use or mention Connectome-Manipulator
+
+### Scientific papers that use Connectome-Manipulator
+
+- Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.__ bioRxiv 2022.08.11.503144. [doi: 10.1101/2022.08.11.503144](https://doi.org/10.1101/2022.08.11.503144)
+
+- James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry.__ Part II: Physiology and Experimentation. bioRxiv 2023.05.17.541168. [doi: 10.1101/2023.05.17.541168](https://doi.org/10.1101/2023.05.17.541168)
+
+- Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. __Efficiency and reliability in biological neural network architectures.__ bioRxiv 2024.03.15.585196. [doi: 10.1101/2024.03.15.585196](https://doi.org/10.1101/2024.03.15.585196)
+
+### Posters that use Connectome-Manipulator
+
+- Christoph Pokorny, Sirio Bolaños-Puchet, András Ecker, James B. Isbister, Michael Gevaert, Joni Herttuainen, Henry Markram, and Michael W. Reimann. __Impact of simplified network structure on cortical activity.__ Bernstein Conference, 2022, Berlin.
+
+- Kerem Kurban, Christoph Pokorny, Julian Budd, Alberto Antonietti, Armando Romani, and Henry Markram. __Topological properties of a full-scale model of rat hippocampus CA1 and their functional implications.__ Annual meeting of the Society for Neuroscience, 2022, San Diego.
+
+- Christoph Pokorny, Omar Awile, Sirio Bolaños-Puchet, András Ecker, Daniela Egas Santander, James B. Isbister, Matthias Wolf, Henry Markram, and Michael W. Reimann. __A connectome manipulation framework for the systematic and reproducible study of the structure-function relationship through simulations.__ Bernstein Conference, 2023, Berlin.
+
+- Christoph Pokorny, Omar Awile, James B. Isbister, Matthias Wolf, and Michael W. Reimann. __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ FENS Forum, 2024 (upcoming), Vienna.
+
+
+## Funding & Acknowledgment
 
 The development of this software was supported by funding to the Blue Brain Project, a research center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government’s ETH Board of the Swiss Federal Institutes of Technology.
 
-Copyright (c) 2024 Blue Brain Project / EPFL.
+Copyright (c) 2024 Blue Brain Project/EPFL

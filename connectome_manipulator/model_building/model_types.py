@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Definition and mapping of model types to classes"""
 
 from abc import ABCMeta, abstractmethod
@@ -14,6 +19,7 @@ from scipy.sparse import csc_matrix
 from scipy.spatial import distance_matrix
 from scipy.stats import truncnorm
 
+import connectome_manipulator
 from connectome_manipulator import log
 
 P_TH_ABS = 0.01  # Absolute probability threshold
@@ -191,6 +197,7 @@ class AbstractModel(metaclass=ABCMeta):
         # Save model dict to .json file
         model_dict["model"] = self.__class__.__name__
         model_dict["__version_info__"] = {
+            "connectome_manipulator": connectome_manipulator.__version__,
             "python": sys.version,
             "pandas": pd.__version__,
         }

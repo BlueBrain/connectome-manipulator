@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Main module for structural connectome comparison:
 
 - Loads two SONATA connectomes
@@ -13,6 +18,8 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from bluepysnap.circuit import Circuit
+
+import connectome_manipulator
 
 
 def compute_results(circuit, comp_dict):
@@ -81,6 +88,8 @@ def plot_results(res_dict, res_sel, plot_args, comp_dict):
 
 def main(structcomp_config, show_fig=False, force_recomp=False):  # pragma: no cover
     """Main entry point for structural connectome comparison."""
+    print(f"VERSION INFO: connectome_manipulator {connectome_manipulator.__version__}")
+
     # Load circuits
     circuit_ids = sorted(structcomp_config["circuits"].keys())
     assert len(circuit_ids) == 2, "ERROR: Exactly two circuits required for comparison!"

@@ -1,12 +1,18 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Customized logging"""
 
-from time import strftime
 import logging
 import os
 import sys
+from time import strftime
 
 import numpy as np
 
+import connectome_manipulator
 
 _LOG_FORMAT = "[%(levelname)s] %(message)s"
 _LOG_FORMAT_WITH_DATE = "[%(levelname)s] (%(asctime)s) %(message)s"
@@ -120,4 +126,6 @@ def create_log_file(log_path, name):
     for h in remove:
         logging.root.removeHandler(h)
     logging.root.addHandler(fileh)
+    info(f'Log file "{logfile}" created!')
+    info(f"Version: connectome_manipulator {connectome_manipulator.__version__}")
     return logfile

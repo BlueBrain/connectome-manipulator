@@ -1,7 +1,7 @@
 Connectome-Manipulator
 ======================
 
-A tool to perform structural manipulations on a SONATA circuit connectome
+A connectome manipulation framework for SONATA circuits
 
 
 Installation

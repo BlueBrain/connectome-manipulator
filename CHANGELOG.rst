@@ -1,10 +1,11 @@
 Changelog
 =========
 
-Version 0.1
------------
+Version 0.0.10.dev4
+-------------------
 
 New Features
 ~~~~~~~~~~~~
-- Created an installable package
-- Added import tests
+- Added license & copyright for open-sourcing
+- Added example notebook
+- Added version info to log files

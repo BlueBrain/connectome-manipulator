@@ -1,3 +1,8 @@
+# This file is part of connectome-manipulator.
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024 Blue Brain Project/EPFL
+
 """Module for position mapping model creation, consisting of three basic functions:
 
 - extract(...): Loads positions of a given nodes population based on some alternative
