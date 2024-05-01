@@ -86,7 +86,9 @@ class JobInfo:
         return np.concatenate([b.node_ids for b in self.batches]).astype(np.int64)
 
 
-def load_circuit(sonata_config, popul_name=None):
+def load_circuit(
+    sonata_config, existing_edge_popul_name=None, src_node_popul_name=None, tgt_node_popul_name=None
+):
     """Load given edges population of a SONATA circuit using SNAP."""
     # Load circuit
     log.info(f"Loading circuit from {sonata_config}")
@@ -98,12 +100,26 @@ def load_circuit(sonata_config, popul_name=None):
         and len(c.edges.population_names) > 0
     ):
         # Select edge population
-        edges, popul_name = get_edges_population(c, popul_name, return_popul_name=True)
+        edges, popul_name = get_edges_population(
+            c, existing_edge_popul_name, return_popul_name=True
+        )
         edges_file = c.config["networks"]["edges"][0]["edges_file"]
 
         # Select corresponding source/target nodes populations
         src_nodes = edges.source
         tgt_nodes = edges.target
+
+        if src_node_popul_name is not None:
+            log.log_assert(
+                src_node_popul_name == src_nodes.name,
+                "Source nodes population name not consistent with selected edges population!",
+            )
+        if tgt_node_popul_name is not None:
+            log.log_assert(
+                tgt_node_popul_name == tgt_nodes.name,
+                "Target nodes population name not consistent with selected edges population!",
+            )
+
         if src_nodes is not tgt_nodes:
             log.log_assert(
                 len(np.intersect1d(src_nodes.ids(), tgt_nodes.ids())) == 0,
@@ -114,7 +130,8 @@ def load_circuit(sonata_config, popul_name=None):
         edges_file = None
         popul_name = None
 
-        src_nodes = tgt_nodes = get_nodes_population(c)
+        src_nodes = get_nodes_population(c, src_node_popul_name)
+        tgt_nodes = get_nodes_population(c, tgt_node_popul_name)
 
     nodes = (src_nodes, tgt_nodes)
 
@@ -326,6 +343,8 @@ def main(options, log_file, executor_args=()):
     config = utils.load_json(options.config_path)
     sonata_config_file = config["circuit_config"]
     edges_popul_name = config.get("edges_popul_name")
+    src_node_popul_name = config.get("src_node_popul_name")
+    tgt_node_popul_name = config.get("tgt_node_popul_name")
 
     if "circuit_path" in config:
         circuit_path = Path(config["circuit_path"])
@@ -338,7 +357,7 @@ def main(options, log_file, executor_args=()):
     profiler.ProfilerManager.set_csv_file(csv_file=log_file + ".csv")
 
     sonata_config, nodes, _, edges, _, src_popul_name = load_circuit(
-        sonata_config_file, edges_popul_name
+        sonata_config_file, edges_popul_name, src_node_popul_name, tgt_node_popul_name
     )
 
     # Define target node splits

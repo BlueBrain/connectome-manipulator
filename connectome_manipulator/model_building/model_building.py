@@ -42,6 +42,7 @@ def create_model_config_per_pathway(
     dest_sel_key="sel_dest",
     group_fct=None,
     group_type=None,
+    edge_popul_name=None,
 ):
     """Create model config dict for pathways between all pairs of groups (e.g. layer, mtype, ...)."""
     # Check model config
@@ -93,8 +94,8 @@ def create_model_config_per_pathway(
     circuit = Circuit(circuit_config)
     print(f"INFO: Circuit loaded: {circuit_config}")
 
-    # Select edge population [assuming exactly one edge population in given edges file]
-    edges = get_edges_population(circuit)
+    # Select edge population
+    edges = get_edges_population(circuit, popul_name=edge_popul_name)
 
     # Select corresponding source/target nodes populations
     src_nodes = edges.source

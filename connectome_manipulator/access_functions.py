@@ -221,7 +221,7 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
 
 
 def get_nodes_population(circuit, popul_name=None):
-    """Select default edge population. Optionally, the population name can be specified."""
+    """Select default nodes population. Optionally, the population name can be specified."""
     log.log_assert(len(circuit.nodes.population_names) > 0, "No node population found!")
     if popul_name is None:
         if len(circuit.nodes.population_names) == 1:
@@ -233,7 +233,7 @@ def get_nodes_population(circuit, popul_name=None):
             )
     log.log_assert(
         popul_name in circuit.nodes.population_names,
-        f'Population "{popul_name}" not found in edges file!',
+        f'Population "{popul_name}" not found in nodes file!',
     )
     nodes = circuit.nodes[popul_name]
 

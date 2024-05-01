@@ -611,7 +611,7 @@ class ConnPropsModel(AbstractModel):
                 all(np.isin(self.src_types, list(self.prop_stats[p].keys())))
                 for p in self.prop_names
             ),
-            "Source type statistics missing!",
+            f"Source type statistics missing! self.src_types:{self.src_types} not in {self.prop_names}",
         )
         log.log_assert(
             all(

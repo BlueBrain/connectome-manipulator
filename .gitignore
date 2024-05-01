@@ -10,3 +10,4 @@ dist/
 build/
 connectome_manipulator.egg-info
 __pycache__
+examples/working_dir
