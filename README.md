@@ -198,7 +198,7 @@ Contribution guidelines can be found [here](CONTRIBUTING.md).
 
 If you use this software, we kindly ask you to cite the following publication:
 
-Pokorny et al. (2024). A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations. In prep.
+C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024). A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations. bioRxiv.
 
 ```
 @article{pokorny2024,
