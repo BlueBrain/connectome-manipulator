@@ -19,11 +19,12 @@ A connectome manipulation framework for SONATA circuits
     - [Model building](#model-building)
     - [Structural comparison](#structural-comparison)
 5. [Examples](#examples)
-6. [Citation](#citation)
-7. [Publications that use or mention Connectome-Manipulator](#publications-that-use-or-mention-connectome-manipulator)
+6. [How to contribute](#how-to-contribute)
+7. [Citation](#citation)
+8. [Publications that use or mention Connectome-Manipulator](#publications-that-use-or-mention-connectome-manipulator)
     - [Scientific papers that use Connectome-Manipulator](#scientific-papers-that-use-connectome-manipulator)
     - [Posters that use Connectome-Manipulator](#posters-that-use-connectome-manipulator)
-8. [Funding & Acknowledgment](#funding-acknowledgment)
+9. [Funding & Acknowledgment](#funding-acknowledgment)
 
 
 ## Introduction
@@ -186,6 +187,11 @@ Options:
 ## Examples
 
 Examples can be found in the Jupyter notebooks listed [here](examples/README.md).
+
+
+## How to contribute
+
+Contribution guidelines can be found [here](CONTRIBUTING.md).
 
 
 ## Citation
