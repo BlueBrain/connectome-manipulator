@@ -24,7 +24,7 @@ A connectome manipulation framework for SONATA circuits
 8. [Publications that use or mention Connectome-Manipulator](#publications-that-use-or-mention-connectome-manipulator)
     - [Scientific papers that use Connectome-Manipulator](#scientific-papers-that-use-connectome-manipulator)
     - [Posters that use Connectome-Manipulator](#posters-that-use-connectome-manipulator)
-9. [Funding & Acknowledgment](#funding-acknowledgment)
+9. [Funding & Acknowledgment](#funding--acknowledgment)
 
 
 ## Introduction
