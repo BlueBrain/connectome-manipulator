@@ -21,7 +21,7 @@ class SynapseSubsampling(Manipulation):
     """
 
     @profiler.profileit(name="syn_subsampling")
-    def apply(self, split_ids, keep_pct=100.0):
+    def apply(self, split_ids, keep_pct=100.0, **kwargs):
         """Random subsampling of synapses, keeping a certain percentage of synapses."""
         # pylint: disable=arguments-differ
         log.log_assert(0.0 <= keep_pct <= 100.0, "keep_pct out of range!")

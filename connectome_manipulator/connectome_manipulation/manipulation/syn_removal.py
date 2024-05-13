@@ -38,6 +38,7 @@ class SynapseRemoval(Manipulation):
         amount_pct=100.0,
         keep_conns=False,
         rescale_gsyn=False,
+        **kwargs,
     ):
         """Remove percentage of randomly selected synapses according to certain cell selection criteria."""
         # pylint: disable=arguments-differ

@@ -37,6 +37,7 @@ class SynapsePropertAlteration(Manipulation):
         sel_dest=None,
         syn_filter=None,
         amount_pct=100.0,
+        **kwargs,
     ):
         """Modification of synaptic property values of a selected set of synapses."""
         # pylint: disable=arguments-differ
@@ -51,6 +52,7 @@ class SynapsePropertAlteration(Manipulation):
         available_modes = [
             "setval",
             "scale",
+            "offset",
             "shuffle",
             "randval",
             "randscale",
@@ -117,6 +119,15 @@ class SynapsePropertAlteration(Manipulation):
             edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
                 np.clip(
                     edges_table.loc[syn_sel_idx, syn_prop] * new_value["factor"],
+                    val_range[0],
+                    val_range[1],
+                )
+            )
+        elif new_value["mode"] == "offset":
+            # Offset by a given value
+            edges_table.loc[syn_sel_idx, syn_prop] = prop_dtype(
+                np.clip(
+                    edges_table.loc[syn_sel_idx, syn_prop] + new_value["value"],
                     val_range[0],
                     val_range[1],
                 )

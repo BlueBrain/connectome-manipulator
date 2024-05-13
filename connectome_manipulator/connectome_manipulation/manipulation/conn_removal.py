@@ -46,6 +46,7 @@ class ConnectomeRemoval(Manipulation):
         min_syn_per_conn=None,
         max_syn_per_conn=None,
         conn_mask_file=None,
+        **kwargs,
     ):
         """Remove percentage of randomly selected connections (i.e., all synapses per connection) according to certain cell and syn/conn selection criteria."""
         # pylint: disable=arguments-differ

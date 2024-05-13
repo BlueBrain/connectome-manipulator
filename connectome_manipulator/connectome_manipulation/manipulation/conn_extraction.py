@@ -28,7 +28,7 @@ class ConnectomeExtraction(Manipulation):
     """
 
     @profiler.profileit(name="conn_extraction")
-    def apply(self, split_ids, target_name=None, node_sets_file=None):
+    def apply(self, split_ids, target_name=None, node_sets_file=None, **kwargs):
         """Extraction of a cell target as given by target_name
 
         Extraction keeping only connections within that target (empty connectome if no target_name provided).

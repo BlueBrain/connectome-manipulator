@@ -191,7 +191,28 @@ def test_apply(manipulation):
         res[prop_sel] == edges_table[prop_sel] * new_value["factor"]
     ), "ERROR: Selected property values not modified correctly!"
 
-    ## (c) Shuffling across synapses
+    ## (c) Offset value
+    new_value = {"mode": "offset", "value": 1.234}
+    writer = EdgeWriter(None, existing_edges=edges_table.copy())
+    manipulation(nodes, writer).apply(
+        tgt_ids,
+        prop_sel,
+        new_value,
+        sel_src=None,
+        sel_dest=None,
+        syn_filter=None,
+        amount_pct=pct,
+    )
+    res = writer.to_pandas()
+
+    assert edges_table[props_nonsel].equals(
+        res[props_nonsel]
+    ), "ERROR: Non-selected property values changed!"
+    assert np.all(
+        res[prop_sel] == edges_table[prop_sel] + new_value["value"]
+    ), "ERROR: Selected property values not modified correctly!"
+
+    ## (d) Shuffling across synapses
     new_value = {"mode": "shuffle"}
     writer = EdgeWriter(None, existing_edges=edges_table.copy())
     manipulation(nodes, writer).apply(
@@ -212,7 +233,7 @@ def test_apply(manipulation):
         edges_table[prop_sel]
     ), "ERROR: Selected property values not modified correctly!"
 
-    ## (d) Random value (constant)
+    ## (e) Random value (constant)
     new_value = {"mode": "randval", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
     writer = EdgeWriter(None, existing_edges=edges_table.copy())
     manipulation(nodes, writer).apply(
@@ -233,7 +254,7 @@ def test_apply(manipulation):
         res[prop_sel] == new_value["kwargs"]["loc"]
     ), "ERROR: Selected property values not modified correctly!"
 
-    ## (e) Random scaling factor (constant)
+    ## (f) Random scaling factor (constant)
     new_value = {"mode": "randscale", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
     writer = EdgeWriter(None, existing_edges=edges_table.copy())
     manipulation(nodes, writer).apply(
@@ -254,7 +275,7 @@ def test_apply(manipulation):
         res[prop_sel] == edges_table[prop_sel] * new_value["kwargs"]["loc"]
     ), "ERROR: Selected property values not modified correctly!"
 
-    ## (f) Random additive value (constant)
+    ## (g) Random additive value (constant)
     new_value = {"mode": "randadd", "rng": "normal", "kwargs": {"loc": -1.0, "scale": 0.0}}
     writer = EdgeWriter(None, existing_edges=edges_table.copy())
     manipulation(nodes, writer).apply(
