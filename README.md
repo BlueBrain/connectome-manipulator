@@ -35,14 +35,12 @@ Important use cases include wiring a connectome from scratch in a biologically r
 ## Install
 
 ~~~
+git clone https://github.com/BlueBrain/connectome-manipulator.git
+cd connectome-manipulator
 pip install .
 ~~~
 
-All dependencies declared in `setup.py` and are available from [PyPI](https://pypi.org/).
-One (optional) dependency, `parquet-converters`, must be installed separately. Another optional dependency, `mpi4py`, is required for parallel processing, i.e., to run `parallel-manipulator`.
-
-> <u>Notes</u>:
-> - The Python library [Blue Brain SNAP](https://github.com/BlueBrain/snap) is used to access SONATA circuits.
+All dependencies declared in `setup.py` and are available from [PyPI](https://pypi.org/), including one optional dependency, `mpi4py` (v3.1.4), which is required for parallel processing, i.e., to run `parallel-manipulator`. Another optional dependency, `parquet-converters` (v0.8.0 or higher), required for converting .parquet output files to SONATA must be installed separately, see instructions under https://github.com/BlueBrain/parquet-converters.
 
 
 ## Framework overview
@@ -197,14 +195,13 @@ If you use this software, we kindly ask you to cite the following publication:
 Pokorny et al. (2024). A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations. In prep.
 
 ```
-@article {pokorny2024,
-author = {Christoph Pokorny and others},
-title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
-year = {In prep.},
-doi = {},
-URL = {},
-publisher = {},
-journal = {}
+@article{pokorny2024,
+  author = {Pokorny, Christoph and Awile, Omar and Isbister, James B and Kurban, Kerem and Wolf, Matthias and Reimann, Michael W},
+  title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
+  journal = {bioRxiv},
+  year = {2024},
+  publisher={Cold Spring Harbor Laboratory},
+  doi = {}
 }
 ```
 
