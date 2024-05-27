@@ -1,10 +1,12 @@
+![Connectome-Manipulator](BPP-Connectome-Manipulator-Banner.jpg)
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![DOI:10.1101/2024.05.24.593860](http://img.shields.io/badge/DOI-10.1101/2024.05.24.593860-B31B1B.svg)](https://doi.org/10.1101/2024.05.24.593860)
+
+
 # Connectome-Manipulator
 
 A connectome manipulation framework for SONATA circuits
-
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
-![Connectome-Manipulator](BPP-Connectome-Manipulator-Banner.jpg)
 
 
 ## Table of contents
@@ -198,16 +200,16 @@ Contribution guidelines can be found [here](CONTRIBUTING.md).
 
 If you use this software, we kindly ask you to cite the following publication:
 
-C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024). A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations. bioRxiv.
+C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024). __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ bioRxiv 2024.05.24.593860. [doi: 10.1101/2024.05.24.593860](https://doi.org/10.1101/2024.05.24.593860)
 
 ```
-@article{pokorny2024,
+@article{pokorny2024connectome,
   author = {Pokorny, Christoph and Awile, Omar and Isbister, James B and Kurban, Kerem and Wolf, Matthias and Reimann, Michael W},
   title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
   journal = {bioRxiv},
   year = {2024},
   publisher={Cold Spring Harbor Laboratory},
-  doi = {}
+  doi = {10.1101/2024.05.24.593860}
 }
 ```
 
