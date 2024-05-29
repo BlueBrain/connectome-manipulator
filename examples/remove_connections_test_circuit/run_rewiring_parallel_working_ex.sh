@@ -25,6 +25,6 @@ srun dplace parallel-manipulator -v manipulate-connectome $1 --output-dir=$2 --p
 # EXAMPLE HOW TO RUN: sbatch run_rewiring_parallel.sh <model_config.json> <output_dir> <num_splits>
 # e.g. sbatch run_rewiring.sh manip_config.json /gpfs/.../O1v5-SONATA__Rewired 100
 #
-# sbatch run_rewiring_parallel_working_ex.sh manip_config.json /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/connectome-manipulator/examples/remove_connections/output/ 100
+# sbatch run_rewiring_parallel_working_ex.sh manip_config.json /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output 100
 #
 # IMPORTANT: Don't launch from within another SLURM allocation!!
