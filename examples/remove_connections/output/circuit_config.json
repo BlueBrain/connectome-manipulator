@@ -1,0 +1,117 @@
+{
+  "version": 2.3,
+  "manifest": {
+    "$BASE_DIR": "."
+  },
+  "node_sets_file": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/node_sets.json",
+  "components": {
+    "biophysical_neuron_models_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+    "mechanisms_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+    "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+    "point_neuron_models_dir": "",
+    "provenance": {
+      "atlas_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/atlas"
+    },
+    "synaptic_models_dir": "",
+    "templates_dir": ""
+  },
+  "networks": {
+    "edges": [
+      {
+        "edges_file": "$BASE_DIR/edges.h5",
+        "populations": {
+          "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      },
+      {
+        "edges_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/VPM__S1nonbarrel_neurons__chemical/edges.h5",
+        "populations": {
+          "VPM__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      },
+      {
+        "edges_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/POm__S1nonbarrel_neurons__chemical/edges.h5",
+        "populations": {
+          "POm__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      },
+      {
+        "edges_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/midrange__S1nonbarrel_neurons__chemical/edges.h5",
+        "populations": {
+          "midrange__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      },
+      {
+        "edges_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/external_midrange__S1nonbarrel_neurons__chemical.h5",
+        "populations": {
+          "external_midrange__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      },
+      {
+        "edges_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/external_S1nonbarrel_neurons__S1nonbarrel_neurons__chemical.h5",
+        "populations": {
+          "external_S1nonbarrel_neurons__S1nonbarrel_neurons__chemical": {
+            "type": "chemical"
+          }
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "nodes_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/S1nonbarrel_neurons/nodes.h5",
+        "populations": {
+          "S1nonbarrel_neurons": {
+            "alternate_morphologies": {
+              "neurolucida-asc": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/morphologies/ascii"
+            },
+            "biophysical_neuron_models_dir": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/emodels_hoc",
+            "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+            "type": "biophysical"
+          }
+        }
+      },
+      {
+        "nodes_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/POm/nodes.h5",
+        "populations": {
+          "POm": {
+            "type": "virtual"
+          }
+        }
+      },
+      {
+        "nodes_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/VPM/nodes.h5",
+        "populations": {
+          "VPM": {
+            "type": "virtual"
+          }
+        }
+      },
+      {
+        "nodes_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/nodes_external_S1nonbarrel_neurons__S1nonbarrel_neurons__chemical.h5",
+        "populations": {
+          "external_S1nonbarrel_neurons__S1nonbarrel_neurons__chemical": {
+            "type": "virtual"
+          }
+        }
+      },
+      {
+        "nodes_file": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/nodes_external_midrange__S1nonbarrel_neurons__chemical.h5",
+        "populations": {
+          "external_midrange__S1nonbarrel_neurons__chemical": {
+            "type": "virtual"
+          }
+        }
+      }
+    ]
+  }
+}

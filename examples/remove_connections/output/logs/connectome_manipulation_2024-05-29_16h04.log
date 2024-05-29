@@ -1,0 +1,236 @@
+[INFO] (May.29 16:04:53) Log file "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/output/logs/connectome_manipulation_2024-05-29_16h04.log" created!
+[INFO] (May.29 16:04:53) Version: connectome_manipulator 0.0.11.dev0
+[INFO] (May.29 16:04:53) Loading circuit from ./circuit_config.json
+[DEBUG] (May.29 16:04:53) Using edges population "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical" between nodes "S1nonbarrel_neurons" and "S1nonbarrel_neurons"
+[INFO] (May.29 16:04:53) Setting up 100 processing batch jobs...
+[INFO] (May.29 16:04:53) Starting Execution context
+[DEBUG] (May.29 16:04:53) Using selector: EpollSelector
+[INFO] (May.29 16:04:54) Start job submission
+[INFO] (May.29 16:04:54) Split 1/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 2/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 3/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 4/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 5/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 6/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 7/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 8/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 9/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 10/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 11/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 12/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 13/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 14/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 15/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 16/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 17/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 18/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 19/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 20/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 21/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 22/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 23/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 24/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 25/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 26/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 27/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 28/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 29/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 30/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 31/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 32/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 33/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 34/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 35/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 36/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 37/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 38/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 39/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 40/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 41/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 42/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 43/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 44/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 45/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 46/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 47/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 48/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 49/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 50/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 51/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 52/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 53/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 54/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 55/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 56/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 57/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 58/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 59/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 60/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 61/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 62/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 63/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 64/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 65/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 66/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 67/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 68/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 69/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 70/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 71/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 72/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 73/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 74/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:54) Split 75/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 76/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 77/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 78/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 79/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 80/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 81/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 82/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 83/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 84/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 85/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 86/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 87/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 88/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 89/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 90/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 91/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 92/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 93/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 94/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 95/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 96/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 97/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 98/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 99/100: Wiring connectome targeting 2118 neurons
+[INFO] (May.29 16:04:55) Split 100/100: Wiring connectome targeting 2030 neurons
+[INFO] (May.29 16:04:55) Jobs submitted to DASK
+[INFO] (May.29 16:05:01) [  1%] Finished 1 (out of 100) splits
+[INFO] (May.29 16:05:01) [  2%] Finished 2 (out of 100) splits
+[INFO] (May.29 16:05:01) [  3%] Finished 3 (out of 100) splits
+[INFO] (May.29 16:05:01) [  4%] Finished 4 (out of 100) splits
+[INFO] (May.29 16:05:02) [  5%] Finished 5 (out of 100) splits
+[INFO] (May.29 16:05:02) [  6%] Finished 6 (out of 100) splits
+[INFO] (May.29 16:05:02) [  7%] Finished 7 (out of 100) splits
+[INFO] (May.29 16:05:02) [  8%] Finished 8 (out of 100) splits
+[INFO] (May.29 16:05:02) [  9%] Finished 9 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 10%] Finished 10 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 11%] Finished 11 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 12%] Finished 12 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 13%] Finished 13 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 14%] Finished 14 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 15%] Finished 15 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 16%] Finished 16 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 17%] Finished 17 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 18%] Finished 18 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 19%] Finished 19 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 20%] Finished 20 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 21%] Finished 21 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 22%] Finished 22 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 23%] Finished 23 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 24%] Finished 24 (out of 100) splits
+[INFO] (May.29 16:05:02) [ 25%] Finished 25 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 26%] Finished 26 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 27%] Finished 27 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 28%] Finished 28 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 29%] Finished 29 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 30%] Finished 30 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 31%] Finished 31 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 32%] Finished 32 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 33%] Finished 33 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 34%] Finished 34 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 35%] Finished 35 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 36%] Finished 36 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 37%] Finished 37 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 38%] Finished 38 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 39%] Finished 39 (out of 100) splits
+[INFO] (May.29 16:05:03) [ 40%] Finished 40 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 41%] Finished 41 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 42%] Finished 42 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 43%] Finished 43 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 44%] Finished 44 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 45%] Finished 45 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 46%] Finished 46 (out of 100) splits
+[INFO] (May.29 16:05:04) [ 47%] Finished 47 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 48%] Finished 48 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 49%] Finished 49 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 50%] Finished 50 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 51%] Finished 51 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 52%] Finished 52 (out of 100) splits
+[INFO] (May.29 16:05:05) [ 53%] Finished 53 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 54%] Finished 54 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 55%] Finished 55 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 56%] Finished 56 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 57%] Finished 57 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 58%] Finished 58 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 59%] Finished 59 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 60%] Finished 60 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 61%] Finished 61 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 62%] Finished 62 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 63%] Finished 63 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 64%] Finished 64 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 65%] Finished 65 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 66%] Finished 66 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 67%] Finished 67 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 68%] Finished 68 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 69%] Finished 69 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 70%] Finished 70 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 71%] Finished 71 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 72%] Finished 72 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 73%] Finished 73 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 74%] Finished 74 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 75%] Finished 75 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 76%] Finished 76 (out of 100) splits
+[INFO] (May.29 16:05:06) [ 77%] Finished 77 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 78%] Finished 78 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 79%] Finished 79 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 80%] Finished 80 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 81%] Finished 81 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 82%] Finished 82 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 83%] Finished 83 (out of 100) splits
+[INFO] (May.29 16:05:07) [ 84%] Finished 84 (out of 100) splits
+[INFO] (May.29 16:05:08) [ 85%] Finished 85 (out of 100) splits
+[INFO] (May.29 16:05:08) [ 86%] Finished 86 (out of 100) splits
+[INFO] (May.29 16:05:14) [ 87%] Finished 87 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 88%] Finished 88 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 89%] Finished 89 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 90%] Finished 90 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 91%] Finished 91 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 92%] Finished 92 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 93%] Finished 93 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 94%] Finished 94 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 95%] Finished 95 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 96%] Finished 96 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 97%] Finished 97 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 98%] Finished 98 (out of 100) splits
+[INFO] (May.29 16:05:15) [ 99%] Finished 99 (out of 100) splits
+[INFO] (May.29 16:05:16) [100%] Finished 100 (out of 100) splits
+[INFO] (May.29 16:05:16) DASK jobs finished
+[INFO] (May.29 16:05:16) Shutting down DASK workers gracefully
+[INFO] (May.29 16:05:16) Done processing
+[INFO] (May.29 16:05:16)   Total input/output synapse counts: 407127134/403793975 (Diff: -3333159)
+[INFO] (May.29 16:05:16) Converting 100 (non-empty) .parquet file(s) to SONATA
+[DEBUG] (May.29 16:07:25) Writing to /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/output/edges.h5
+Aggregate totals: 403793975 records (100 blocks)
+
+Data conversion complete. 
+Creating indices...
+- Indexing /edges/S1nonbarrel_neurons__S1nonbarrel_neurons__chemical/source_node_id
+- Writing indexes out to hdf5...
+- Indexing /edges/S1nonbarrel_neurons__S1nonbarrel_neurons__chemical/target_node_id
+- Writing indexes out to hdf5...
+Finished writing /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/output/edges.h5
+
+[INFO] (May.29 16:07:25) Deleting 100 temporary .parquet file(s), "_metadata" file, and "parquet.DONE"
+[INFO] (May.29 16:07:25) Creating SONATA config /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/output/circuit_config.json
+[INFO] (May.29 16:07:25) +=============================================== PROFILER STATS ===============================================+
+[INFO] (May.29 16:07:25) |                Event Label                 | Min.Time | Avg.Time | Max.Time | Min.Mem  | Avg.Mem  | Max.Mem  |
+[INFO] (May.29 16:07:25) +--------------------------------------------------------------------------------------------------------------+
+[INFO] (May.29 16:07:25) | connectome_manipulation_main               |   151.85 |   151.85 |   151.85 |     0.02 |     0.02 |     0.02 |
+[INFO] (May.29 16:07:25) | processing                                 |     2.26 |     5.88 |    12.33 |     0.76 |     2.90 |     6.92 |
+[INFO] (May.29 16:07:25) |   conn_removal                             |     0.73 |     2.47 |     5.85 |     0.40 |     1.54 |     3.75 |
+[INFO] (May.29 16:07:25) |   write_to_parquet                         |     1.24 |     2.56 |     4.64 |     0.03 |     0.05 |     0.09 |
+[INFO] (May.29 16:07:25) +--------------------------------------------------------------------------------------------------------------+
+[DEBUG] (May.29 16:07:25) Using selector: EpollSelector
