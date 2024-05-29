@@ -1,0 +1,48 @@
+{
+  "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical",
+  "manip": {
+    "name": "SSCx_remove_conns",
+    "fcts": [
+      {
+        "source": "conn_removal",
+        "kwargs": {
+          "sel_src": {
+            "node_set": "hex_0",
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "node_set": "hex_0"
+          },
+          "syn_class": "EXC",
+          "keep_indegree": false,
+          "reuse_conns": true,
+          "gen_method": "duplicate_randomize",
+          "amount_pct": 50
+        },
+        "model_config": {}
+      },
+      {
+        "source": "conn_removal",
+        "kwargs": {
+          "sel_src": {
+            "node_set": "hex_0",
+            "synapse_class": "INH"
+          },
+          "sel_dest": {
+            "node_set": "hex_0"
+          },
+          "syn_class": "INH",
+          "keep_indegree": false,
+          "reuse_conns": true,
+          "gen_method": "duplicate_randomize",
+          "amount_pct": 50
+        },
+        "model_config": {}
+      }
+    ]
+  },
+  "circuit_config": "./circuit_config.json",
+  "output_path": "./output/SSCx_remove_conns",
+  "seed": 3220,
+  "working_dir": "./"
+}

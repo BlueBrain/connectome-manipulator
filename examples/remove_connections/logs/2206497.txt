@@ -1,0 +1,73 @@
+rm: cannot remove 'output/*': No such file or directory
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/parallel-manipulator", line 5, in <module>
+    from connectome_manipulator.cli_parallel import app
+    from connectome_manipulator.cli_parallel import app
+    from connectome_manipulator.cli_parallel import app
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+    setup()
+    setup()
+    setup()
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+    is_client = initialize(
+    is_client = initialize(
+    is_client = initialize(
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+    from mpi4py import MPI
+    from mpi4py import MPI
+    from mpi4py import MPI
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+    from connectome_manipulator.cli_parallel import app
+    from connectome_manipulator.cli_parallel import app
+    from connectome_manipulator.cli_parallel import app
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 76, in <module>
+    setup()
+    setup()
+    setup()
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/connectome_manipulator/cli_parallel.py", line 53, in setup
+    is_client = initialize(
+    is_client = initialize(
+    is_client = initialize(
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+  File "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/lib/python3.10/site-packages/dask_mpi/core.py", line 75, in initialize
+    from mpi4py import MPI
+    from mpi4py import MPI
+    from mpi4py import MPI
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+ImportError: cannot import name 'MPI' from 'mpi4py' (/gpfs/bbp.cscs.ch/ssd/apps/bsd/2024-02-01/stage_applications/install_gcc-12.3.0-skylake/py-mpi4py-3.1.4-x733hw/lib/python3.11/site-packages/mpi4py/__init__.py)
+srun: error: r1i6n24: task 4: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=2206497.0
+srun: error: r1i6n25: task 5: Exited with exit code 1
+srun: error: r1i6n22: task 3: Exited with exit code 1
+srun: error: r1i6n21: task 2: Exited with exit code 1
+srun: error: r1i6n28: task 6: Exited with exit code 1
+srun: error: r1i6n19: task 0: Exited with exit code 1
+srun: error: r1i7n30: task 9: Terminated
+srun: error: r1i7n29: task 8: Terminated
+srun: error: r1i6n29: task 7: Terminated
+srun: error: r1i6n20: task 1: Terminated
+srun: Force Terminated StepId=2206497.0

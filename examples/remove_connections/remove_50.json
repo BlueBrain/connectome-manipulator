@@ -1,0 +1,21 @@
+{
+    "circuit_config": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/connectome_manipulator/examples/remove_connections/circuit_config.json",
+    "seed": 3210,
+    "manip": {
+      "name": "removed_conns_sscx",
+      "fcts": [
+        {
+          "source": "conn_removal",
+          "sel_src": {
+            "node_set": "small_hex0"
+          },
+          "sel_dest": {
+            "node_set": "small_hex0"
+          },
+          "amount_pct": 50,
+          "model_config": {
+          }
+        }
+      ]
+    }
+  }

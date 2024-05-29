@@ -1,0 +1,21 @@
+{
+    "circuit_config": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/connectome-manipulator/examples/remove_connections_test_circuit/circuit_sonata_quick_scx_multi_circuit/circuit_sonata.json",
+    "seed": 3210,
+    "manip": {
+      "name": "removed_half_conns_Mosaic_A",
+      "fcts": [
+        {
+          "source": "conn_removal",
+          "sel_src": {
+            "node_set": "Mosaic_A"
+          },
+          "sel_dest": {
+            "node_set": "Mosaic_A"
+          },
+          "amount_pct": 50,
+          "model_config": {
+          }
+        }
+      ]
+    }
+  }

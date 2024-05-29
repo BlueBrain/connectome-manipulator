@@ -1,0 +1,13 @@
+[INFO] (May.27 17:58:04) Log file "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/connectome-manipulator/examples/remove_connections/output/logs/r4i4n30.bbp.epfl.ch/connectome_manipulation.task-64_2024-05-27_17h58.log" created!
+[INFO] (May.27 17:58:04) Version: connectome_manipulator 0.0.11.dev0
+[INFO] (May.27 17:58:04) Processing job JobInfo(split_index=64, split_total=100, batches=[BatchInfo(payload=None, selection=None, node_ids=[135552, ..., 137669])], out_parquet_file=PosixPath('/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/connectome-manipulator/examples/remove_connections/output/parquet/edges.100-064.parquet')) (common: JobsCommonInfo(nodes=(<bluepysnap.nodes.node_population.NodePopulation object at 0x2aab774feda0>, <bluepysnap.nodes.node_population.NodePopulation object at 0x2aab774feda0>), edges=<bluepysnap.edges.edge_population.EdgePopulation object at 0x2aab774fee90>))
+[INFO] (May.27 17:58:10) Applying manipulation "SSCx_remove_conns" for split 64
+[INFO] (May.27 17:58:10) Results will be written to "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/connectome-manipulator/examples/remove_connections/output/parquet/edges.100-064.parquet"
+[INFO] (May.27 17:58:11) >>Function 1 of 2: source=conn_removal
+[INFO] (May.27 17:58:11) >>Step 1: source=conn_removal sel_src=None sel_dest=None
+[INFO] (May.27 17:58:18) Removing 866501 (100.0%) of 866501 connections (sel_src=None, sel_dest=None, 4259298 synapses)
+[INFO] (May.27 17:58:18) >>Function 2 of 2: source=conn_removal
+[INFO] (May.27 17:58:18) >>Step 1: source=conn_removal sel_src=None sel_dest=None
+[DEBUG] (May.27 17:58:18) Selection empty, nothing to remove!
+[INFO] (May.27 17:58:18) Removing 0 (100.0%) of 0 connections (sel_src=None, sel_dest=None, 0 synapses)
+[DEBUG] (May.27 17:58:18) Writing 0 edges to disk, total of 0 edges
