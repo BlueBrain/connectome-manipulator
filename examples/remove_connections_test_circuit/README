@@ -4,7 +4,21 @@
 
 Current state of the tool has a specific requirements like python=3.10.8 and its only tested in BBP supercomputer. So i suggest creating python3.10.8 venv and then install the manipulator.
 
+# Allowed
 
+"sel_src": "Mosaic_A",
+        "sel_dest": {
+            "node_set":"Mosaic_A",
+            "mtype": [
+              "L4_PC", 
+              "L4_MC"
+            ]
+          }
+
+# Not Allowed
+
+1. Deleting all connections so that no edges left i.e. amount_pct=100
+2. Giving node population name directly to sel_src value
 
 To debug on salloc , after allocation run
 
@@ -17,4 +31,4 @@ source /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv
 
 and then call manipulator directly like this
 
-connectome-manipulator -v manipulate-connectome manip_config.json --output-dir=/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_nodeA --convert-to-sonata --splits=1
+connectome-manipulator -v manipulate-connectome manip_config.json --output-dir=/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A --convert-to-sonata --splits=1

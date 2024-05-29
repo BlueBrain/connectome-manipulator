@@ -1,0 +1,33 @@
+[INFO] (May.29 13:14:43) Log file "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/logs/connectome_manipulation_2024-05-29_13h14.log" created!
+[INFO] (May.29 13:14:43) Version: connectome_manipulator 0.0.11.dev0
+[INFO] (May.29 13:14:43) Loading circuit from ./circuit_sonata_quick_scx_multi_circuit/circuit_sonata.json
+[DEBUG] (May.29 13:14:43) Using edges population "NodeA__NodeA__chemical" between nodes "NodeA" and "NodeA"
+[INFO] (May.29 13:14:43) Setting up 1 processing batch jobs...
+[INFO] (May.29 13:14:43) Starting Execution context
+[INFO] (May.29 13:14:43) Start job submission
+[INFO] (May.29 13:14:43) Split 1/1: Wiring connectome targeting 3 neurons
+[INFO] (May.29 13:14:43) Processing job JobInfo(split_index=0, split_total=1, batches=[BatchInfo(payload=None, selection=None, node_ids=[0 1 2])], out_parquet_file=PosixPath('/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/parquet/edges.parquet')) (common: JobsCommonInfo(nodes=(<bluepysnap.nodes.node_population.NodePopulation object at 0x7ffed1675c30>, <bluepysnap.nodes.node_population.NodePopulation object at 0x7ffed1675c30>), edges=<bluepysnap.edges.edge_population.EdgePopulation object at 0x7ffed1675ab0>))
+[INFO] (May.29 13:14:43) Applying manipulation "example_circuit_remove_conns" for split 0
+[INFO] (May.29 13:14:43) Results will be written to "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/parquet/edges.parquet"
+[INFO] (May.29 13:14:43) >>Function 1 of 1: source=conn_removal
+[INFO] (May.29 13:14:43) >>Step 1: source=conn_removal sel_src={'mtype': ['L4_PC', 'L4_MC']} sel_dest={'mtype': ['L4_PC', 'L4_MC']}
+[INFO] (May.29 13:14:43) Removing 0 (10%) of 2 connections (sel_src={'mtype': ['L4_PC', 'L4_MC']}, sel_dest={'mtype': ['L4_PC', 'L4_MC']}, 0 synapses)
+[DEBUG] (May.29 13:14:43) Writing 4 edges to disk, total of 4 edges
+[DEBUG] (May.29 13:14:43) Opening /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/parquet/edges.parquet to write
+[INFO] (May.29 13:14:43) [100%] Finished 1 (out of 1) splits
+[INFO] (May.29 13:14:43) Done processing
+[INFO] (May.29 13:14:43)   Total input/output synapse counts: 4/4 (Diff: 0)
+[INFO] (May.29 13:14:43) Converting 1 (non-empty) .parquet file(s) to SONATA
+[DEBUG] (May.29 13:14:43) Writing to /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/edges.h5
+Aggregate totals: 4 records (1 blocks)
+
+Data conversion complete. 
+Creating indices...
+- Indexing /edges/NodeA__NodeA__chemical/source_node_id
+- Writing indexes out to hdf5...
+- Indexing /edges/NodeA__NodeA__chemical/target_node_id
+- Writing indexes out to hdf5...
+Finished writing /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/edges.h5
+
+[INFO] (May.29 13:14:43) Deleting 1 temporary .parquet file(s), "_metadata" file, and "parquet.DONE"
+[INFO] (May.29 13:14:43) Creating SONATA config /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections_test_circuit/output/example_circuit_Mosaic_A/circuit_config.json
