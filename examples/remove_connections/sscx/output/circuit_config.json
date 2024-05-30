@@ -3,14 +3,14 @@
   "manifest": {
     "$BASE_DIR": "."
   },
-  "node_sets_file": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/node_sets.json",
+  "node_sets_file": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx/node_sets.json",
   "components": {
-    "biophysical_neuron_models_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
-    "mechanisms_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
-    "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+    "biophysical_neuron_models_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx",
+    "mechanisms_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx",
+    "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx",
     "point_neuron_models_dir": "",
     "provenance": {
-      "atlas_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/atlas"
+      "atlas_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx/atlas"
     },
     "synaptic_models_dir": "",
     "templates_dir": ""
@@ -75,7 +75,7 @@
               "neurolucida-asc": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/morphologies/ascii"
             },
             "biophysical_neuron_models_dir": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/emodels_hoc",
-            "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections",
+            "morphologies_dir": "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx",
             "type": "biophysical"
           }
         }

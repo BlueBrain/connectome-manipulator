@@ -8,17 +8,15 @@
         "sel_src": {
           "node_set": "hex0",
           "synapse_class": "EXC"
-          },
+        },
         "sel_dest": {
           "node_set": "hex0"
-          },
-        "amount_pct": 10,
+        },
+        "amount_pct": 20,
         "model_config": {}
-        }
+      }
     ]
   },
   "circuit_config": "./circuit_config.json",
-  "output_path": "./output/SSCx_remove_conns",
-  "seed": 3220,
-  "working_dir": "./"
+  "seed": 3220
 }

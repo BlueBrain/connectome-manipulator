@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=struct_comp
-#SBATCH --time=1:00:00
+#SBATCH --time=5:00:00
 #SBATCH --account=proj142
 #SBATCH --partition=prod
 #SBATCH --mem=0
