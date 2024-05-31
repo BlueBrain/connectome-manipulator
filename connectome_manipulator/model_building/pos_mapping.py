@@ -167,7 +167,7 @@ def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
 
     # 3D cell positions in atlas vs. flat space
     num_layers = len(np.unique(nrn_lay))
-    lay_colors = plt.cm.get_cmap("jet")(np.linspace(0, 1, num_layers))
+    lay_colors = plt.get_cmap("jet")(np.linspace(0, 1, num_layers))
     views = [[90, 0], [0, 0]]
     pos_list = [nrn_pos, nrn_pos_model]
     lbl_list = ["Atlas space (data)", "Flat space (model)"]
