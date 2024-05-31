@@ -51,7 +51,7 @@ Recommended Python version: v3.10.8
 
 ### Main components
 
-The _Connectome-Manipulator_ framework is illustrated in Figure 1 and consists of the following main components:
+The _Connectome-Manipulator_ framework is illustrated in Figure 1 and consists of the following main components: 
 
 * __Connectome manipulator__\
   As specified in the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA edges file. All manipulations are separately implemented in sub-modules and can be easily extended.\
@@ -67,6 +67,8 @@ The _Connectome-Manipulator_ framework is illustrated in Figure 1 and consists o
 * __Structural comparator__\
   As specified in the config, performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.\
   Details can be found in the corresponding README file: [/connectome_comparison/README.md](connectome_manipulator/connectome_comparison/)
+
+ℹ️ More details can be also found in the accompanying publication (esp. _Supplementary tables_), see [Citation](#citation).
 
 | ![Schematic overview](doc/source/images/schematic_overview.png "Schematic overview of the connectome manipulation pipeline, consisting of the 'Connectome manipulator', 'Model building', 'Structural comparator', and 'Topological comparator' modules.") |
 | :-: |
