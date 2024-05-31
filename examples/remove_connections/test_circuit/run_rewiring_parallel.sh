@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=conn_rewire
 #SBATCH --partition=prod
-#SBATCH --nodes=64
+#SBATCH --nodes=2
 #SBATCH --tasks-per-node=5
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=0
@@ -17,6 +17,7 @@ unset MODULEPATH
 module purge
 module load archive/2023-07 python-dev parquet-converters/0.8.0 py-mpi4py
 source /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/activate
+#source /gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/bin/activate
 
 set -x
 

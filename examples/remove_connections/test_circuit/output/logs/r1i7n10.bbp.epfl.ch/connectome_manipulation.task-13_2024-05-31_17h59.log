@@ -1,0 +1,9 @@
+[INFO] (May.31 17:59:09) Log file "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/test_circuit/output/logs/r1i7n10.bbp.epfl.ch/connectome_manipulation.task-13_2024-05-31_17h59.log" created!
+[INFO] (May.31 17:59:09) Version: connectome_manipulator 0.0.11.dev0
+[INFO] (May.31 17:59:09) Processing job JobInfo(split_index=13, split_total=100, batches=[BatchInfo(payload=None, selection=None, node_ids=[])], out_parquet_file=PosixPath('/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/test_circuit/output/parquet/edges.100-013.parquet')) (common: JobsCommonInfo(nodes=(<bluepysnap.nodes.node_population.NodePopulation object at 0x2aab66c6f040>, <bluepysnap.nodes.node_population.NodePopulation object at 0x2aab66c6f040>), edges=<bluepysnap.edges.edge_population.EdgePopulation object at 0x2aab66c6f130>))
+[INFO] (May.31 17:59:09) Applying manipulation "example_remove_conns" for split 13
+[INFO] (May.31 17:59:09) Results will be written to "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/test_circuit/output/parquet/edges.100-013.parquet"
+[INFO] (May.31 17:59:09) >>Function 1 of 1: source=conn_removal
+[INFO] (May.31 17:59:09) >>Step 1: source=conn_removal sel_src={'mtype': ['L4_PC', 'L4_MC']} sel_dest={'mtype': ['L4_PC', 'L4_MC']}
+[DEBUG] (May.31 17:59:09) This batch of process doesnt have any edges to write! Skipping
+[DEBUG] (May.31 17:59:09) Writing 0 edges to disk, total of 0 edges
