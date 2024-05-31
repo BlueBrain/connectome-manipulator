@@ -1,25 +1,28 @@
 {
-  "edges_popul_name": "NodeB__NodeA__chemical",
+  "edges_popul_name": "NodeA__NodeA__chemical",
   "manip": {
     "name": "example_circuit_remove_conns",
     "fcts": [
       {
         "source": "conn_removal",
-        "sel_src": "Mosaic_B",
-        "sel_dest": {
-            "node_set":"Mosaic_A",
+        "sel_src": {
             "mtype": [
               "L4_PC", 
               "L4_MC"
             ]
           },
-        "amount_pct": 50,
+        "sel_dest": {
+            "mtype": [
+              "L4_PC", 
+              "L4_MC"
+            ]
+          },
+        "amount_pct": 10,
         "model_config": {}
         }
     ]
   },
   "circuit_config": "./circuit_sonata_quick_scx_multi_circuit/circuit_sonata.json",
-  "output_path": "./output/example_circuit_nodeA",
   "seed": 3220,
   "working_dir": "./"
 }
