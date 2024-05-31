@@ -21,20 +21,3 @@ Example:
 sbatch run_rewiring_parallel.sh  manip_config.json /path/to/output 100
 
 ```
-
-## Developer Info
-
-In the configuration file , anything that works with Bluepysnap querying should work under sel_source or sel_dest
-
-### Allowed Use Cases Example
-
-```
-"sel_src": "Mosaic_A",
-        "sel_dest": {
-            "node_set":"Mosaic_A",
-            "mtype": [
-              "L4_PC", 
-              "L4_MC"
-            ]
-          }
-```
