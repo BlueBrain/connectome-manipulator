@@ -25,3 +25,6 @@ Within each example, you will find:
 	3.	Monitor the logs after submitting the job.
 	4.	Once the job has finished, check your specified output directory for circuit_config.json.
 	5.	(Optional) Run run_struct_comparison.sh to compare connectomes.
+    
+    
+Copyright (c) 2024 Blue Brain Project/EPFL
