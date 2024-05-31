@@ -45,6 +45,7 @@ pip install .
 
 All dependencies declared in `setup.py` and are available from [PyPI](https://pypi.org/), including one optional dependency, `mpi4py` (v3.1.4), which is required for parallel processing, i.e., to run `parallel-manipulator`. Another optional dependency, `parquet-converters` (v0.8.0 or higher), required for converting .parquet output files to SONATA must be installed separately, see instructions under https://github.com/BlueBrain/parquet-converters.
 
+Recommended Python version: v3.10.8
 
 ## Framework overview
 
