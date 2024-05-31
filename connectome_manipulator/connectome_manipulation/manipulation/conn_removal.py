@@ -60,6 +60,13 @@ class ConnectomeRemoval(Manipulation):
             np.isin(edges_table["@source_node"], gids_src),
             np.isin(edges_table["@target_node"], gids_dest),
         )  # All potential synapses to be removed
+
+	 edges_sel = edges_table[syn_sel_idx][["@source_node", "@target_node"]]
+
+        if len(edges_sel) == 0: # if processes are more than connectome size, account for empty writer
+            log.debug('This batch of process doesnt have any edges to write! Skipping')
+            return
+
         conns, syn_conn_idx, num_syn_per_conn = np.unique(
             edges_table[syn_sel_idx][["@source_node", "@target_node"]],
             axis=0,

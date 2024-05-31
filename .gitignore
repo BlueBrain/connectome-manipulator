@@ -11,3 +11,12 @@ build/
 connectome_manipulator.egg-info
 __pycache__
 examples/working_dir
+
+# Ignore all .h5 files under examples
+examples/**/*.h5
+
+# Unignore specific folder (replace specific/folder with your folder path)
+!examples/circuits/**/*.h5
+
+# ignore dev files
+**/*.dev.*
