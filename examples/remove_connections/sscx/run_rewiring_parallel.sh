@@ -16,7 +16,7 @@ unset MODULEPATH
 . /gpfs/bbp.cscs.ch/ssd/apps/bsd/config/modules.sh
 module purge
 module load archive/2023-07 python-dev parquet-converters/0.8.0 py-mpi4py
-# module load py-connectome-manipulator
+
 source /gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/bin/activate
 #source /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/venv_3_10_8/bin/activate
 

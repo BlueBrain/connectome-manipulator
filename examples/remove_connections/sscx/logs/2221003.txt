@@ -1,0 +1,1008 @@
+Autoloading python/3.10.8
+py-mpi4py/3.1.4(20):ERROR:105: Unable to locate a modulefile for 'python/3.10.8'
+Autoloading hpe-mpi/2.25.hmpt
+py-mpi4py/3.1.4(24):ERROR:105: Unable to locate a modulefile for 'hpe-mpi/2.25.hmpt'
+Autoloading python/3.10.8
+parquet-converters/0.8.0(19):ERROR:105: Unable to locate a modulefile for 'python/3.10.8'
+Autoloading hpe-mpi/2.25.hmpt
+parquet-converters/0.8.0(23):ERROR:105: Unable to locate a modulefile for 'hpe-mpi/2.25.hmpt'
+Autoloading python/3.10.8
+python-dev/0.5(17):ERROR:105: Unable to locate a modulefile for 'python/3.10.8'
+Autoloading intel-oneapi-mkl/2021.4.0
+python-dev/0.5(21):ERROR:105: Unable to locate a modulefile for 'intel-oneapi-mkl/2021.4.0'
+Autoloading hpe-mpi/2.25.hmpt
+python-dev/0.5(25):ERROR:105: Unable to locate a modulefile for 'hpe-mpi/2.25.hmpt'
+Autoloading python/3.10.8
+Autoloading intel-oneapi-mkl/2021.4.0
+Autoloading hpe-mpi/2.25.hmpt
+Autoloading python/3.10.8
+Autoloading hpe-mpi/2.25.hmpt
+Autoloading python/3.10.8
+Autoloading hpe-mpi/2.25.hmpt
++ srun dplace parallel-manipulator -v manipulate-connectome manip_config.json --output-dir=/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx/output/ --parallel --profile --convert-to-sonata --splits=100
+Dashboard URL: r5i1n0.bbp.epfl.ch:8787
+[INFO] Log file "/gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx/output/logs/connectome_manipulation_2024-05-29_19h52.log" created!
+[INFO] Version: connectome_manipulator 0.0.11.dev0
+[INFO] Loading circuit from ./circuit_config.json
+[INFO] Setting up 100 processing batch jobs...
+[INFO] Starting Execution context
+[INFO] Start job submission
+[INFO] Split 1/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 2/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 3/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 4/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 5/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 6/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 7/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 8/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 9/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 10/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 11/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 12/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 13/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 14/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 15/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 16/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 17/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 18/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 19/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 20/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 21/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 22/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 23/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 24/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 25/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 26/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 27/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 28/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 29/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 30/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 31/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 32/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 33/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 34/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 35/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 36/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 37/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 38/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 39/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 40/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 41/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 42/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 43/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 44/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 45/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 46/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 47/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 48/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 49/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 50/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 51/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 52/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 53/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 54/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 55/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 56/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 57/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 58/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 59/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 60/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 61/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 62/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 63/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 64/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 65/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 66/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 67/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 68/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 69/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 70/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 71/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 72/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 73/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 74/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 75/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 76/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 77/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 78/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 79/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 80/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 81/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 82/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 83/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 84/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 85/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 86/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 87/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 88/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 89/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 90/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 91/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 92/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 93/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 94/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 95/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 96/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 97/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 98/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 99/100: Wiring connectome targeting 2118 neurons
+[INFO] Split 100/100: Wiring connectome targeting 2030 neurons
+[INFO] Jobs submitted to DASK
+[INFO] [  1%] Finished 1 (out of 100) splits
+[INFO] [  2%] Finished 2 (out of 100) splits
+[INFO] [  3%] Finished 3 (out of 100) splits
+[INFO] [  4%] Finished 4 (out of 100) splits
+[INFO] [  5%] Finished 5 (out of 100) splits
+[INFO] [  6%] Finished 6 (out of 100) splits
+[INFO] [  7%] Finished 7 (out of 100) splits
+[INFO] [  8%] Finished 8 (out of 100) splits
+[INFO] [  9%] Finished 9 (out of 100) splits
+[INFO] [ 10%] Finished 10 (out of 100) splits
+[INFO] [ 11%] Finished 11 (out of 100) splits
+[INFO] [ 12%] Finished 12 (out of 100) splits
+[INFO] [ 13%] Finished 13 (out of 100) splits
+[INFO] [ 14%] Finished 14 (out of 100) splits
+[INFO] [ 15%] Finished 15 (out of 100) splits
+[INFO] [ 16%] Finished 16 (out of 100) splits
+[INFO] [ 17%] Finished 17 (out of 100) splits
+[INFO] [ 18%] Finished 18 (out of 100) splits
+[INFO] [ 19%] Finished 19 (out of 100) splits
+[INFO] [ 20%] Finished 20 (out of 100) splits
+[INFO] [ 21%] Finished 21 (out of 100) splits
+[INFO] [ 22%] Finished 22 (out of 100) splits
+[INFO] [ 23%] Finished 23 (out of 100) splits
+[INFO] [ 24%] Finished 24 (out of 100) splits
+[INFO] [ 25%] Finished 25 (out of 100) splits
+[INFO] [ 26%] Finished 26 (out of 100) splits
+[INFO] [ 27%] Finished 27 (out of 100) splits
+[INFO] [ 28%] Finished 28 (out of 100) splits
+[INFO] [ 29%] Finished 29 (out of 100) splits
+[INFO] [ 30%] Finished 30 (out of 100) splits
+[INFO] [ 31%] Finished 31 (out of 100) splits
+[INFO] [ 32%] Finished 32 (out of 100) splits
+[INFO] [ 33%] Finished 33 (out of 100) splits
+[INFO] [ 34%] Finished 34 (out of 100) splits
+[INFO] [ 35%] Finished 35 (out of 100) splits
+[INFO] [ 36%] Finished 36 (out of 100) splits
+[INFO] [ 37%] Finished 37 (out of 100) splits
+[INFO] [ 38%] Finished 38 (out of 100) splits
+[INFO] [ 39%] Finished 39 (out of 100) splits
+[INFO] [ 40%] Finished 40 (out of 100) splits
+[INFO] [ 41%] Finished 41 (out of 100) splits
+[INFO] [ 42%] Finished 42 (out of 100) splits
+[INFO] [ 43%] Finished 43 (out of 100) splits
+[INFO] [ 44%] Finished 44 (out of 100) splits
+[INFO] [ 45%] Finished 45 (out of 100) splits
+[INFO] [ 46%] Finished 46 (out of 100) splits
+[INFO] [ 47%] Finished 47 (out of 100) splits
+[INFO] [ 48%] Finished 48 (out of 100) splits
+[INFO] [ 49%] Finished 49 (out of 100) splits
+[INFO] [ 50%] Finished 50 (out of 100) splits
+[INFO] [ 51%] Finished 51 (out of 100) splits
+[INFO] [ 52%] Finished 52 (out of 100) splits
+[INFO] [ 53%] Finished 53 (out of 100) splits
+[INFO] [ 54%] Finished 54 (out of 100) splits
+[INFO] [ 55%] Finished 55 (out of 100) splits
+[INFO] [ 56%] Finished 56 (out of 100) splits
+[INFO] [ 57%] Finished 57 (out of 100) splits
+[INFO] [ 58%] Finished 58 (out of 100) splits
+[INFO] [ 59%] Finished 59 (out of 100) splits
+[INFO] [ 60%] Finished 60 (out of 100) splits
+[INFO] [ 61%] Finished 61 (out of 100) splits
+[INFO] [ 62%] Finished 62 (out of 100) splits
+[INFO] [ 63%] Finished 63 (out of 100) splits
+[INFO] [ 64%] Finished 64 (out of 100) splits
+[INFO] [ 65%] Finished 65 (out of 100) splits
+[INFO] [ 66%] Finished 66 (out of 100) splits
+[INFO] [ 67%] Finished 67 (out of 100) splits
+[INFO] [ 68%] Finished 68 (out of 100) splits
+[INFO] [ 69%] Finished 69 (out of 100) splits
+[INFO] [ 70%] Finished 70 (out of 100) splits
+[INFO] [ 71%] Finished 71 (out of 100) splits
+[INFO] [ 72%] Finished 72 (out of 100) splits
+[INFO] [ 73%] Finished 73 (out of 100) splits
+[INFO] [ 74%] Finished 74 (out of 100) splits
+[INFO] [ 75%] Finished 75 (out of 100) splits
+[INFO] [ 76%] Finished 76 (out of 100) splits
+[INFO] [ 77%] Finished 77 (out of 100) splits
+[INFO] [ 78%] Finished 78 (out of 100) splits
+[INFO] [ 79%] Finished 79 (out of 100) splits
+[INFO] [ 80%] Finished 80 (out of 100) splits
+[INFO] [ 81%] Finished 81 (out of 100) splits
+[INFO] [ 82%] Finished 82 (out of 100) splits
+[INFO] [ 83%] Finished 83 (out of 100) splits
+[INFO] [ 84%] Finished 84 (out of 100) splits
+[INFO] [ 85%] Finished 85 (out of 100) splits
+[INFO] [ 86%] Finished 86 (out of 100) splits
+[INFO] [ 87%] Finished 87 (out of 100) splits
+[INFO] [ 88%] Finished 88 (out of 100) splits
+[INFO] [ 89%] Finished 89 (out of 100) splits
+[INFO] [ 90%] Finished 90 (out of 100) splits
+[INFO] [ 91%] Finished 91 (out of 100) splits
+[INFO] [ 92%] Finished 92 (out of 100) splits
+[INFO] [ 93%] Finished 93 (out of 100) splits
+[INFO] [ 94%] Finished 94 (out of 100) splits
+[INFO] [ 95%] Finished 95 (out of 100) splits
+[INFO] [ 96%] Finished 96 (out of 100) splits
+[INFO] [ 97%] Finished 97 (out of 100) splits
+[INFO] [ 98%] Finished 98 (out of 100) splits
+[INFO] [ 99%] Finished 99 (out of 100) splits
+[INFO] [100%] Finished 100 (out of 100) splits
+[INFO] DASK jobs finished
+[INFO] Shutting down DASK workers gracefully
+2024-05-29 19:53:36,927 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.191:45057'.
+2024-05-29 19:53:36,927 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.191:35329'.
+2024-05-29 19:53:36,927 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.191:45057'. Shutting down.
+2024-05-29 19:53:36,928 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.191:41304'.
+2024-05-29 19:53:36,928 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.183:39007'.
+2024-05-29 19:53:36,928 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.183:35585'.
+2024-05-29 19:53:36,928 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.183:39007'. Shutting down.
+2024-05-29 19:53:36,929 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.183:38665'.
+2024-05-29 19:53:36,928 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.191:35329'. Shutting down.
+2024-05-29 19:53:36,928 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.191:41304'. Shutting down.
+2024-05-29 19:53:36,929 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.183:35585'. Shutting down.
+2024-05-29 19:53:36,929 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.183:38665'. Shutting down.
+[INFO] Done processing
+[INFO]   Total input/output synapse counts: 407127134/400468892 (Diff: -6658242)
+2024-05-29 19:53:37,100 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.204:56854 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,082 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.204:56862 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,077 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.204:56858 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,084 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.214:53554 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,078 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.214:53560 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,097 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.182:37812 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,101 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.182:37814 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,090 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.185:36286 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,083 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.185:36284 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,081 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.185:36290 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,102 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.204:56860 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,111 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.204:56856 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,107 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.169:52272 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,100 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.169:52274 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,105 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.169:52268 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,115 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.185:36282 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,117 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.185:36288 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,086 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.173:51776 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,100 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.173:51772 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,104 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.173:51770 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,083 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.173:51774 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,102 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+2024-05-29 19:53:37,121 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.162:41484'.
+2024-05-29 19:53:37,122 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.162:46101'.
+2024-05-29 19:53:37,122 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.162:41484'. Shutting down.
+2024-05-29 19:53:37,122 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.162:41647'.
+2024-05-29 19:53:37,122 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.162:46101'. Shutting down.
+2024-05-29 19:53:37,123 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.191:46088'.
+2024-05-29 19:53:37,123 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.191:42349'.
+2024-05-29 19:53:37,123 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.223:39280'.
+2024-05-29 19:53:37,123 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.191:46088'. Shutting down.
+2024-05-29 19:53:37,124 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.223:35115'.
+2024-05-29 19:53:37,123 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.191:42349'. Shutting down.
+2024-05-29 19:53:37,124 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.183:46225'.
+2024-05-29 19:53:37,124 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.183:45361'.
+2024-05-29 19:53:37,124 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.223:35115'. Shutting down.
+2024-05-29 19:53:37,125 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.219:43196'.
+2024-05-29 19:53:37,124 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.162:41647'. Shutting down.
+2024-05-29 19:53:37,125 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.219:39303'.
+2024-05-29 19:53:37,125 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.183:45361'. Shutting down.
+2024-05-29 19:53:37,125 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.219:34205'.
+2024-05-29 19:53:37,125 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.219:45911'.
+2024-05-29 19:53:37,126 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.219:44913'.
+2024-05-29 19:53:37,126 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.204:39216'.
+2024-05-29 19:53:37,127 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.204:33089'.
+2024-05-29 19:53:37,127 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.204:33617'.
+2024-05-29 19:53:37,112 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.214:53552 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,125 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.214:53558 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,127 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.204:46576'.
+2024-05-29 19:53:37,128 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.204:46673'.
+2024-05-29 19:53:37,128 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.185:42167'.
+2024-05-29 19:53:37,130 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.183:46225'. Shutting down.
+2024-05-29 19:53:37,124 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.223:39280'. Shutting down.
+2024-05-29 19:53:37,126 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.223:55802 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,121 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.223:55804 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,128 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.182:37810 remote=tcp://10.80.152.162:42060>: Stream is closed
+[INFO] Converting 100 (non-empty) .parquet file(s) to SONATA
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.219:54956 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,125 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.219:43196'. Shutting down.
+2024-05-29 19:53:37,125 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.219:39303'. Shutting down.
+2024-05-29 19:53:37,126 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.219:34205'. Shutting down.
+2024-05-29 19:53:37,140 - distributed.worker - ERROR - Scheduler was unaware of this worker 'tcp://10.80.152.219:45911'. Shutting down.
+2024-05-29 19:53:37,137 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.214:53556 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,191 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.185:34327'.
+2024-05-29 19:53:37,192 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.185:34330'.
+2024-05-29 19:53:37,192 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.185:41602'.
+2024-05-29 19:53:37,193 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.185:34031'.
+2024-05-29 19:53:37,193 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.214:33300'.
+2024-05-29 19:53:37,194 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.214:46107'.
+2024-05-29 19:53:37,194 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.214:33166'.
+2024-05-29 19:53:37,194 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.214:39223'.
+2024-05-29 19:53:37,178 - distributed.worker - ERROR - Failed to communicate with scheduler during heartbeat.
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 225, in read
+    frames_nbytes = await stream.read_bytes(fmt_size)
+tornado.iostream.StreamClosedError: Stream is closed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/worker.py", line 1238, in heartbeat
+    response = await retry_operation(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 434, in retry_operation
+    return await retry(
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/utils_comm.py", line 413, in retry
+    return await coro()
+2024-05-29 19:53:37,206 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.214:33350'.
+2024-05-29 19:53:37,206 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.223:36727'.
+2024-05-29 19:53:37,207 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.173:41536'.
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1365, in send_recv_from_rpc
+    return await send_recv(comm=comm, op=key, **kwargs)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/core.py", line 1124, in send_recv
+    response = await comm.read(deserializers=deserializers)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 241, in read
+    convert_stream_closed_error(self, e)
+  File "/gpfs/bbp.cscs.ch/home/pokorny/ReWiringKernel/lib/python3.10/site-packages/distributed/comm/tcp.py", line 144, in convert_stream_closed_error
+    raise CommClosedError(f"in {obj}: {exc}") from exc
+distributed.comm.core.CommClosedError: in <TCP (closed) ConnectionPool.heartbeat_worker local=tcp://10.80.152.233:56844 remote=tcp://10.80.152.162:42060>: Stream is closed
+2024-05-29 19:53:37,230 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.173:34817'.
+2024-05-29 19:53:37,245 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.173:44875'.
+2024-05-29 19:53:37,247 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.173:33550'.
+2024-05-29 19:53:37,256 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.182:33535'.
+2024-05-29 19:53:37,257 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.169:44415'.
+2024-05-29 19:53:37,258 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.223:34302'.
+2024-05-29 19:53:37,261 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.169:34012'.
+2024-05-29 19:53:37,263 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.182:43384'.
+2024-05-29 19:53:37,265 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.169:43413'.
+2024-05-29 19:53:37,266 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.182:41494'.
+2024-05-29 19:53:37,276 - distributed.scheduler - WARNING - Received heartbeat from unregistered worker 'tcp://10.80.152.233:34803'.
+[INFO] Deleting 100 temporary .parquet file(s), "_metadata" file, and "parquet.DONE"
+[INFO] Creating SONATA config /gpfs/bbp.cscs.ch/project/proj112/home/kurban/christoph_paper/github/forked/connectome-manipulator_forked/examples/remove_connections/sscx/output/circuit_config.json
+[INFO] +=============================================== PROFILER STATS ===============================================+
+[INFO] |                Event Label                 | Min.Time | Avg.Time | Max.Time | Min.Mem  | Avg.Mem  | Max.Mem  |
+[INFO] +--------------------------------------------------------------------------------------------------------------+
+[INFO] | connectome_manipulation_main               |   211.96 |   211.96 |   211.96 |     0.02 |     0.02 |     0.02 |
+[INFO] | processing                                 |     1.91 |     8.80 |    58.05 |     0.73 |     2.90 |     6.89 |
+[INFO] |   conn_removal                             |     0.58 |     2.38 |     5.81 |     0.38 |     1.54 |     3.70 |
+[INFO] |   write_to_parquet                         |     1.03 |     5.59 |    54.47 |     0.03 |     0.05 |     0.10 |
+[INFO] +--------------------------------------------------------------------------------------------------------------+

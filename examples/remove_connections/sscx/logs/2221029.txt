@@ -1,0 +1,19 @@
+Autoloading python/3.10.8
+Autoloading hpe-mpi/2.25.hmpt
+Autoloading python/3.10.8
+Autoloading hpe-mpi/2.25.hmpt
+Autoloading python/3.10.8
+Autoloading intel-oneapi-mkl/2021.4.0
+Autoloading hpe-mpi/2.25.hmpt
+VERSION INFO: connectome_manipulator 0.0.11.dev0
+INFO: 2 circuits loaded:
+  /gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/circuit_config.json
+  ./output/circuit_config.json
+INFO: Preparing "ConnPerLayer" plot(s)...
+{'edges_popul_name': 'S1nonbarrel_neurons__S1nonbarrel_neurons__chemical', 'group_by': 'layer', 'skip_empty_groups': False, 'sel_src': {'synapse_class': 'EXC'}, 'sel_dest': {'synapse_class': 'EXC'}}
+INFO: Computing connectivity (group_by=layer, sel_src={'synapse_class': 'EXC'}, sel_dest={'synapse_class': 'EXC'}, N=6x6 groups)
+  0% |                                                                        | 16% |############                                                            | 33% |########################                                                | 50% |####################################                                    | 66% |################################################                        | 83% |############################################################            |100% |########################################################################|
+INFO: Writing results to ./output/structcomp/data/Orig_ConnPerLayer.pickle
+{'edges_popul_name': 'S1nonbarrel_neurons__S1nonbarrel_neurons__chemical', 'group_by': 'layer', 'skip_empty_groups': False, 'sel_src': {'synapse_class': 'EXC'}, 'sel_dest': {'synapse_class': 'EXC'}}
+INFO: Computing connectivity (group_by=layer, sel_src={'synapse_class': 'EXC'}, sel_dest={'synapse_class': 'EXC'}, N=6x6 groups)
+  0% |                                                                        | 16% |############                                                            | 33% |########################                                                | 50% |####################################                                    |slurmstepd: error: *** JOB 2221029 ON r1i5n35 CANCELLED AT 2024-05-29T21:13:28 DUE TO TIME LIMIT ***
