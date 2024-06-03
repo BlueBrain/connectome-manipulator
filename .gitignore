@@ -20,3 +20,6 @@ examples/**/*.h5
 
 # ignore dev files
 **/*.dev.*
+
+# ignore log files under examples
+examples/**/logs/*.txt
