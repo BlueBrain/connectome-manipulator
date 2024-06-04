@@ -32,8 +32,8 @@ from connectome_manipulator.access_functions import (
     get_connections,
 )
 
-JET = plt.cm.get_cmap("jet")
-HOT = plt.cm.get_cmap("hot")
+JET = plt.get_cmap("jet")
+HOT = plt.get_cmap("hot")
 
 
 def extract(

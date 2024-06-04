@@ -150,8 +150,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             )
 
         log.log_assert(
-            syn_pos_mode in ["reuse", "random", "external"],
-            f'Synapse position mode "{syn_pos_mode}" not supported (must be "reuse", "random", or "external")!',
+            syn_pos_mode in ["reuse", "reuse_strict", "random", "external"],
+            f'Synapse position mode "{syn_pos_mode}" not supported (must be "reuse", "reuse_strict", "random", or "external")!',
         )
 
         if keep_indegree and reuse_conns:
@@ -160,8 +160,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                 'No generation method required for "keep_indegree" and "reuse_conns" options!',
             )
             log.log_assert(
-                syn_pos_mode == "reuse",
-                '"reuse" synapse position mode required when using "keep_indegree" and "reuse_conns" options!',
+                syn_pos_mode in ["reuse", "reuse_strict"],
+                '"reuse[_strict]" synapse position mode required when using "keep_indegree" and "reuse_conns" options!',
             )
         else:
             log.log_assert(
@@ -333,7 +333,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         # Load target morphologies, if needed
         if syn_pos_mode == "random":
             tgt_morphs = self._get_tgt_morphs(morph_ext, libsonata.Selection(tgt_node_ids))
-        else:  # "reuse" or "external"
+        else:  # "reuse", "reuse_strict", or "external"
             tgt_morphs = [None] * num_tgt
 
         log.info(
@@ -367,9 +367,14 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             syn_sel_idx_tgt = edges_table["@target_node"] == tgt
             syn_sel_idx = np.logical_and(syn_sel_idx_tgt, syn_sel_idx_src)
 
-            if (keep_indegree and np.sum(syn_sel_idx) == 0) or (
-                np.sum(syn_sel_idx_tgt) == 0 and syn_pos_mode == "reuse"
-            ):
+            if syn_pos_mode == "reuse":
+                syn_sel_idx_reuse = syn_sel_idx_tgt.copy()  # Reuse all synapses
+            elif syn_pos_mode == "reuse_strict":
+                syn_sel_idx_reuse = syn_sel_idx.copy()  # Reuse synapses restricted to sel_src
+            else:
+                syn_sel_idx_reuse = None
+
+            if (keep_indegree and np.sum(syn_sel_idx) == 0) or (np.sum(syn_sel_idx_reuse) == 0):
                 stats_dict["unable_to_rewire_nrn_count"] += 1  # (Neurons)
                 # Nothing to rewire: either keeping indegree zero, or no target synapses exist
                 # that could be rewired or positions reused from
@@ -502,7 +507,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
                     src_gen,
                     tidx,
                     tgt_node_ids,
-                    syn_sel_idx_tgt,
+                    syn_sel_idx_reuse,
                     edges_table,
                     gen_method,
                     props_model,
@@ -775,7 +780,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         src_gen,
         tidx,
         tgt_node_ids,
-        syn_sel_idx_tgt,
+        syn_sel_idx_reuse,
         edges_table,
         gen_method,
         props_model,
@@ -809,10 +814,10 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         new_edges["@target_node"] = tgt
 
         # Fill-in synapse positions (in-place)
-        if morph is None and syn_pos_model is None:  # i.e., syn_pos_mode "reuse"
+        if morph is None and syn_pos_model is None:  # i.e., syn_pos_mode "reuse" or "reuse_strict"
             # Duplicate synapse positions on target neuron
             self._reuse_synapse_positions(
-                new_edges, edges_table, syn_sel_idx_tgt, syn_conn_idx, tgt
+                new_edges, edges_table, syn_sel_idx_reuse, syn_conn_idx, tgt
             )
         elif syn_pos_model is None and morph is not None:  # i.e., syn_pos_mode "random"
             # Randomly generate new synapse positions on target neuron
@@ -832,13 +837,15 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         return new_edges
 
-    def _reuse_synapse_positions(self, new_edges, edges_table, syn_sel_idx_tgt, syn_conn_idx, tgt):
+    def _reuse_synapse_positions(
+        self, new_edges, edges_table, syn_sel_idx_reuse, syn_conn_idx, tgt
+    ):
         """Assigns (in-place) duplicate synapse positions on target neuron (w/o accessing dendritic morphologies).
 
         If possible, synapses will be selected such that no duplicated synapses belong to same connection.
         """
         conns, nsyns = np.unique(syn_conn_idx, return_counts=True)
-        draw_from = np.where(syn_sel_idx_tgt)[0]
+        draw_from = np.where(syn_sel_idx_reuse)[0]
         sel_dupl = []
         unique_per_conn_warning = False
         for dupl_count in nsyns:

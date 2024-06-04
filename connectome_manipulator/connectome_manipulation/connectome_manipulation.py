@@ -422,7 +422,9 @@ def main(options, log_file, executor_args=()):
 def _get_afferent_edges_table(node_ids, edges):
     if edges is None:
         return None
-    return edges.afferent_edges(node_ids, properties=sorted(edges.property_names))
+    return edges.afferent_edges(node_ids, properties=sorted(edges.property_names)).astype(
+        edges.property_dtypes
+    )
 
 
 def _write_blue_config(manip_config, output_path, edges_fn_manip, edges_file_manip):
