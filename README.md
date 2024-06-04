@@ -60,7 +60,7 @@ The _Connectome-Manipulator_ framework is illustrated in Figure 1 and consists o
   As specified in the config, builds a model from a given connectome and writes the model to a file to be loaded and used by specific manipulations requiring a model (e.g., model-based rewiring based on connection probability model). All models are separately implemented in sub-modules and can be easily extended.\
   Details can be found in the corresponding README file: [/model_building/README.md](connectome_manipulator/model_building/)
   
-  > <u>Notes</u>:
+  > <ins>Notes</ins>:
   > - Some models may not even require a connectome as input.
   > - Some models may depend on other models as input for model building.
 
@@ -87,7 +87,7 @@ As illustrated in Figure 2, the synapses of the connectome (SONATA edges) are di
 | :-: |
 | __Figure 3:__ Example of an edge table (Pandas dataframe), comprising a list of synapses together with all synapse properties. |
 
-> <u>Notes</u>:
+> <ins>Notes</ins>:
 > - Manipulations can only be applied to a single SONATA edges population at a time.
 > - The synapses in each loaded edge table are assumed to be sorted by post-synaptic neuron ID. Likewise, the manipulated edges tables are to be returned with synapses sorted by post-synaptic neuron ID.
 > - Optionally, processing can be resumed from an earlier (incomplete) run, by re-using all .parquet files that already exist instead of re-computing them.
