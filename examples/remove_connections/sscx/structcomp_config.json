@@ -1,0 +1,137 @@
+{
+  "working_dir": "./output/structcomp",
+  "out_dir": "./output/structcomp",
+  "circuits": {
+    "0": {
+      "circuit_config": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data_physiology/circuit_config.json",
+      "circuit_name": "Orig"
+    },
+    "1": {
+      "circuit_config": "./output/circuit_config.json",
+      "circuit_name": "Manip"
+    }
+  },
+  "plot_types": [
+    {
+      "name": "ConnPerLayer",
+      "fct": {
+        "source": "connectivity",
+        "kwargs": {
+          "group_by": "layer",
+          "skip_empty_groups": false,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          },
+          "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+        }
+      },
+      "res_sel": [
+        "nsyn_conn",
+        "conn_prob"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "ConnPerMtype",
+      "fct": {
+        "source": "connectivity",
+        "kwargs": {
+          "group_by": "mtype",
+          "skip_empty_groups": true,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          },
+          "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+        }
+      },
+      "res_sel": [
+        "nsyn_conn",
+        "conn_prob"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "PropsPerMtype",
+      "fct": {
+        "source": "properties",
+        "kwargs": {
+          "group_by": "mtype",
+          "skip_empty_groups": true,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          },
+          "fct": "np.mean",
+          "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+        }
+      },
+      "res_sel": [
+        "conductance",
+        "decay_time",
+        "delay",
+        "depression_time",
+        "facilitation_time",
+        "n_rrp_vesicles",
+        "syn_type_id",
+        "u_syn"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "Adjacency",
+      "fct": {
+        "source": "adjacency",
+        "kwargs": {
+          "sel_src": null,
+          "sel_dest": null,
+          "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+        }
+      },
+      "res_sel": [
+        "adj",
+        "adj_cnt"
+      ],
+      "range_prctile": 95,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    }
+  ]
+}

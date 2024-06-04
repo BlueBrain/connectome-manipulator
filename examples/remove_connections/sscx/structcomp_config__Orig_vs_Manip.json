@@ -1,0 +1,133 @@
+{
+    "working_dir": "<To be added>",
+    "out_dir": "<To be added>",
+    "circuits": {
+      "0": {
+        "circuit_config": "<To be added>",
+        "circuit_name": "Orig"
+      },
+      "1": {
+        "circuit_config": "<To be added>",
+        "circuit_name": "Manip"
+      }
+    },
+    "plot_types": [
+      {
+        "name": "ConnPerLayer",
+        "fct": {
+          "source": "connectivity",
+          "kwargs": {
+            "group_by": "layer",
+            "skip_empty_groups": false,
+            "sel_src": {
+              "synapse_class": "EXC"
+            },
+            "sel_dest": {
+              "synapse_class": "EXC"
+            }
+          }
+        },
+        "res_sel": [
+          "nsyn_conn",
+          "conn_prob"
+        ],
+        "range_prctile": 100,
+        "fig_size": [
+          11,
+          3
+        ],
+        "fig_file": {
+          "format": "png",
+          "dpi": 600
+        }
+      },
+      {
+        "name": "ConnPerMtype",
+        "fct": {
+          "source": "connectivity",
+          "kwargs": {
+            "group_by": "mtype",
+            "skip_empty_groups": true,
+            "sel_src": {
+              "synapse_class": "EXC"
+            },
+            "sel_dest": {
+              "synapse_class": "EXC"
+            }
+          }
+        },
+        "res_sel": [
+          "nsyn_conn",
+          "conn_prob"
+        ],
+        "range_prctile": 100,
+        "fig_size": [
+          11,
+          3
+        ],
+        "fig_file": {
+          "format": "png",
+          "dpi": 600
+        }
+      },
+      {
+        "name": "PropsPerMtype",
+        "fct": {
+          "source": "properties",
+          "kwargs": {
+            "group_by": "mtype",
+            "skip_empty_groups": true,
+            "sel_src": {
+              "synapse_class": "EXC"
+            },
+            "sel_dest": {
+              "synapse_class": "EXC"
+            },
+            "fct": "np.mean"
+          }
+        },
+        "res_sel": [
+          "conductance",
+          "decay_time",
+          "delay",
+          "depression_time",
+          "facilitation_time",
+          "n_rrp_vesicles",
+          "syn_type_id",
+          "u_syn"
+        ],
+        "range_prctile": 100,
+        "fig_size": [
+          11,
+          3
+        ],
+        "fig_file": {
+          "format": "png",
+          "dpi": 600
+        }
+      },
+      {
+        "name": "Adjacency",
+        "fct": {
+          "source": "adjacency",
+          "kwargs": {
+            "sel_src": null,
+            "sel_dest": null
+          }
+        },
+        "res_sel": [
+          "adj",
+          "adj_cnt"
+        ],
+        "range_prctile": 95,
+        "fig_size": [
+          11,
+          3
+        ],
+        "fig_file": {
+          "format": "png",
+          "dpi": 600
+        }
+      }
+    ]
+  }

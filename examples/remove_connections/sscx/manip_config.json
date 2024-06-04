@@ -1,0 +1,22 @@
+{
+  "edges_popul_name": "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical",
+  "manip": {
+    "name": "SSCx_remove_conns",
+    "fcts": [
+      {
+        "source": "conn_removal",
+        "sel_src": {
+          "node_set": "hex0",
+          "synapse_class": "EXC"
+        },
+        "sel_dest": {
+          "node_set": "hex0"
+        },
+        "amount_pct": 20,
+        "model_config": {}
+      }
+    ]
+  },
+  "circuit_config": "./circuit_config.json",
+  "seed": 3220
+}
