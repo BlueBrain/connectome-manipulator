@@ -203,7 +203,7 @@ Contribution guidelines can be found [here](CONTRIBUTING.md).
 
 If you use this software, we kindly ask you to cite the following publication:
 
-C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024). __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ bioRxiv 2024.05.24.593860. [doi: 10.1101/2024.05.24.593860](https://doi.org/10.1101/2024.05.24.593860)
+C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024). __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ bioRxiv 2024.05.24.593860. DOI: [10.1101/2024.05.24.593860](https://doi.org/10.1101/2024.05.24.593860)
 
 ```
 @article{pokorny2024connectome,
@@ -220,11 +220,11 @@ C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024)
 
 ### Scientific papers that use Connectome-Manipulator
 
-- Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.__ bioRxiv 2022.08.11.503144. [doi: 10.1101/2022.08.11.503144](https://doi.org/10.1101/2022.08.11.503144)
+- Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.__ bioRxiv 2022.08.11.503144. DOI: [10.1101/2022.08.11.503144](https://doi.org/10.1101/2022.08.11.503144)
 
-- James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry.__ Part II: Physiology and Experimentation. bioRxiv 2023.05.17.541168. [doi: 10.1101/2023.05.17.541168](https://doi.org/10.1101/2023.05.17.541168)
+- James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. __Modeling and Simulation of Neocortical Micro- and Mesocircuitry.__ Part II: Physiology and Experimentation. bioRxiv 2023.05.17.541168. DOI: [10.1101/2023.05.17.541168](https://doi.org/10.1101/2023.05.17.541168)
 
-- Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. __Efficiency and reliability in biological neural network architectures.__ bioRxiv 2024.03.15.585196. [doi: 10.1101/2024.03.15.585196](https://doi.org/10.1101/2024.03.15.585196)
+- Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. __Efficiency and reliability in biological neural network architectures.__ bioRxiv 2024.03.15.585196. DOI: [10.1101/2024.03.15.585196](https://doi.org/10.1101/2024.03.15.585196)
 
 ### Posters that use Connectome-Manipulator
 
@@ -234,7 +234,7 @@ C. Pokorny, O. Awile, J.B. Isbister, K. Kurban, M. Wolf, and M.W. Reimann (2024)
 
 - Christoph Pokorny, Omar Awile, Sirio Bolaños-Puchet, András Ecker, Daniela Egas Santander, James B. Isbister, Matthias Wolf, Henry Markram, and Michael W. Reimann. __A connectome manipulation framework for the systematic and reproducible study of the structure-function relationship through simulations.__ Bernstein Conference, 2023, Berlin.
 
-- Christoph Pokorny, Omar Awile, James B. Isbister, Matthias Wolf, and Michael W. Reimann. __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ FENS Forum, 2024 (upcoming), Vienna.
+- Christoph Pokorny, Omar Awile, James B. Isbister, Kerem Kurban, Matthias Wolf, and Michael W. Reimann. __A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.__ FENS Forum, 2024, Vienna.
 
 
 ## Funding & Acknowledgment
