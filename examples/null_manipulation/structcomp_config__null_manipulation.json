@@ -1,27 +1,27 @@
 {
-  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/structural_comparator",
-  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/structural_comparator",
+  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/structural_comparator",
+  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/structural_comparator",
   "circuits": {
     "0": {
-      "circuit_config": "/gpfs/bbp.cscs.ch/project/proj83/jira-tickets/NSETM-1948-extract-hex-O1/data/O1_data/circuit_config.json",
+      "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config.json",
       "circuit_name": "Original"
     },
     "1": {
-      "circuit_config": "/gpfs/bbp.cscs.ch/home/pokorny/JupyterLab/git_dev/connectome_manipulator/examples/circuits/SSCx_NullManip/circuit_config.json",
+      "circuit_config": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/circuits/ToyCircuit_NullManip/circuit_config.json",
       "circuit_name": "NullManip"
     }
   },
   "plot_types": [
     {
-      "name": "Adjacency_Hex0",
+      "name": "Adjacency",
       "fct": {
         "source": "adjacency",
         "kwargs": {
           "sel_src": {
-            "node_set": "hex0"
+            "node_set": "All"
           },
           "sel_dest": {
-            "node_set": "hex0"
+            "node_set": "All"
           }
         }
       },
@@ -40,18 +40,18 @@
       }
     },
     {
-      "name": "ConnPerLayer_Hex0EE",
+      "name": "ConnPerLayer_EE",
       "fct": {
         "source": "connectivity",
         "kwargs": {
           "group_by": "layer",
           "skip_empty_groups": false,
           "sel_src": {
-            "node_set": "hex0",
+            "node_set": "All",
             "synapse_class": "EXC"
           },
           "sel_dest": {
-            "node_set": "hex0",
+            "node_set": "All",
             "synapse_class": "EXC"
           }
         }
@@ -71,18 +71,18 @@
       }
     },
     {
-      "name": "PropsPerLayer_Hex0EE",
+      "name": "PropsPerLayer_EE",
       "fct": {
         "source": "properties",
         "kwargs": {
           "group_by": "layer",
           "skip_empty_groups": false,
           "sel_src": {
-            "node_set": "hex0",
+            "node_set": "All",
             "synapse_class": "EXC"
           },
           "sel_dest": {
-            "node_set": "hex0",
+            "node_set": "All",
             "synapse_class": "EXC"
           },
           "fct": "np.mean"
