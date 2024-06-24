@@ -1,0 +1,133 @@
+{
+  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/struct_comparison",
+  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/struct_comparison",
+  "circuits": {
+    "0": {
+      "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config.json",
+      "circuit_name": "Orig"
+    },
+    "1": {
+      "circuit_config": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/circuits/ToyCircuit_AdjRewire/circuit_config.json",
+      "circuit_name": "Manip"
+    }
+  },
+  "plot_types": [
+    {
+      "name": "ConnPerLayer_EE",
+      "fct": {
+        "source": "connectivity",
+        "kwargs": {
+          "group_by": "layer",
+          "skip_empty_groups": false,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          }
+        }
+      },
+      "res_sel": [
+        "nsyn_conn",
+        "conn_prob"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "ConnPerMtype_EE",
+      "fct": {
+        "source": "connectivity",
+        "kwargs": {
+          "group_by": "mtype",
+          "skip_empty_groups": true,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          }
+        }
+      },
+      "res_sel": [
+        "nsyn_conn",
+        "conn_prob"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "PropsPerMtype_EE",
+      "fct": {
+        "source": "properties",
+        "kwargs": {
+          "group_by": "mtype",
+          "skip_empty_groups": true,
+          "sel_src": {
+            "synapse_class": "EXC"
+          },
+          "sel_dest": {
+            "synapse_class": "EXC"
+          },
+          "fct": "np.mean"
+        }
+      },
+      "res_sel": [
+        "conductance",
+        "decay_time",
+        "delay",
+        "depression_time",
+        "facilitation_time",
+        "n_rrp_vesicles",
+        "syn_type_id",
+        "u_syn"
+      ],
+      "range_prctile": 100,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    },
+    {
+      "name": "Adjacency",
+      "fct": {
+        "source": "adjacency",
+        "kwargs": {
+          "sel_src": null,
+          "sel_dest": null
+        }
+      },
+      "res_sel": [
+        "adj",
+        "adj_cnt"
+      ],
+      "range_prctile": 95,
+      "fig_size": [
+        11,
+        3
+      ],
+      "fig_file": {
+        "format": "png",
+        "dpi": 600
+      }
+    }
+  ]
+}

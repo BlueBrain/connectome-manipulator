@@ -1,0 +1,36 @@
+{
+  "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config.json",
+  "seed": 3210,
+  "manip": {
+    "name": "ConnRewire",
+    "fcts": [
+      {
+        "source": "conn_rewiring",
+        "sel_src": {
+          "synapse_class": "EXC"
+        },
+        "sel_dest": {
+          "synapse_class": "EXC"
+        },
+        "syn_class": "EXC",
+        "keep_indegree": false,
+        "reuse_conns": false,
+        "keep_conns": false,
+        "gen_method": "randomize",
+        "syn_pos_mode": "reuse",
+        "amount_pct": 100,
+        "model_config": {
+          "prob_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/model_building/model/ConnProbAdjModel.json"
+          },
+          "delay_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/model_building/model/DistDepDelay.json"
+          },
+          "props_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/model_building/model/ConnPropsPerPathway.json"
+          }
+        }
+      }
+    ]
+  }
+}

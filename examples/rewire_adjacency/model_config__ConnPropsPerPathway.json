@@ -1,0 +1,42 @@
+{
+  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/model_building",
+  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/rewire_adjacency/model_building",
+  "seed": 7531,
+  "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config.json",
+  "model": {
+    "name": "ConnPropsPerPathway",
+    "fct": {
+      "source": "conn_props",
+      "kwargs": {
+        "sel_src": {
+          "synapse_class": "EXC"
+        },
+        "sel_dest": {
+          "synapse_class": "EXC"
+        },
+        "min_sample_size_per_group": 10,
+        "max_sample_size_per_group": 10000,
+        "distr_types": {
+          "conductance": "gamma",
+          "conductance_scale_factor": "constant",
+          "decay_time": "truncnorm",
+          "depression_time": "gamma",
+          "facilitation_time": "gamma",
+          "n_rrp_vesicles": "discrete",
+          "n_syn_per_conn": "discrete",
+          "syn_type_id": "constant",
+          "u_hill_coefficient": "constant",
+          "u_syn": "truncnorm",
+          "spine_length": "zero"
+        },
+        "data_types": {
+          "n_rrp_vesicles": "int",
+          "n_syn_per_conn": "int",
+          "syn_type_id": "int"
+        },
+        "data_bounds": {},
+        "plot_sample_size": 10000
+      }
+    }
+  }
+}
