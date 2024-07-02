@@ -210,6 +210,8 @@ def get_node_ids(nodes, sel_spec, split_ids=None):
             log.log_assert(isinstance(node_set, str), "Node set must be a string!")
             if selection is None:  # Nothing else selected
                 gids = nodes.ids(node_set)
+                if split_ids is not None:
+                    gids = np.intersect1d(gids, sel_ids.flatten().astype(np.int64))
             else:  # Otherwise, intersect with selection
                 gids = np.intersect1d(gids, nodes.ids(node_set))
     else:
