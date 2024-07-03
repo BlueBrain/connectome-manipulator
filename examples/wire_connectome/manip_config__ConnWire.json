@@ -1,0 +1,76 @@
+{
+  "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config__no_conn.json",
+  "seed": 3210,
+  "manip": {
+    "name": "ConnWiring",
+    "syn_props_init": {
+        "conductance": "float32",
+        "conductance_scale_factor": "float32",
+        "decay_time": "float32",
+        "depression_time": "float32",
+        "facilitation_time": "float32",
+        "n_rrp_vesicles": "int16",
+        "syn_type_id": "int16",
+        "u_hill_coefficient": "float32",
+        "u_syn": "float32"
+    },
+    "fcts": [
+      {
+        "source": "conn_rewiring",
+        "sel_src": {
+          "synapse_class": "EXC"
+        },
+        "sel_dest": {
+          "node_set": "All"
+        },
+        "syn_class": "EXC",
+        "keep_indegree": false,
+        "reuse_conns": false,
+        "keep_conns": false,
+        "gen_method": "randomize",
+        "syn_pos_mode": "random",
+        "amount_pct": 100,
+        "morph_ext": "asc",
+        "model_config": {
+          "prob_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/ConnProb2ndOrderModel.json"
+          },
+          "delay_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/LinDelayModel.json"
+          },
+          "props_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/ConnPropsModel.json"
+          }
+        }
+      },
+      {
+        "source": "conn_rewiring",
+        "sel_src": {
+          "synapse_class": "INH"
+        },
+        "sel_dest": {
+          "node_set": "All"
+        },
+        "syn_class": "INH",
+        "keep_indegree": false,
+        "reuse_conns": false,
+        "keep_conns": false,
+        "gen_method": "randomize",
+        "syn_pos_mode": "random",
+        "amount_pct": 100,
+        "morph_ext": "asc",
+        "model_config": {
+          "prob_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/ConnProb2ndOrderModel.json"
+          },
+          "delay_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/LinDelayModel.json"
+          },
+          "props_model_spec": {
+            "file": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/wire_connectome/model_building/model/ConnPropsModel.json"
+          }
+        }
+      }
+    ]
+  }
+}

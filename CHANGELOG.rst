@@ -8,6 +8,7 @@ New Features
 ~~~~~~~~~~~~
 - New synapse position re-use mode "reuse_strict" with re-use restricted to source selection
 - Minor fixes for empty data splits, node selection, and data logs
+- Additional examples
 
 
 Version 0.0.11.dev0
