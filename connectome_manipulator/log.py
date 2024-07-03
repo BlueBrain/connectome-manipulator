@@ -8,6 +8,7 @@
 import logging
 import os
 import sys
+from glob import glob
 from time import strftime
 
 import numpy as np
@@ -69,7 +70,16 @@ def data(filespec, **kwargs):
         filespec = "." + filespec
     data_file = base_name + filespec + ".npz"
     if os.path.exists(data_file):
-        warning(f'Data log file "{data_file}" already exists and will be overwritten!')
+        # File may exist, e.g., in case of multiple rewiring functions.
+        # Therefore, extend filename to prevent overwriting.
+        p, df = os.path.split(data_file)
+        fn, ext = os.path.splitext(df)
+        file_list = [_f for _f in glob(fn + ".*" + ext, root_dir=p)]
+        fidx = len(file_list) + 1
+        data_file = os.path.join(p, fn + f".{fidx}" + ext)
+        if os.path.exists(data_file):
+            # Check again if for any reason this file still already exists
+            warning(f'Data log file "{data_file}" already exists and will be overwritten!')
     np.savez_compressed(data_file, **kwargs)
     info(f'Data log ({", ".join(list(kwargs.keys()))}) written to "{data_file}"')
 
