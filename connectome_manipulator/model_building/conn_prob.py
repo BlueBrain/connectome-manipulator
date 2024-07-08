@@ -645,7 +645,7 @@ def build_2nd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist * count_all).astype(int)
@@ -977,7 +977,7 @@ def build_3rd_order(
     else:
         log.log_assert(False, "ERROR: Model type not specified or unknown!")
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_dist_bip * count_all).astype(int)
@@ -1249,7 +1249,7 @@ def build_4th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1631,7 +1631,7 @@ def build_4th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_offset * count_all).astype(int)
@@ -1953,7 +1953,7 @@ def build_5th_order(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)
@@ -2458,7 +2458,7 @@ def build_5th_order_reduced(
     else:
         log.log_assert(False, f'ERROR: Model type "{model_specs.get("type")}" unknown!')
 
-    log.debug("Model description:\n%s", model)
+    log.debug("Model description:\n%s", model)  # pylint: disable=E0606
 
     # Check model prediction of total number of connections
     conn_count_data = np.nansum(p_conn_position * count_all).astype(int)

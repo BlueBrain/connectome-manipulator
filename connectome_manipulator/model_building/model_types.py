@@ -849,7 +849,7 @@ class ConnPropsModel(AbstractModel):
             drawn_values = np.full(size, 0.0)
         else:
             log.log_assert(False, f'Distribution type "{distr_type}" not supported!')
-        return drawn_values
+        return drawn_values  # pylint: disable=E0606
 
     def draw(self, prop_name, src_type, tgt_type, size=1):
         """Draw value(s) for given property name of a single connection

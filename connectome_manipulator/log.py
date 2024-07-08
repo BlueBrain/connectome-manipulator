@@ -74,7 +74,7 @@ def data(filespec, **kwargs):
         # Therefore, extend filename to prevent overwriting.
         p, df = os.path.split(data_file)
         fn, ext = os.path.splitext(df)
-        file_list = [_f for _f in glob(fn + ".*" + ext, root_dir=p)]
+        file_list = list(glob(fn + ".*" + ext, root_dir=p))
         fidx = len(file_list) + 1
         data_file = os.path.join(p, fn + f".{fidx}" + ext)
         if os.path.exists(data_file):

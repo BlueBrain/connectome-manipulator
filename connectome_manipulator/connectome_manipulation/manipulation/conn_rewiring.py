@@ -810,6 +810,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             log.log_assert(False, f"Generation method {gen_method} unknown!")
 
         # Assign synapses to connections from src_gen to tgt
+        # pylint: disable=E0601, E0606
         new_edges["@source_node"] = src_gen[syn_conn_idx]
         new_edges["@target_node"] = tgt
 

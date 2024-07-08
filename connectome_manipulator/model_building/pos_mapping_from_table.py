@@ -62,6 +62,7 @@ def extract(
     else:
         log.log_assert(False, f'ERROR: "{file_format}" format not supported!')
 
+    # pylint: disable=E0606
     log.debug(f'Loaded position table for {nrn_table.shape[0]} neurons from "{pos_file}"')
 
     # Assign mapped positions
