@@ -41,8 +41,7 @@ jobs:
         cmake --build build
         ctest --test-dir build --output-on-failure
         cmake --install build
-        cd ..
-        echo "./parquet-converters" >> $GITHUB_PATH
+        export PATH=$PATH:$PWD/install/bin
 
     - name: Check dependencies
       run: |
