@@ -35,16 +35,16 @@ setup(
         "numpy==1.24.3",
         "pandas==2.0.2",
         "progressbar==2.5",
-        "pyarrow==12.0.1",
+        "pyarrow==14.0.1",
         "scipy==1.10.1",
-        "scikit-learn==1.2.2",
+        "scikit-learn==1.5.0",
         "voxcell==3.1.5",
         "tables==3.8.0",  # Optional dependency of pandas.DataFrame.to_hdf()
         "distributed==2023.6.0",  # Dask
         "dask-mpi==2022.4.0",
     ],
     packages=find_packages(),
-    python_requires="==3.10.8",
+    python_requires="==3.10",
     extras_require={"docs": ["sphinx", "sphinx-bluebrain-theme"]},
     entry_points={
         "console_scripts": [
