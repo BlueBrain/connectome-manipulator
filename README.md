@@ -1,5 +1,6 @@
 ![Connectome-Manipulator](BPP-Connectome-Manipulator-Banner.jpg)
 
+![Run status](https://github.com/BlueBrain/connectome-manipulator/actions/workflows/run-tox.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![DOI:10.1101/2024.05.24.593860](http://img.shields.io/badge/DOI-10.1101/2024.05.24.593860-B31B1B.svg)](https://doi.org/10.1101/2024.05.24.593860)
 
