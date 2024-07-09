@@ -58,9 +58,6 @@ jobs:
 
     - name: Run tox
       run: |
-#        tox -e lint
-#        tox -e coverage
-#        tox -e py
         tox -e functional
 
     - name: Upload to codecov
