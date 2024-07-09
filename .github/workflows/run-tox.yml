@@ -41,15 +41,8 @@ jobs:
         cmake --build build
         ctest --test-dir build --output-on-failure
         cmake --install build
+        echo "parquet2hdf5 --version: $(./install/bin/parquet2hdf5 --version)"
         echo "$PWD/install/bin" >> $GITHUB_PATH
-        echo $GITHUB_PATH
-
-    - name: Check dependencies
-      run: |
-        echo $GITHUB_PATH
-        echo $PATH
-        echo "parquet2hdf5 --version"
-        parquet2hdf5 --version
 
     - uses: actions/checkout@v2
 
