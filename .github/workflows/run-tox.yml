@@ -42,9 +42,11 @@ jobs:
         ctest --test-dir build --output-on-failure
         cmake --install build
         export PATH=$PATH:$PWD/install/bin
+        echo $PATH
 
     - name: Check dependencies
       run: |
+        echo $PATH
         echo "parquet2hdf5 --version"
         parquet2hdf5 --version
 
