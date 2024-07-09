@@ -58,7 +58,9 @@ jobs:
 
     - name: Run tox
       run: |
-        tox -e functional
+        tox -e lint
+        tox -e coverage
+        tox -e py
 
     - name: Upload to codecov
       if: ${{matrix.python-version == '3.10'}}
