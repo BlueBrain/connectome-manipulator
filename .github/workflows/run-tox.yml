@@ -41,11 +41,12 @@ jobs:
         cmake --build build
         ctest --test-dir build --output-on-failure
         cmake --install build
-        export PATH=$PATH:$PWD/install/bin
-        echo $PATH
+        echo "$PWD/install/bin" >> $GITHUB_PATH
+        echo $GITHUB_PATH
 
     - name: Check dependencies
       run: |
+        echo $GITHUB_PATH
         echo $PATH
         echo "parquet2hdf5 --version"
         parquet2hdf5 --version
