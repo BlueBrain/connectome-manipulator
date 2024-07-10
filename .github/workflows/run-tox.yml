@@ -43,6 +43,9 @@ jobs:
         cmake --install build
         echo "parquet2hdf5 --version: $(./install/bin/parquet2hdf5 --version)"
         echo "$PWD/install/bin" >> $GITHUB_PATH
+        echo "$PWD"
+        echo "$GITHUB_PATH"
+        echo "$PATH"
 
     - uses: actions/checkout@v2
 
@@ -54,7 +57,6 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip setuptools
-        pip install tox-gh-actions
         pip install libsonata
         pip install mock
         pip install pytest
@@ -64,6 +66,9 @@ jobs:
     - name: Run pytest
       run: |
         echo "ls: $(ls)"
+        echo "$PWD"
+        echo "$GITHUB_PATH"
+        echo "$PATH"
         echo "parquet2hdf5 --version: $(./install/bin/parquet2hdf5 --version)"
         echo "parquet2hdf5 --version: $(./parquet-converters/install/bin/parquet2hdf5 --version)"
         echo "parquet2hdf5 --version: $(parquet2hdf5 --version)"
