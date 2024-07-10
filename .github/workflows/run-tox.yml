@@ -59,7 +59,7 @@ jobs:
         pip install mock
         pip install pytest
         pip install tables
-        pip install click
+        pip install .
 
     - name: Run pytest
       run: |
