@@ -8,11 +8,14 @@ import subprocess
 
 
 def test_parquet2hdf5():
-    """Test if parquet2hdf5 function is available. Will raise an FileNotFoundError if not."""
-    with subprocess.Popen(
-        ["parquet2hdf5", "--version"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        env={"PATH": os.getenv("PATH", "")},
-    ) as proc:
-        print("parquet2hdf5 v" + proc.communicate()[0].decode())
+    """Test if parquet2hdf5 function is available."""
+    try:
+        with subprocess.Popen(
+            ["parquet2hdf5", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env={"PATH": os.getenv("PATH", "")},
+        ) as proc:
+            print("parquet2hdf5 v" + proc.communicate()[0].decode())
+    except FileNotFoundError as e:
+        assert False, str(e) + f"\nPATH={os.getenv("PATH", "")}"
