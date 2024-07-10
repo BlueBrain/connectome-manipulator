@@ -63,7 +63,10 @@ jobs:
 
     - name: Run pytest
       run: |
-        pytest -vv tests/functional
+        echo "ls: $(ls)"
+        echo "parquet2hdf5 --version: $(./install/bin/parquet2hdf5 --version)"
+        echo "parquet2hdf5 --version: $(./parquet-converters/install/bin/parquet2hdf5 --version)"
+        echo "parquet2hdf5 --version: $(parquet2hdf5 --version)"
 
     - name: Upload to codecov
       if: ${{matrix.python-version == '3.10'}}
