@@ -18,4 +18,4 @@ def test_parquet2hdf5():
         ) as proc:
             print("parquet2hdf5 v" + proc.communicate()[0].decode())
     except FileNotFoundError as e:
-        assert False, str(e) + f"\nPATH={os.getenv("PATH", "")}"
+        assert False, str(e) + f'\nPATH={os.getenv("PATH", "")}'
