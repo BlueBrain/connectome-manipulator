@@ -38,6 +38,12 @@ Important use cases include wiring a connectome from scratch in a biologically r
 
 ## Install
 
+From [PyPI](https://pypi.org/project/connectome-manipulator) (recommended):
+~~~
+pip install connectome-manipulator
+~~~
+
+Alternatively, from [GitHub](https://github.com/BlueBrain/connectome-manipulator):
 ~~~
 git clone https://github.com/BlueBrain/connectome-manipulator.git
 cd connectome-manipulator
