@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Version 1.0.0
+--------------
+
+- First major release
+
+
 Version 0.0.11.dev1
 -------------------
 
