@@ -1,6 +1,6 @@
 |banner|
 
-|license| |doi| |tox| |coverage| |release|
+|license| |doi| |tox| |coverage| |release| |doc|
 
 Connectome-Manipulator
 ======================
@@ -270,14 +270,22 @@ Copyright (c) 2024 Blue Brain Project/EPFL
 
 .. |license| image:: https://img.shields.io/badge/License-Apache_2.0-blue.svg
    :target: https://opensource.org/licenses/Apache-2.0
+   :alt: License
 .. |doi| image:: http://img.shields.io/badge/DOI-10.1101/2024.05.24.593860-B31B1B.svg
    :target: https://doi.org/10.1101/2024.05.24.593860
+   :alt: DOI
 .. |tox| image:: https://github.com/BlueBrain/connectome-manipulator/actions/workflows/run-tox.yml/badge.svg
    :target: https://github.com/BlueBrain/connectome-manipulator/actions/workflows/run-tox.yml
+   :alt: Tox
 .. |coverage| image:: https://codecov.io/github/BlueBrain/connectome-manipulator/coverage.svg?branch=main
    :target: https://codecov.io/github/BlueBrain/connectome-manipulator
+   :alt: Coverage
 .. |release| image:: https://img.shields.io/pypi/v/connectome-manipulator.svg
    :target: https://pypi.org/project/connectome-manipulator/
+   :alt: Release
+.. |doc| image:: https://readthedocs.org/projects/connectome-manipulator/badge/?version=latest
+   :target: https://connectome-manipulator.readthedocs.io
+   :alt: Documentation
 
 .. substitutions
 .. |banner| image:: BPP-Connectome-Manipulator-Banner.jpg
