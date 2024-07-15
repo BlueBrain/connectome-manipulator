@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.10', '3.11', '3.12']
     steps:
 
     - uses: actions/checkout@v4
@@ -26,11 +26,19 @@ jobs:
         python -m pip install --upgrade pip setuptools
         pip install tox-gh-actions
 
-    - name: Run tox
+    - name: Lint
+      if: ${{matrix.python-version == '3.10'}}
       run: |
         tox -e lint
-        tox -e coverage
+
+    - name: Run tests for all Pythons
+      run: |
         tox -e unit
+
+    - name: Run coverage
+      if: ${{matrix.python-version == '3.10'}}
+      run: |
+        tox -e coverage
 
     - name: Upload to codecov
       if: ${{matrix.python-version == '3.10'}}
@@ -47,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.10', '3.11', '3.12']
     steps:
 
     - uses: actions/checkout@v4
