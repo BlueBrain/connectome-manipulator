@@ -1,8 +1,15 @@
 Changelog
 =========
 
+Version 1.0.1
+-------------
+
+- Added Python 3.11 and 3.12 support
+- Added documentation building
+
+
 Version 1.0.0
---------------
+-------------
 
 - First major release
 
