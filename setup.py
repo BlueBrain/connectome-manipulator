@@ -44,7 +44,7 @@ setup(
         "dask-mpi==2022.4.0",
     ],
     packages=find_packages(),
-    python_requires="==3.10.*",
+    python_requires=">=3.10",
     extras_require={"docs": ["sphinx", "sphinx-bluebrain-theme"]},
     entry_points={
         "console_scripts": [
@@ -59,6 +59,8 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
