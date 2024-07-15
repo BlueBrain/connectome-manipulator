@@ -1,4 +1,4 @@
-# Models building overview
+# Model building overview
 
 Extracting models from existing connectomes or related data.
 
