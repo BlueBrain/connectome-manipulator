@@ -31,16 +31,16 @@ setup(
     url="https://github.com/BlueBrain/connectome-manipulator.git",
     license="Apache-2",
     install_requires=[
-        "bluepysnap==3.0.1",
+        "bluepysnap>=3.0.1",
         "numpy>=1.24.3",
-        "pandas>=2.0.2",
+        "pandas>=1.5.3",
         "progressbar>=2.5",
-        "pyarrow>=14.0.1",
+        "pyarrow>=10.0.1",
         "scipy>=1.10.1",
-        "scikit-learn>=1.5.0",
+        "scikit-learn>=1.3.2",
         "voxcell>=3.1.5",
         "tables>=3.8.0",  # Optional dependency of pandas.DataFrame.to_hdf()
-        "distributed>=2023.6.0",  # Dask
+        "distributed>=2023.4.1",  # Dask
         "dask-mpi>=2022.4.0",
     ],
     packages=find_packages(),
