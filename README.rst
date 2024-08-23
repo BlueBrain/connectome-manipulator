@@ -180,6 +180,22 @@ Please note that this feature will require at least 4 MPI ranks. Dask will use 2
 
 When processing with ``parallel-manipulator``, one may pass the flag ``--target-payload`` to determine how big the individual workload for each process should be. The default value of 20e9 was determined empirically to run on the whole mouse brain with 75 million neurons. We recommend to use this value as a starting point and scale it up or down to achieve the desired runtime characteristics.
 
+❗ Notes on error handling
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Errors may occur for many different reasons and are not always easy to track. Most common errors are that an allocation gets "killed", either due to a time limit or due to an out-of-memory error. Here we provide a few hints on how to avoid or track errors that may occur:
+
+-  Use the "verbose" mode (``-v`` flag) which will produce a lot of log output.
+-  Look into the log files: there is usually one master log file and individual log files for all data splits, all of which can be found in the ``/logs`` subfolder of the output circuit folder.
+-  Use a small connectome to start with.
+-  Use a simple operation to start with, such as ``null_manipulation`` (see examples).
+-  Run serially to start with, before switching to parallel processing.
+-  Start with a single data split.
+-  But: In case of memory errors, use more than a single data splits, even when running serially (!), which will reduce the memory consumption as individual splits will be processed one after the other.
+-  When running in parallel, use ``--tasks-per-node`` in the SLURM configuration to define how many tasks (=splits) will be executed on a single node; reducing this number may reduce the risk of out-of-memory errors.
+-  In general: Increasing memory allocation and/or allocation time may help.
+-  For high performance: Allocate many nodes and use parallel processing together with a relatively large number of data splits depending on the network size (i.e., aim for a few hundered post-synaptic neurons per data split).
+
 Model building
 ~~~~~~~~~~~~~~
 
