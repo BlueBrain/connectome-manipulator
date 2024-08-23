@@ -260,11 +260,11 @@ Publications that use or mention Connectome-Manipulator
 Scientific papers that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. (2022) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.** bioRxiv 2022.08.11.503144. DOI: `10.1101/2022.08.11.503144 <https://doi.org/10.1101/2022.08.11.503144>`_
+-  Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. (2024) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.** eLife, 13:RP99688. DOI: `10.7554/eLife.99688.1 <https://doi.org/10.7554/eLife.99688.1>`_
 
--  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2023) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry.** Part II: Physiology and Experimentation. bioRxiv 2023.05.17.541168. DOI: `10.1101/2023.05.17.541168 <https://doi.org/10.1101/2023.05.17.541168>`_
+-  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2023) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part II: Physiology and Experimentation.** bioRxiv, 2023.05.17.541168. DOI: `10.1101/2023.05.17.541168 <https://doi.org/10.1101/2023.05.17.541168>`_
 
--  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Efficiency and reliability in biological neural network architectures.** bioRxiv 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
+-  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Efficiency and reliability in biological neural network architectures.** bioRxiv, 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
 
 Posters that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
