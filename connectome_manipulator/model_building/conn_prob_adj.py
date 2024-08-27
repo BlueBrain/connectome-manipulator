@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for building deterministic connection probability models based on adjacency matrices, consisting of three basic functions:
-
-- extract(...): Extracts adjacency matrix between neurons
-- build(...): Builds a deterministic connection probability model from data (returns 0.0 or 1.0 only)
-- plot(...): Visualizes model output
-"""
+"""Module for building (deterministic) connection probability models based on adjacency matrices"""
 
 import os.path
 
@@ -23,7 +18,17 @@ from connectome_manipulator.model_building import model_types
 
 
 def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
-    """Extract adjacency matrix between selected src/dest neurons."""
+    """Extracts adjacency matrix between selected src/dest neurons.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+        sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+        edges_popul_name (str): Name of SONATA egdes population to extract data from
+
+    Returns:
+        dict: Dictionary containing the extracted adjacency matrix and source/target node ids
+    """
     log.info(f"Running adjacency data extraction (sel_src={sel_src}, sel_dest={sel_dest})...")
 
     adj_dict = adjacency.compute(circuit, sel_src, sel_dest, edges_popul_name)
@@ -36,7 +41,18 @@ def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
 
 
 def build(adj_mat, src_node_ids, tgt_node_ids, inverted=False, **_):
-    """Build connection probability model from adjacency matrix."""
+    """Builds a (deterministic) connection probability model of type ``ConnProbAdjModel`` from an adjacency matrix
+    (i.e., returning probabilities 0.0 or 1.0 only).
+
+    Args:
+        adj_mat (scipy.sparse.csc_matrix): Sparse adjacency matrix with boolean entries (i.e., True...connection, False...no connection)
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        inverted (bool): Flag for interpreting the boolean matrix entries in an inverted way (i.e., True...no connection, False...connection)
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProbAdjModel: Resulting adjacency model
+    """
     log.info(f"Running {'inverted ' if inverted else ''}adjacency model building...")
 
     log.log_assert(
@@ -67,7 +83,12 @@ def build(adj_mat, src_node_ids, tgt_node_ids, inverted=False, **_):
 
 
 def plot(out_dir, model, **_):
-    """Visualize adjacency model."""
+    """Visualizes the adjacency model.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        model (connectome_manipulator.model_building.model_types.ConnProbAdjModel): Adjacency model, as returned by :func:`build`
+    """
     log.info("Running adjacency model visualization...")
 
     # Apply model, i.e., getting connection probabilities between all pairs of neurons

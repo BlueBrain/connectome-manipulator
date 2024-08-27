@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for building synaptic delay model, consisting of three basic functions:
-
-- extract(...): Extracts distance-dependent synaptic delays between samples of neurons
-- build(...): Fits a linear distance-dependent synaptic delay model of type "LinDelayModel" to the data
-- plot(...): Visualizes extracted data vs. actual model output
-"""
+"""Module for building synaptic delay models"""
 
 import os.path
 
@@ -32,7 +27,20 @@ def extract(
     edges_popul_name=None,
     **_,
 ):
-    """Extract distance-dependent synaptic delays between samples of neurons."""
+    """Extracts distance-dependent synaptic delays between samples of neurons.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        bin_size_um (float): Distance bin size in um
+        max_range_um (float): Maximum distance range in um to consider
+        sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+        sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+        sample_size (int): Size of random subsample of data to extract data from
+        edges_popul_name (str): Name of SONATA egdes population to extract data from
+
+    Returns:
+        dict: Dictionary containing the extracted data elements
+    """
     # Select edge population
     edges = get_edges_population(circuit, edges_popul_name)
 
@@ -119,7 +127,18 @@ def extract(
 
 
 def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size_um, **_):
-    """Build distance-dependent synaptic delay model (linear model for delay mean, const model for delay std)."""
+    """Fits a linear distance-dependent synaptic delay model of type ``LinDelayModel`` to the data.
+
+    Args:
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract`
+        dist_delays_mean (numpy.ndarray): Delay mean for all bins, as returned by :func:`extract`
+        dist_delays_std (numpy.ndarray): Delay std for all bins, as returned by :func:`extract`
+        dist_delay_min (float): Overall delay minimum, as returned by :func:`extract`
+        bin_size_um (float): Distance bin size in um
+
+    Returns:
+        connectome_manipulator.model_building.model_types.LinDelayModel: Fitted linear distance-dependent delay model
+    """
     log.log_assert(np.all((np.diff(dist_bins) - bin_size_um) < 1e-12), "ERROR: Bin size mismatch!")
     bin_offset = 0.5 * bin_size_um
 
@@ -151,7 +170,16 @@ def build(dist_bins, dist_delays_mean, dist_delays_std, dist_delay_min, bin_size
 def plot(
     out_dir, dist_bins, dist_delays_mean, dist_delays_std, dist_count, model, **_
 ):  # pragma: no cover
-    """Visualize data vs. model."""
+    """Visualizes extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract`
+        dist_delays_mean (numpy.ndarray): Delay mean for all bins, as returned by :func:`extract`
+        dist_delays_std (numpy.ndarray): Delay std for all bins, as returned by :func:`extract`
+        dist_count (numpy.ndarray): Number of data elemets in each bin, as returned by :func:`extract`
+        model (connectome_manipulator.model_building.model_types.LinDelayModel): Fitted linear distance-dependent delay model, as returned by :func:`build`
+    """
     bin_width = np.diff(dist_bins[:2])[0]
 
     model_params = model.get_param_dict()

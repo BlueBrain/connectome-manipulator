@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for building connection probability models of different orders, consisting of three basic functions:
-
-- extract(...): Extracts connection probability between samples of neurons
-- build(...): Fits a connection probability model to data
-- plot(...): Visualizes extracted data vs. actual model output
-"""
+"""Module for building stochastic connection probability models of various model orders"""
 
 from functools import partial
 import itertools
@@ -39,7 +34,31 @@ HOT = plt.get_cmap("hot")
 def extract(
     circuit, order, sel_src=None, sel_dest=None, sample_size=None, edges_popul_name=None, **kwargs
 ):
-    """Extract connection probability between samples of neurons."""
+    """Extracts the connection probabilities between samples of neurons.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        order (str): Model order, such as "1" (constant), "2" (distance-dependent), "3" (bipolar distance-dependent), "4" (offset-dependent), "4R" (reduced offset-dependent), "5" (position-dependent), "5R" (reduced position dependent)
+        sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+        sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+        sample_size (int): Size of random subsample of data to extract data from
+        edges_popul_name (str): Name of SONATA egdes population to extract data from
+        **kwargs: Additional keyword arguments depending on the model order; see Notes
+
+    Returns:
+        dict: Dictionary containing the extracted connection probability data depending on the model order
+
+    Note:
+        For (optional) keyword arguments, see details in the respective helper functions:
+
+        * Order 1: :func:`extract_1st_order`
+        * Order 2: :func:`extract_2nd_order`
+        * Order 3: :func:`extract_3rd_order`
+        * Order 4: :func:`extract_4th_order`
+        * Order 4R: :func:`extract_4th_order_reduced`
+        * Order 5: :func:`extract_5th_order`
+        * Order 5R: :func:`extract_5th_order_reduced`
+    """
     log.info(
         f"Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)..."
     )
@@ -109,7 +128,27 @@ def extract(
 
 
 def build(order, **kwargs):
-    """Build connection probability model from data."""
+    """Builds a stochastic connection probability model from (binned) data.
+
+    Args:
+        order (str): Model order, such as "1" (constant), "2" (distance-dependent), "3" (bipolar distance-dependent), "4" (offset-dependent), "4R" (reduced offset-dependent), "5" (position-dependent), "5R" (reduced position dependent)
+        **kwargs: Additional keyword arguments depending on the model order; see Notes
+
+    Returns:
+        Type depends on the model order; see Notes: Fitted stochastic connection probability model
+
+    Note:
+        For (optional) keyword arguments and return types, see details in the respective helper functions:
+
+        * Order 1: :func:`build_1st_order`
+        * Order 2: :func:`build_2nd_order`
+        * Order 3: :func:`build_3rd_order`
+        * Order 4: :func:`build_4th_order`
+        * Order 4R: :func:`build_4th_order_reduced`
+        * Order 5: :func:`build_5th_order`
+        * Order 5R: :func:`build_5th_order_reduced`
+
+    """
     log.info(f"Running order-{order} model building...")
 
     if not isinstance(order, str):
@@ -135,7 +174,24 @@ def build(order, **kwargs):
 
 
 def plot(order, **kwargs):
-    """Visualize data vs. model."""
+    """Visualizes extracted data vs. actual model output.
+
+    Args:
+        order (str): Model order, such as "1" (constant), "2" (distance-dependent), "3" (bipolar distance-dependent), "4" (offset-dependent), "4R" (reduced offset-dependent), "5" (position-dependent), "5R" (reduced position dependent)
+        **kwargs: Additional keyword arguments depending on the model order; see Notes
+
+    Note:
+        For (optional) keyword arguments, see details in the respective helper functions:
+
+        * Order 1: :func:`plot_1st_order`
+        * Order 2: :func:`plot_2nd_order`
+        * Order 3: :func:`plot_3rd_order`
+        * Order 4: :func:`plot_4th_order`
+        * Order 4R: :func:`plot_4th_order_reduced`
+        * Order 5: :func:`plot_5th_order`
+        * Order 5R: :func:`plot_5th_order_reduced`
+    """
+    
     log.info(f"Running order-{order} data/model visualization...")
 
     if not isinstance(order, str):
@@ -410,7 +466,18 @@ def get_value_ranges(max_range, num_coords, pos_range=False):
 
 
 def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, min_count_per_bin=10, **_):
-    """Extract average connection probability (1st order) from a sample of pairs of neurons."""
+    """Extracts the average connection probability (1st order) from a sample of pairs of neurons.
+
+    Args:
+        _nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes - Not used
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        min_count_per_bin (int): Minimum number of samples; otherwise, no estimate will be made
+
+    Returns:
+        dict: Dictionary containing the extracted 1st-order connection probability data
+    """
     p_conn, conn_count, _ = extract_dependent_p_conn(
         src_node_ids, tgt_node_ids, edges, [], [], min_count_per_bin
     )
@@ -425,7 +492,14 @@ def extract_1st_order(_nodes, edges, src_node_ids, tgt_node_ids, min_count_per_b
 
 
 def build_1st_order(p_conn, **_):
-    """Build 1st order model (Erdos-Renyi, capturing average conn. prob.)."""
+    """Builds a stochastic 1st order connection probability model (Erdos-Renyi).
+
+    Args:
+        p_conn (float): Constant connection probability, as returned by :func:`extract_1st_order`
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb1stOrderModel: Resulting stochastic 1st order connectivity model
+    """
     # Create model
     model = model_types.ConnProb1stOrderModel(p_conn=float(p_conn))
     log.debug("Model description:\n%s", model)
@@ -434,7 +508,16 @@ def build_1st_order(p_conn, **_):
 
 
 def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):  # pragma: no cover
-    """Visualize data vs. model (1st order)."""
+    """Visualizes 1st order extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn (float): Constant connection probability, as returned by :func:`extract_1st_order`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_1st_order`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_1st_order`
+        model (connectome_manipulator.model_building.model_types.ConnProb1stOrderModel): Fitted stochastic 1st order connectivity model, as returned by :func:`build_1st_order`
+    """
+    
     model_params = model.get_param_dict()
     model_str = f'f(x) = {model_params["p_conn"]:.3f}'
 
@@ -483,7 +566,21 @@ def extract_2nd_order(
     min_count_per_bin=10,
     **_,
 ):
-    """Extract distance-dependent connection probability (2nd order) from a sample of pairs of neurons."""
+    """Extracts the binned, distance-dependent connection probabilities (2nd order) from a sample of pairs of neurons.
+
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        bin_size_um (float): Distance bin size in um
+        max_range_um (float): Maximum distance range in um
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+
+    Returns:
+        dict: Dictionary containing the extracted 2nd-order connection probability data
+    """
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
@@ -520,7 +617,26 @@ def extract_2nd_order(
 def build_2nd_order(
     p_conn_dist, dist_bins, count_all, model_specs=None, rel_fit_err_th=None, strict_fit=False, **_
 ):
-    """Build 2nd order model (exponential distance-dependent conn. prob.)."""
+    """Builds a stochastic 2nd order connection probability model (exponential distance-dependent).
+
+    Args:
+        p_conn_dist (numpy.ndarray): Binned connection probabilities, as retuned by :func:`extract_2nd_order`
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract_2nd_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_2nd_order`
+        model_specs (dict): Model specifications; see Notes
+        rel_fit_err_th (float): Threshold for rel. standard error of the coefficients; exceeding the threshold will return an invalid model
+        strict_fit (bool): Flag to enforce strict model fitting, which means that first data bin must contain valid data (otherwise, there is a risk of a bad extrapolation at low distances)
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb2ndOrder[Complex]ExpModel: Resulting stochastic 2nd order connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; either "SimpleExponential" (2 parameters) or "ComplexExponential" (5 parameters)
+        * p0 (list-like): Initial guess for parameter fit, as used in :func:`scipy.optimize.curve_fit`
+        * bounds (list-like): Lower and upper bounds on parameters, as used in :func:`scipy.optimize.curve_fit`
+    """
     if model_specs is None:
         model_specs = {"type": "SimpleExponential"}
 
@@ -670,7 +786,19 @@ def plot_2nd_order(
     pos_map_file=None,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (2nd order)."""
+    """Visualizes 2nd order extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_dist (numpy.ndarray): Binned connection probabilities, as retuned by :func:`extract_2nd_order`
+        count_conn (numpy.ndarray): Count of all connected pairs of neurons (i.e., all actual connections) in each bin, as retuned by :func:`extract_2nd_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_2nd_order`
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract_2nd_order`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_2nd_order`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_2nd_order`
+        model (connectome_manipulator.model_building.model_types.ConnProb2ndOrder[Complex]ExpModel): Fitted stochastic 2nd order connectivity model, as returned by :func:`extract_2nd_order`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+    """
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
@@ -766,7 +894,23 @@ def extract_3rd_order(
     bip_coord=2,
     **_,
 ):
-    """Extract distance-dependent connection probability (3rd order) from a sample of pairs of neurons."""
+    """Extracts the binned, bipolar distance-dependent connection probability (3rd order) from a sample of pairs of neurons.
+
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        bin_size_um (float): Distance bin size in um
+        max_range_um (float): Maximum distance range in um
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        no_dist_mapping (bool): Flag to disable position mapping for computing distances, i.e., position mapping will only be used to determine the bipolar coordinate if selected
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+        bip_coord (int): Index to select bipolar coordinate axis (0..x, 1..y, 2..z), usually perpendicular to layers
+
+    Returns:
+        dict: Dictionary containing the extracted 3rd-order connection probability data
+    """
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos_raw, tgt_nrn_pos_raw = get_neuron_positions(
@@ -833,7 +977,27 @@ def build_3rd_order(
     strict_fit=False,
     **_,
 ):
-    """Build 3rd order model (bipolar exp. distance-dependent conn. prob.)."""
+    """Builds a stochastic 3rd order connection probability model (bipolar exponential distance-dependent).
+
+    Args:
+        p_conn_dist_bip (numpy.ndarray): Binned bipolar connection probabilities, as retuned by :func:`extract_3rd_order`
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract_3rd_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_3rd_order`
+        bip_coord_data (int): Index of bipolar coordinate axis, as returned by :func:`extract_3rd_order`
+        model_specs (dict): Model specifications; see Notes
+        rel_fit_err_th (float): Threshold for rel. standard error of the coefficients; exceeding the threshold will return an invalid model
+        strict_fit (bool): Flag to enforce strict model fitting, which means that first data bin must contain valid data (otherwise, there is a risk of a bad extrapolation at low distances)
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb3rdOrder[Complex]ExpModel: Resulting stochastic 3rd order connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; either "SimpleExponential" (2 parameters) or "ComplexExponential" (5 parameters)
+        * p0 (list-like): Initial guess for parameter fit, as used in :func:`scipy.optimize.curve_fit`
+        * bounds (list-like): Lower and upper bounds on parameters, as used in :func:`scipy.optimize.curve_fit`
+    """
     if model_specs is None:
         model_specs = {"type": "SimpleExponential"}
 
@@ -1005,7 +1169,20 @@ def plot_3rd_order(
     pos_map_file=None,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (3rd order)."""
+    """Visualizes 3rd order extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_dist_bip (numpy.ndarray): Binned bipolar connection probabilities, as retuned by :func:`extract_3rd_order`
+        count_conn (numpy.ndarray): Count of all connected pairs of neurons (i.e., all actual connections) in each bin, as retuned by :func:`extract_3rd_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_3rd_order`
+        dist_bins (numpy.ndarray): Distance bin edges, as returned by :func:`extract_3rd_order`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_3rd_order`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_3rd_order`
+        model (connectome_manipulator.model_building.model_types.ConnProb3rdOrder[Complex]ExpModel): Fitted stochastic 3rd order connectivity model, as returned by :func:`extract_3rd_order`
+        bip_coord_data (int): Index of bipolar coordinate axis, as returned by :func:`extract_3rd_order`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+    """
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
 
@@ -1123,7 +1300,21 @@ def extract_4th_order(
     min_count_per_bin=10,
     **_,
 ):
-    """Extract offset-dependent connection probability (4th order) from a sample of pairs of neurons."""
+    """Extracts the binned, offset-dependent connection probability (4th order) from a sample of pairs of neurons.
+    
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
+        max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+
+    Returns:
+        dict: Dictionary containing the extracted 4th-order connection probability data
+    """
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
@@ -1196,7 +1387,25 @@ def build_4th_order(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build 4th order model (linear interpolation model for offset-dependent conn. prob.)."""
+    """Builds a stochastic 4th order connection probability model (offset-dependent, based on linear interpolation).
+
+    Args:
+        p_conn_offset (numpy.ndarray): Binned offset-dependent connection probabilities, as retuned by :func:`extract_4th_order`
+        dx_bins (numpy.ndarray): Offset bin edges along x-axis, as returned by :func:`extract_4th_order`
+        dy_bins (numpy.ndarray): Offset bin edges along y-axis, as returned by :func:`extract_4th_order`
+        dz_bins (numpy.ndarray): Offset bin edges along z-axis, as returned by :func:`extract_4th_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_4th_order`
+        model_specs (dict): Model specifications; see Notes
+        smoothing_sigma_um (float/list-like): Sigma in um for Gaussian smoothing; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnModel: Resulting stochastic 4th order connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; only "LinearInterpolation" supported which does not require any additional specs
+    """
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1277,7 +1486,21 @@ def plot_4th_order(
     plot_model_extsn=0,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (4th order)."""
+    """Visualizes 4th order extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_offset (numpy.ndarray): Binned offset-dependent connection probabilities, as retuned by :func:`extract_4th_order`
+        dx_bins (numpy.ndarray): Offset bin edges along x-axis, as returned by :func:`extract_4th_order`
+        dy_bins (numpy.ndarray): Offset bin edges along y-axis, as returned by :func:`extract_4th_order`
+        dz_bins (numpy.ndarray): Offset bin edges along z-axis, as returned by :func:`extract_4th_order`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_4th_order`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_4th_order`
+        model (connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnModel): Fitted stochastic 4th order connectivity model, as returned by :func:`extract_4th_order`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
+        plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
+    """
     dx_bin_offset = 0.5 * np.diff(dx_bins[:2])[0]
     dy_bin_offset = 0.5 * np.diff(dy_bins[:2])[0]
     dz_bin_offset = 0.5 * np.diff(dz_bins[:2])[0]
@@ -1513,7 +1736,22 @@ def extract_4th_order_reduced(
     axial_coord=2,
     **_,
 ):
-    """Extract offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons."""
+    """Extracts the binned, offset-dependent connection probability (reduced 4th order) from a sample of pairs of neurons.
+
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for radial/axial dimension) or list-like with two individual values for radial/axial dimensions
+        max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with two elements for radial/axial dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges; in any case, the lower radial offset range must always be zero
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+        axial_coord (int): Index to select axial coordinate (0..x, 1..y, 2..z), usually perpendicular to layers
+
+    Returns:
+        dict: Dictionary containing the extracted 4th-order (reduced) connection probability data
+    """
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
@@ -1574,7 +1812,25 @@ def build_4th_order_reduced(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build reduced 4th order model (linear interpolation model for offset-dependent conn. prob.)."""
+    """Builds a stochastic 4th order reduced connection probability model (offset-dependent, based on linear interpolation).
+
+    Args:
+        p_conn_offset (numpy.ndarray): Binned offset-dependent connection probabilities, as retuned by :func:`extract_4th_order_reduced`
+        dr_bins (numpy.ndarray): Offset bin edges along radial axis, as returned by :func:`extract_4th_order_reduced`
+        dz_bins (numpy.ndarray): Offset bin edges along axial axis, as returned by :func:`extract_4th_order_reduced`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_4th_order_reduced`
+        axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_4th_order_reduced`
+        model_specs (dict): Model specifications; see Notes
+        smoothing_sigma_um (float/list-like): Sigma in um for Gaussian smoothing; can be scalar (same value for radial/axial dimension) or list-like with two individual values for radial/axial dimensions
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnReducedModel: Resulting stochastic 4th order reduced connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; only "LinearInterpolation" supported which does not require any additional specs
+    """
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1659,7 +1915,21 @@ def plot_4th_order_reduced(
     plot_model_extsn=0,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (4th order reduced)."""
+    """Visualizes 4th order reduced extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_offset (numpy.ndarray): Binned offset-dependent connection probabilities, as retuned by :func:`extract_4th_order_reduced`
+        dr_bins (numpy.ndarray): Offset bin edges along radial axis, as returned by :func:`extract_4th_order_reduced`
+        dz_bins (numpy.ndarray): Offset bin edges along axial axis, as returned by :func:`extract_4th_order_reduced`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_4th_order_reduced`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_4th_order_reduced`
+        model (connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnReducedModel): Fitted stochastic 4th order reduced connectivity model, as returned by :func:`extract_4th_order_reduced`
+        axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_4th_order_reduced`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
+        plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
+    """
     # Oversampled bins for model plotting, incl. plot extension (#bins of original size) in each direction
     log.log_assert(
         isinstance(plot_model_ovsampl, int) and plot_model_ovsampl >= 1,
@@ -1763,7 +2033,23 @@ def extract_5th_order(
     min_count_per_bin=10,
     **_,
 ):
-    """Extract position-dependent connection probability (5th order) from a sample of pairs of neurons."""
+    """Extracts the binned, position-dependent connection probability (5th order) from a sample of pairs of neurons.
+
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        position_bin_size_um (float/list-like): Position bin size in um; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
+        position_max_range_um (float/list-like): Maximum position range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
+        offset_bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
+        offset_max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+
+    Returns:
+        dict: Dictionary containing the extracted 5th-order connection probability data
+    """
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
     src_nrn_pos, tgt_nrn_pos = get_neuron_positions(
@@ -1876,7 +2162,28 @@ def build_5th_order(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build 5th order model (linear interpolation model for position-dependent conn. prob.)."""
+    """Builds a stochastic 5th order connection probability model (position-dependent, based on linear interpolation).
+
+    Args:
+        p_conn_position (numpy.ndarray): Binned position- and offset-dependent connection probabilities, as retuned by :func:`extract_5th_order`
+        x_bins (numpy.ndarray): Position bin edges along x-axis, as returned by :func:`extract_5th_order`
+        y_bins (numpy.ndarray): Position bin edges along y-axis, as returned by :func:`extract_5th_order`
+        z_bins (numpy.ndarray): Position bin edges along z-axis, as returned by :func:`extract_5th_order`
+        dx_bins (numpy.ndarray): Offset bin edges along x-axis, as returned by :func:`extract_5th_order`
+        dy_bins (numpy.ndarray): Offset bin edges along y-axis, as returned by :func:`extract_5th_order`
+        dz_bins (numpy.ndarray): Offset bin edges along z-axis, as returned by :func:`extract_5th_order`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_5th_order`
+        model_specs (dict): Model specifications; see Notes
+        smoothing_sigma_um (float/list-like): Sigma in um for Gaussian smoothing; can be scalar (same value for x/y/z/dx/dy/dz dimension) or list-like with six individual values for x/y/z/dx/dy/dz dimensions
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnModel: Resulting stochastic 5th order connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; only "LinearInterpolation" supported which does not require any additional specs
+    """
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -1986,7 +2293,24 @@ def plot_5th_order(
     plot_model_extsn=0,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (5th order)."""
+    """Visualizes 5th order extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_position (numpy.ndarray): Binned position- and offset-dependent connection probabilities, as retuned by :func:`extract_5th_order`
+        x_bins (numpy.ndarray): Position bin edges along x-axis, as returned by :func:`extract_5th_order`
+        y_bins (numpy.ndarray): Position bin edges along y-axis, as returned by :func:`extract_5th_order`
+        z_bins (numpy.ndarray): Position bin edges along z-axis, as returned by :func:`extract_5th_order`
+        dx_bins (numpy.ndarray): Offset bin edges along x-axis, as returned by :func:`extract_5th_order`
+        dy_bins (numpy.ndarray): Offset bin edges along y-axis, as returned by :func:`extract_5th_order`
+        dz_bins (numpy.ndarray): Offset bin edges along z-axis, as returned by :func:`extract_5th_order`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_5th_order`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_5th_order`
+        model (connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnModel): Fitted stochastic 5th order connectivity model, as returned by :func:`extract_5th_order`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
+        plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
+    """
     x_bin_offset = 0.5 * np.diff(x_bins[:2])[0]
     y_bin_offset = 0.5 * np.diff(y_bins[:2])[0]
     z_bin_offset = 0.5 * np.diff(z_bins[:2])[0]
@@ -2296,13 +2620,28 @@ def extract_5th_order_reduced(
     offset_bin_size_um=100,
     offset_max_range_um=None,
     pos_map_file=None,
-    plot_model_ovsampl=3,
-    plot_model_extsn=0,
     min_count_per_bin=10,
     axial_coord=2,
     **_,
 ):
-    """Extract position-dependent connection probability (5th order reduced) from a sample of pairs of neurons."""
+    """Extracts the binned, position-dependent connection probability (5th order reduced) from a sample of pairs of neurons.
+
+    Args:
+        nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
+        edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from
+        src_node_ids (list-like): List of source (pre-synaptic) neuron IDs
+        tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
+        position_bin_size_um (float): Axial position bin size in um
+        position_max_range_um (float/list-like): Maximum axial position range in um; can be scalar (same +/- value) or list-like with two elements for individual +/- ranges
+        offset_bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for radial/axial dimension) or list-like with two individual values for radial/axial dimensions
+        offset_max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with two elements for radial/axial dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges; in any case, the lower radial offset range must always be zero
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
+        axial_coord (int): Index to select axial coordinate (0..x, 1..y, 2..z), usually perpendicular to layers
+
+    Returns:
+        dict: Dictionary containing the extracted 5th-order (reduced) connection probability data
+    """
     # pylint: disable=W0613
     # Get source/target neuron positions (optionally: two types of mappings)
     pos_acc, vox_map = get_pos_mapping_fcts(pos_map_file)
@@ -2396,7 +2735,26 @@ def build_5th_order_reduced(
     smoothing_sigma_um=None,
     **_,
 ):
-    """Build reduced 5th order model (linear interpolation model for position-dependent conn. prob.)."""
+    """Builds a stochastic 5th order reduced connection probability model (position-dependent, based on linear interpolation).
+
+    Args:
+        p_conn_position (numpy.ndarray): Binned position- and offset-dependent connection probabilities, as retuned by :func:`extract_5th_order_reduced`
+        z_bins (numpy.ndarray): Position bin edges along axial axis, as returned by :func:`extract_5th_order_reduced`
+        dr_bins (numpy.ndarray): Offset bin edges along radial axis, as returned by :func:`extract_5th_order_reduced`
+        dz_bins (numpy.ndarray): Offset bin edges along axial axis, as returned by :func:`extract_5th_order_reduced`
+        count_all (numpy.ndarray): Count of all pairs of neurons (i.e., all possible connections) in each bin, as retuned by :func:`extract_5th_order_reduced`
+        axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_5th_order_reduced`
+        model_specs (dict): Model specifications; see Notes
+        smoothing_sigma_um (float/list-like): Sigma in um for Gaussian smoothing; can be scalar (same value for z/dr/dz dimension) or list-like with three individual values for z/dr/dz dimensions
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnReducedModel: Resulting stochastic 5th order reduced connectivity model
+
+    Note:
+        Info on possible keys contained in `model_specs` dict:
+
+        * type (str): Type of the fitted model; only "LinearInterpolation" supported which does not require any additional specs
+    """
     if model_specs is None:
         model_specs = {"type": "LinearInterpolation"}
 
@@ -2487,7 +2845,22 @@ def plot_5th_order_reduced(
     plot_model_extsn=0,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model (5th order reduced)."""
+    """Visualizes 5th order reduced extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        p_conn_position (numpy.ndarray): Binned position- and offset-dependent connection probabilities, as retuned by :func:`extract_5th_order_reduced`
+        z_bins (numpy.ndarray): Position bin edges along axial axis, as returned by :func:`extract_5th_order_reduced`
+        dr_bins (numpy.ndarray): Offset bin edges along radial axis, as returned by :func:`extract_5th_order_reduced`
+        dz_bins (numpy.ndarray): Offset bin edges along axial axis, as returned by :func:`extract_5th_order_reduced`
+        src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_5th_order_reduced`
+        tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_5th_order_reduced`
+        model (connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnReducedModel): Fitted stochastic 5th order reduced connectivity model, as returned by :func:`extract_5th_order_reduced`
+        axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_5th_order_reduced`
+        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
+        plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
+    """
     z_bin_offset = 0.5 * np.diff(z_bins[:2])[0]
     z_pos_model = z_bins[:-1] + z_bin_offset  # Positions at bin centers
 

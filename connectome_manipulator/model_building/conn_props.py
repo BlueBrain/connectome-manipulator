@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for building connection/synapse properties model, consisting of three basic functions:
+"""Module for building connection/synapse properties models"""
 
-- extract(...): Extracts statistics for connection/synaptic properties between samples of neurons for each pair of m-types
-- build(...): Fit model distribution to data, incl. missing values interpolated at different levels of granularity
-- plot(...): Visualizes extracted data vs. actual model output
-"""
+#- extract(...): 
+#- build(...): 
+#- plot(...): Visualizes extracted data vs. actual model output
+
 
 import os.path
 
@@ -40,10 +40,39 @@ def extract(
     edges_popul_name=None,
     **_,
 ):
-    """Extract statistics for synaptic properties between samples of neurons for each pair of m-types.
+    """Extracts statistics (like mean, std, min, max, histogram, ...) for synapse properties of samples of connections between each pair of m-types.
 
-    (sel_props: None to select default properties; if no properties are selected (empty list),
-                only #synapses/connection will be estimated)
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        min_sample_size_per_group (int): Minimum number of samples (connections) required based on which to estimate statistics for a given pair of m-types; otherwise, no statistics will be estimated
+        max_sample_size_per_group (int): Maximum number of samples (connections) based on which to estimate statistics for a given pair of m-types; if more samples are available, a random subset is used
+        hist_bins (int): Number of bins for extracting histograms
+        sel_props (list-like): List of synaptic property names to extract statistics from; None to select default properties
+        sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+        sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+        edges_popul_name (str): Name of SONATA egdes population to extract data from
+
+    Returns:
+        dict: Dictionary containing the extracted data elements
+
+    Note:
+        The followind statistics will be extracted:
+
+        * mean (float): Data mean
+        * std (float): Standard deviation
+        * min (float): Minimum value
+        * max (float): Maximum value
+        * hist (tuple): Histogram with `hist_bins` bins; stored as (counts, edges) tuple as returned by :func:`numpy.histogram`
+        * norm_loc (float): Location estimate for truncnorm distributions
+        * norm_scale (float): Scale estimate for truncnorm distributions
+        * val (list-like): List of unique values for discrete distributions
+        * cnt (list-like): List of unique value counts for discrete distributions
+        * p (list-like): List of unique value probabilities for discrete distributions
+        * shared_within (bool): Flag indicating that all synapses within a connection share the same value for a given property; not applicable for #synapses/connection
+
+        Discrete statistics (i.e., val/cnt/p) are only stored if there are not too many (less or equal MAX_UNIQUE_COUNT=100).
+
+        Statistics for #synapses/connection will always be extracted, even if no properties are selected under `sel_props` (i.e., empty list).
     """
     # Select edge population
     edges = get_edges_population(circuit, edges_popul_name)
@@ -269,7 +298,37 @@ def build(
     shared_within={},
     **_,
 ):
-    """Build model from data (lookup table with missing values interpolated at different levels of granularity)."""
+    """Fit model distribution to data, incl. missing values interpolated at different levels of granularity.
+
+    Args:
+        syns_per_conn_data (dict): Dictionary with entries for all statistics (see Notes under :func:`extract`) estimated for #synapses/connection, each of which contains a numpy.ndarray of size <#source-mtypes x #target-mtypes> for all pairs of m-types, as returned by :func:`extract`
+        conn_prop_data (dict): Dictionary with entries for all statistics (see Notes under :func:`extract`) estimated for all synaptic properties, each of which contains a numpy.ndarray of size <#source-mtypes x #target-mtypes x #properties> for all pairs of m-types and synapse properties, as returned by :func:`extract`
+        m_types (list): Two-element list of lists of source (pre-synaptic) and target (post-synaptic) m-types, as returned by :func:`extract`
+        m_type_class (list): Two-element list of lists of synapse classes (i.e., EXC, INH) belonging to each source and target m-type (assuming that each m-type corresponds to exactly one synapse class), as returned by :func:`extract`
+        m_type_layer (list): Two-element list of lists of layers belonging to each source and target m-type (assuming that each m-type corresponds to exactly one cortical layer), as returned by :func:`extract`
+        syn_props (list-like): List of synaptic property names stored in `conn_prop_data`, as returned by :func:`extract`
+        distr_types (dict): Optional dictionary specifying the distribution type (dict value) for each property (dict key); if omitted, a "normal" distribution is assumed (and will raise a warning)
+        data_types (dict): Optional dictionary specifying the output data type (dict value; e.g., "int", "float", ...) for each property (dict key) when drawing values from the fitted model
+        data_bounds (dict): Optional dictionary specifying the output data bounds (dict value; list-like with two elements for lower/upper bounds) for each property (dict key) when drawing values from the fitted model
+        shared_within (dict): Optional dictionary specifying if the same values are shared among synapses belonging to the same connections (boolean dict value) for each property (dict key) when drawing values from the fitted model; can be used to manually overwrite the data-derived value
+
+    Returns:
+        connectome_manipulator.model_building.model_types.ConnPropsModel: Fitted connection/synapse properties model
+
+    Note:
+        The property name "n_syn_per_conn" (defined by model_types.N_SYN_PER_CONN_NAME) can be used to specify distribution types, data types, etc. for the #synapses/connection property.
+
+        The following distribution types are supported:
+
+        * "constant": Constant value
+        * "normal": Gaussian normal distribution
+        * "truncnorm": Truncated normal distribution
+        * "gamma": Gamma distribution
+        * "poisson": Poisson distribution
+        * "ztpoisson": Zero-truncated poisson distribution
+        * "discrete": Discrete distribution
+        * "zero": Empty distribution always returning zero; can be used to model unused parameters
+    """
     # Interpolate missing values in lookup tables
     syns_per_conn_model = {k: v.copy() for (k, v) in syns_per_conn_data.items()}
     conn_prop_model = {k: v.copy() for (k, v) in conn_prop_data.items()}
@@ -470,7 +529,17 @@ def plot(
     plot_sample_size=1000,
     **_,
 ):  # pragma: no cover
-    """Visualize data vs. model."""
+    """Visualizes extracted data vs. actual model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        syns_per_conn_data (dict): Dictionary with entries for all statistics (see Notes under :func:`extract`) estimated for #synapses/connection, each of which contains a numpy.ndarray of size <#source-mtypes x #target-mtypes> for all pairs of m-types, as returned by :func:`extract`
+        conn_prop_data (dict): Dictionary with entries for all statistics (see Notes under :func:`extract`) estimated for all synaptic properties, each of which contains a numpy.ndarray of size <#source-mtypes x #target-mtypes x #properties> for all pairs of m-types and synapse properties, as returned by :func:`extract`
+        m_types (list): Two-element list of lists of source (pre-synaptic) and target (post-synaptic) m-types, as returned by :func:`extract`
+        syn_props (list-like): List of synaptic property names stored in `conn_prop_data`, as returned by :func:`extract`
+        model (connectome_manipulator.model_building.model_types.ConnPropsModel): Fitted connection/synapse properties model, as returned by :func:`build`
+        plot_sample_size (int): Number of samples to draw when plotting model distributions
+    """
     model_params = model.get_param_dict()
     prop_names = model.get_prop_names()
 
