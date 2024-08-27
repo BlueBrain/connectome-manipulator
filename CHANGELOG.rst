@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Version 1.0.2
+-------------
+
+- Improved readme and documentation
+
+
 Version 1.0.1
 -------------
 
