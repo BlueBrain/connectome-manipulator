@@ -170,11 +170,11 @@ def plot(
 
     Args:
         res_dict (dict): Results dictionary, containing selected data for plotting; must contain a "data" item with a connectivity matrix of type numpy.ndarray of size  <#source-group-values x #target-group-values>, as well as "name" and "unit" items containing strings.
-        common_dict (dict): Common dictionary, containing additional information; must contain "src_group_values" and "tgt_group_values" items containing lists of source/target values of the grouped property, matching the size of the connectivity matrix in `res_dict`
+        common_dict (dict): Common dictionary, containing additional information; must contain "src_group_values" and "tgt_group_values" items containing lists of source/target values of the grouped property, matching the size of the connectivity matrix in ``res_dict``
         fig_title (str): Optional figure title
         vmin (float): Minimum plot range
         vmax (float): Maximum plot range
-        isdiff (bool): Flag indicating that `res_dict` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
+        isdiff (bool): Flag indicating that ``res_dict`` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
         group_by (str): Neuron property name based on which to group connections, e.g., "synapse_class", "layer", or "mtype"; if omitted, the overall average is computed
     """
     if isdiff:  # Difference plot

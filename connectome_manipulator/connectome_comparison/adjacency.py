@@ -109,7 +109,7 @@ def plot(
         fig_title (str): Optional figure title
         vmin (float): Minimum plot range
         vmax (float): Maximum plot range
-        isdiff (bool): Flag indicating that `res_dict` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
+        isdiff (bool): Flag indicating that ``res_dict`` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
     """
     if isdiff:  # Difference plot
         assert -1 * vmin == vmax, "ERROR: Symmetric plot range required!"

@@ -38,7 +38,7 @@ def compute(
         group_by (str): Neuron property name based on which to group connections, e.g., "synapse_class", "layer", or "mtype"; if omitted, the overall average is computed
         sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
         sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
-        per_conn (bool): If selected, `fct` is applied to the average property value per connection (i.e., average value of all synapses belonging to a connection); otherwise, `fct` is applied to the synapses of all connections altogether
+        per_conn (bool): If selected, ``fct`` is applied to the average property value per connection (i.e., average value of all synapses belonging to a connection); otherwise, ``fct`` is applied to the synapses of all connections altogether
         skip_empty_groups (bool): If selected, only group property values that exist within the given source/target selection are kept; otherwise, all group property values, even if not present in the given source/target selection, will be included
         edges_popul_name (str): Name of SONATA egdes population to extract data from
 
@@ -154,11 +154,11 @@ def plot(
 
     Args:
         res_dict (dict): Results dictionary, containing selected data for plotting; must contain a "data" item with a properties matrix of type numpy.ndarray of size  <#source-group-values x #target-group-values>, as well as "name" and "unit" items containing strings.
-        common_dict (dict): Common dictionary, containing additional information; must contain "src_group_values" and "tgt_group_values" items containing lists of source/target values of the grouped property, matching the size of the properties matrix in `res_dict`
+        common_dict (dict): Common dictionary, containing additional information; must contain "src_group_values" and "tgt_group_values" items containing lists of source/target values of the grouped property, matching the size of the properties matrix in ``res_dict``
         fig_title (str): Optional figure title
         vmin (float): Minimum plot range
         vmax (float): Maximum plot range
-        isdiff (bool): Flag indicating that `res_dict` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
+        isdiff (bool): Flag indicating that ``res_dict`` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
         group_by (str): Neuron property name based on which to group connections, e.g., "synapse_class", "layer", or "mtype"; if omitted, the overall average is computed
     """
     if isdiff:  # Difference plot
