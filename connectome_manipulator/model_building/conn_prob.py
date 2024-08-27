@@ -147,7 +147,6 @@ def build(order, **kwargs):
         * Order 4R: :func:`build_4th_order_reduced`
         * Order 5: :func:`build_5th_order`
         * Order 5R: :func:`build_5th_order_reduced`
-
     """
     log.info(f"Running order-{order} model building...")
 
@@ -191,7 +190,6 @@ def plot(order, **kwargs):
         * Order 5: :func:`plot_5th_order`
         * Order 5R: :func:`plot_5th_order_reduced`
     """
-    
     log.info(f"Running order-{order} data/model visualization...")
 
     if not isinstance(order, str):
@@ -517,7 +515,6 @@ def plot_1st_order(out_dir, p_conn, src_cell_count, tgt_cell_count, model, **_):
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_1st_order`
         model (connectome_manipulator.model_building.model_types.ConnProb1stOrderModel): Fitted stochastic 1st order connectivity model, as returned by :func:`build_1st_order`
     """
-    
     model_params = model.get_param_dict()
     model_str = f'f(x) = {model_params["p_conn"]:.3f}'
 
@@ -1301,7 +1298,7 @@ def extract_4th_order(
     **_,
 ):
     """Extracts the binned, offset-dependent connection probability (4th order) from a sample of pairs of neurons.
-    
+
     Args:
         nodes (list): Two-element list containing source and target neuron populations of type bluepysnap.nodes.Nodes
         edges (bluepysnap.edges.Edges): SONATA egdes population to extract connection probabilities from

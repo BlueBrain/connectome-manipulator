@@ -5,11 +5,6 @@
 
 """Module for building connection/synapse properties models"""
 
-#- extract(...): 
-#- build(...): 
-#- plot(...): Visualizes extracted data vs. actual model output
-
-
 import os.path
 
 import matplotlib.pyplot as plt
