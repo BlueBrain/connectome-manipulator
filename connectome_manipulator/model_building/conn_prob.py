@@ -572,7 +572,7 @@ def extract_2nd_order(
         tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
         bin_size_um (float): Distance bin size in um
         max_range_um (float): Maximum distance range in um
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
 
     Returns:
@@ -794,7 +794,7 @@ def plot_2nd_order(
         src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_2nd_order`
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_2nd_order`
         model (connectome_manipulator.model_building.model_types.ConnProb2ndOrder[Complex]ExpModel): Fitted stochastic 2nd order connectivity model, as returned by :func:`extract_2nd_order`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
     """
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -900,7 +900,7 @@ def extract_3rd_order(
         tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
         bin_size_um (float): Distance bin size in um
         max_range_um (float): Maximum distance range in um
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         no_dist_mapping (bool): Flag to disable position mapping for computing distances, i.e., position mapping will only be used to determine the bipolar coordinate if selected
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
         bip_coord (int): Index to select bipolar coordinate axis (0..x, 1..y, 2..z), usually perpendicular to layers
@@ -1178,7 +1178,7 @@ def plot_3rd_order(
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_3rd_order`
         model (connectome_manipulator.model_building.model_types.ConnProb3rdOrder[Complex]ExpModel): Fitted stochastic 3rd order connectivity model, as returned by :func:`extract_3rd_order`
         bip_coord_data (int): Index of bipolar coordinate axis, as returned by :func:`extract_3rd_order`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
     """
     bin_offset = 0.5 * np.diff(dist_bins[:2])[0]
     dist_model = np.linspace(dist_bins[0], dist_bins[-1], 100)
@@ -1306,7 +1306,7 @@ def extract_4th_order(
         tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
         bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
         max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
 
     Returns:
@@ -1494,7 +1494,7 @@ def plot_4th_order(
         src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_4th_order`
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_4th_order`
         model (connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnModel): Fitted stochastic 4th order connectivity model, as returned by :func:`extract_4th_order`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
         plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
     """
@@ -1742,7 +1742,7 @@ def extract_4th_order_reduced(
         tgt_node_ids (list-like): List of target (post-synaptic) neuron IDs
         bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for radial/axial dimension) or list-like with two individual values for radial/axial dimensions
         max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with two elements for radial/axial dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges; in any case, the lower radial offset range must always be zero
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
         axial_coord (int): Index to select axial coordinate (0..x, 1..y, 2..z), usually perpendicular to layers
 
@@ -1923,7 +1923,7 @@ def plot_4th_order_reduced(
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_4th_order_reduced`
         model (connectome_manipulator.model_building.model_types.ConnProb4thOrderLinInterpnReducedModel): Fitted stochastic 4th order reduced connectivity model, as returned by :func:`extract_4th_order_reduced`
         axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_4th_order_reduced`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
         plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
     """
@@ -2041,7 +2041,7 @@ def extract_5th_order(
         position_max_range_um (float/list-like): Maximum position range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
         offset_bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for x/y/z dimension) or list-like with three individual values for x/y/z dimensions
         offset_max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with three elements for x/y/z dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
 
     Returns:
@@ -2304,7 +2304,7 @@ def plot_5th_order(
         src_cell_count (int): Number of source (pre-synaptic) neurons, as returned by :func:`extract_5th_order`
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_5th_order`
         model (connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnModel): Fitted stochastic 5th order connectivity model, as returned by :func:`extract_5th_order`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
         plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
     """
@@ -2632,7 +2632,7 @@ def extract_5th_order_reduced(
         position_max_range_um (float/list-like): Maximum axial position range in um; can be scalar (same +/- value) or list-like with two elements for individual +/- ranges
         offset_bin_size_um (float/list-like): Offset bin size in um; can be scalar (same value for radial/axial dimension) or list-like with two individual values for radial/axial dimensions
         offset_max_range_um (float/list-like): Maximum offset range in um; can be scalar (same +/- value for all dimensions) or list-like with two elements for radial/axial dimensions each of which can be either a scalar (same +/- ranges) or a two-element list with individual +/- ranges; in any case, the lower radial offset range must always be zero
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         min_count_per_bin (int): Minimum number of samples per bin; otherwise, no estimate will be made for a given bin
         axial_coord (int): Index to select axial coordinate (0..x, 1..y, 2..z), usually perpendicular to layers
 
@@ -2854,7 +2854,7 @@ def plot_5th_order_reduced(
         tgt_cell_count (int): Number or target (post-synaptic) neurons, as returned by :func:`extract_5th_order_reduced`
         model (connectome_manipulator.model_building.model_types.ConnProb5thOrderLinInterpnReducedModel): Fitted stochastic 5th order reduced connectivity model, as returned by :func:`extract_5th_order_reduced`
         axial_coord_data (int):  Index of axial coordinate axis, as returned by :func:`extract_5th_order_reduced`
-        pos_map_file (str): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd)
+        pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
         plot_model_ovsampl (int): Oversampling factor w.r.t. data binning for plotting model output (must be >=1)
         plot_model_extsn (int): Range extension in multiples of original data bins in each direction for plotting model output (must be >=0)
     """
