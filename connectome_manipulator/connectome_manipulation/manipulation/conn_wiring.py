@@ -3,14 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: conn_wiring
-
-Description: Special case of connectome rewiring, which wires an empty connectome from scratch, or simply
-adds connections to an existing connectome (edges table)!
-Only specific properties like source/target node, afferent synapse positions, synapse type
-(INH: 0, EXC: 100), and delay (optional) will be generated.
-"""
-
 from datetime import datetime, timedelta
 
 import libsonata
@@ -36,11 +28,19 @@ from connectome_manipulator.model_building import model_types, conn_prob
 
 
 class ConnectomeWiring(MorphologyCachingManipulation):
-    """Special case of connectome rewiring
+    """Special case of connectome manipulation class for wiring a connectome:
 
-    Wires an empty connectome from scratch, or simply adds connections to an existing connectome (edges table)!
-    Only specific properties like source/target node, afferent synapse positions, synapse type
+    Special operation of connectome wiring, which generates an empty connectome
+    from scratch, or simply adds connections to an existing connectome.
+    The manipulation can be applied through the :func:`apply` method.
+
+    IMPORTANT: This is a highly optimized operation for wiring huge connectomes by pathways
+    (i.e., for each pair of pre-/post-synaptic hemisphere/region/m-type). However, only
+    specific properties like source/target node, afferent synapse positions, synapse type
     (INH: 0, EXC: 100), and delay (optional) will be generated.
+    For general purpose wiring, please use the
+    :func:`connectome_manipulator.connectome_manipulation.manipulation.conn_rewiring.ConnectomeRewiring`
+    operation!
     """
 
     # SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
@@ -61,12 +61,23 @@ class ConnectomeWiring(MorphologyCachingManipulation):
         pathway_specs=None,
         **kwargs,
     ):
-        """Wiring (generation) of structural connections between pairs of neurons based on given conn. prob. model.
+        """Applies a wiring (generation) of structural connections between pairs of neurons based on a given connectivity model.
 
-        => Only structural synapse properties will be set: PRE/POST neuron IDs, synapse positions, type, axonal delays
-        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed
-        => Position model file (pos_map_file) can be passed as model file (.json) or voxel data file (.nrrd);
-           one or two files for src/tgt nodes may be provided
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+            sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+            pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
+            amount_pct (float): Percentage of randomly sampled target (post-synaptic) neurons that will be wired
+            morph_ext (str): Morphology file extension, e.g., "swc", "asc", "h5"
+            prob_model_spec (dict): Connection probability model specification; a file can be specified by ``{"file": "path/file.json"}``
+            nsynconn_model_spec (dict): Model specifications for #synapses/connection; a file can be specified by ``{"file": "path/file.json"}``
+            delay_model_spec (dict): Delay model specification; a file can be specified by ``{"file": "path/file.json"}``
+            pathway_specs (dict): Optional model specifications for efficiently setting model coefficients by pathway; will be automatically provided by the manipulator framework in case a .parquet file (containing a coefficient table for all pathways) is specified under "model_pathways" in the manipulation configuration file; only works with specific types of models
+            **kwargs: Additional keyword arguments - Not used
+
+        Note:
+            Only structural synapse properties will be set: pre-/postsynaptic neuron IDs, synapse positions, type, axonal delays
         """
         # pylint: disable=arguments-differ
         assert len(kwargs) == 0

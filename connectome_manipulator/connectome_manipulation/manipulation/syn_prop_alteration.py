@@ -3,17 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: syn_prop_alteration
-
-Description: Modification of synaptic property values of a selected set of synapses, as given by
-- absolute value
-- relative scaling
-- shuffling across synapses
-- random absolute value drawn from given distribution
-- random relative scaling drawn from given distribution
-- random additive value drawn from given distribution
-"""
-
 import numpy as np
 
 from connectome_manipulator import log, profiler
@@ -22,9 +11,11 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 
 class SynapsePropertAlteration(Manipulation):
-    """Manipulation name: syn_prop_alteration
+    """Connectome manipulation class for altering synapse property values:
 
-    Description: Modification of synaptic property values of a selected set of synapses.
+    Modifies the values of a selected synapse property and a selected set of synapses,
+    as given by constant, multiplicative, additive, or random values drawn from chosen
+    distributions. The manipulation can be applied through the :func:`apply` method.
     """
 
     @profiler.profileit(name="syn_prop_alteration")
@@ -39,7 +30,37 @@ class SynapsePropertAlteration(Manipulation):
         amount_pct=100.0,
         **kwargs,
     ):
-        """Modification of synaptic property values of a selected set of synapses."""
+        """Applies a modification of synapse property values on a selected set of synapses.
+
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            syn_prop (str): Selected synapse property values of which should be altered; can be selected from all available properties in the given SONATA input edges table (except for "@source_node" and "@target_node")
+            new_value (dict): Dictionary specifying the type of alteration; must contain a "mode" key with one of the available alteration modes, together with additional settings depending on the mode, see Notes; optionally, can also contain a "range" key with lower/upper value bounds, an "rng" key to specify a random number generator, and a "kwargs" dict with additional arguments for the random number generator
+            sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+            sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+            syn_filter (dict): Optional filter dictionary with property names (keys) with a corresponding list of values (e.g., ``{"layer": [2, 3, 4], "synapse_class": ["EXC"]}``); only synapses corresponding to that selection of values will be considered for alteration
+            amount_pct (float): Percentage of randomly sampled synapses to be altered
+            **kwargs: Additional keyword arguments - Not used
+
+        Note:
+            Available alteration modes and corresponding settings:
+
+            * "setval": Absolute value, as given by "value"
+            * "scale": Multiplicative scaling, as given by "factor"
+            * "offset": Additive offset, as given by "value"
+            * "shuffle": Shuffling of values among synapses; only supported when using a single data split
+            * "randval": Random absolute value drawn from a given distribution (*)
+            * "randscale": Multiplicative scaling by a random value drawn from a given distribution (*)
+            * "randadd": Additive offset by a random value drawn from a given distribution (*)
+            
+            (*) A random distribution can be specified in ``new_value`` by choosing a random number generator as "rng" from ``numpy.random`` (e.g., "normal"), together with "kwargs" which will be passed when drawing values from that generator (e.g., "loc" and "scale" in case of "normal")
+
+        Note:
+            Input/output edges (synapse) tables are accessed through the ``writer`` object:
+
+            * Loading input edges: ``edges_table = self.writer.to_pandas()``
+            * Writing output edges: ``self.writer.from_pandas(edges_table_manip)``
+        """
         # pylint: disable=arguments-differ
         if syn_filter is None:
             syn_filter = {}
