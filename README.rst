@@ -62,6 +62,11 @@ All dependencies declared in ``setup.py`` and are available from PyPI, including
 
 Recommended Python version: v3.10.8
 
+Compatibility notes
+~~~~~~~~~~~~~~~~~~~
+
+The software famework is intended to be used on Linux/MacOS-based systems! Specifically, some dependencies, like ``libsonata``, is currently not compatible with Microsoft Windows OS.
+
 Framework overview
 ------------------
 
