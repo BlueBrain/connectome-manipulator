@@ -78,11 +78,11 @@ consists of the following main components:
 
 -  | **Connectome manipulator**
    | As specified in the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA edges file. All manipulations are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `connectome_manipulation/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/connectome_manipulation/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `connectome_manipulation/README.md <connectome_manipulator/connectome_manipulation/README.md>`_
 
 -  | **Model building**
    | As specified in the config, builds a model from a given connectome and writes the model to a file to be loaded and used by specific manipulations requiring a model (e.g., model-based rewiring based on connection probability model). All models are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `model_building/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/model_building/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `model_building/README.md <connectome_manipulator/model_building/README.md>`_
 
       Notes:
 
@@ -92,7 +92,9 @@ consists of the following main components:
 
 -  | **Structural comparator**
    | As specified in the config, performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `connectome_comparison/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/connectome_comparison/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `connectome_comparison/README.md <connectome_manipulator/connectome_comparison/README.md>`_
+
+The structure of the respective configuration files can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
 
 ℹ️ More details can be also found in the accompanying publication (esp.
 *Supplementary tables*), see `Citation`_.
@@ -185,6 +187,8 @@ Please note that this feature will require at least 4 MPI ranks. Dask will use 2
 
 When processing with ``parallel-manipulator``, one may pass the flag ``--target-payload`` to determine how big the individual workload for each process should be. The default value of 20e9 was determined empirically to run on the whole mouse brain with 75 million neurons. We recommend to use this value as a starting point and scale it up or down to achieve the desired runtime characteristics.
 
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
+
 ❗ Notes on error handling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -215,6 +219,8 @@ Model building
      --force-rebuild    Force model re-building, in case already existing.
      --help             Show this message and exit.
 
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
+
 Structural comparison
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -231,15 +237,17 @@ Structural comparison
                            in case already existing.
      --help                Show this message and exit.
 
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
+
 Examples
 --------
 
-Examples can be found under `examples/ <https://github.com/BlueBrain/connectome-manipulator/tree/main/examples>`_ in the repository.
+Examples can be found under `examples/ </examples>`_ in the repository.
 
 How to contribute
 -----------------
 
-Contribution guidelines can be found in `CONTRIBUTING.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/CONTRIBUTING.md>`_ in the repository.
+Contribution guidelines can be found in `CONTRIBUTING.md <CONTRIBUTING.md>`_ in the repository.
 
 Citation
 --------
