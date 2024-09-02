@@ -52,7 +52,7 @@ class SynapsePropertAlteration(Manipulation):
             * "randval": Random absolute value drawn from a given distribution (*)
             * "randscale": Multiplicative scaling by a random value drawn from a given distribution (*)
             * "randadd": Additive offset by a random value drawn from a given distribution (*)
-            
+
             (*) A random distribution can be specified in ``new_value`` by choosing a random number generator as "rng" from ``numpy.random`` (e.g., "normal"), together with "kwargs" which will be passed when drawing values from that generator (e.g., "loc" and "scale" in case of "normal")
 
         Note:
