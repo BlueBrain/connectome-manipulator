@@ -15,6 +15,7 @@ Model fitting config
       "working_dir": "/path/to/working/directory",
       "out_dir": "/path/to/output/directory",
       "seed": 1234,
+      "CV_folds": 5,
       "circuit_config": "/path/to/circuit_config.json",
       "model": {
         "name": "User-defined-model-name",
@@ -35,6 +36,9 @@ Key                   Description
 "working_dir"         Working directory to store data and model
 "out_dir"             Output directory to store output figures (can be the same as ``working_dir``)
 "seed"                Random seed, e.g., used when randomly subsampling data
+"CV_folds"            Optional number of cross-validation folds; will fit one separate model to each training data set;
+                      can be overwritten by command line argument "--cv-folds=N"; only supported by some model building
+                      functions, e.g., "conn_prob", "conn_props", and delay"
 "circuit_config"      Path to SONATA circuit config file (.json)
 "model"               Model-specific settings
 ↳"name"               User-defined name of the model; will be used in filenames
@@ -125,7 +129,7 @@ Key                    Description
 "src_node_popul_name"  Optional name of SONATA source nodes population
 "tgt_node_popul_name"  Optional name of SONATA target nodes population
 "seed"                 Random seed for stochastic manipulation
-"N_split_nodes"        Optional number of data splits; will be overwritten by command line argument "--splits=N"
+"N_split_nodes"        Optional number of data splits; can be overwritten by command line argument "--splits=N"
 "manip"                Manipulation-specific settings
 ↳"name"                User-defined name of the manipulation; will be used in filenames
 ↳"syn_props_init"      Optional key-value pairs of property names and data types for initializing an enpty connectome
