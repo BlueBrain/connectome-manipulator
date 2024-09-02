@@ -82,9 +82,13 @@ Connectome manipulation config
     :linenos:
 
     {
-      "circuit_config": "/path/to/circuit_config.json",
+      "circuit_config": "circuit_config.json OR /path/to/circuit_config.json",
+      "circuit_path": "/path/to/circuit",
       "edges_popul_name": "Name-of-edges-population",
+      "src_node_popul_name": "Name-of-source-nodes-population",
+      "tgt_node_popul_name": "Name-of-target-nodes-population",
       "seed": 1234,
+      "N_split_nodes": 100,
       "manip": {
         "name": "User-defined-manipulation-name",
         "syn_props_init": {
@@ -115,9 +119,13 @@ Connectome manipulation config
 =====================  ====================================================================================================
 Key                    Description
 =====================  ====================================================================================================
-"circuit_config"       Path to SONATA circuit config file (.json)
+"circuit_config"       Circuit config filename (requires "circuit_path") OR full path to SONATA circuit config file (.json)
+"circuit_path"         Optional path to SONATA circuit; required if "circuit_config" only contains a filename
 "edges_popul_name"     Optional name of SONATA edges population
+"src_node_popul_name"  Optional name of SONATA source nodes population
+"tgt_node_popul_name"  Optional name of SONATA target nodes population
 "seed"                 Random seed for stochastic manipulation
+"N_split_nodes"        Optional number of data splits; will be overwritten by command line argument "--splits=N"
 "manip"                Manipulation-specific settings
 ↳"name"                User-defined name of the manipulation; will be used in filenames
 ↳"syn_props_init"      Optional key-value pairs of property names and data types for initializing an enpty connectome
