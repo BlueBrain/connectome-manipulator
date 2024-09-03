@@ -17,7 +17,7 @@ from connectome_manipulator.connectome_comparison import adjacency
 from connectome_manipulator.model_building import model_types
 
 
-def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
+def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, CV_dict=None, **_):
     """Extracts adjacency matrix between selected src/dest neurons.
 
     Args:
@@ -25,11 +25,13 @@ def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, **_):
         sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
         sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
         edges_popul_name (str): Name of SONATA egdes population to extract data from
+        CV_dict (dict): Cross-validation dictionary - Not supported
 
     Returns:
         dict: Dictionary containing the extracted adjacency matrix and source/target node ids
     """
     log.info(f"Running adjacency data extraction (sel_src={sel_src}, sel_dest={sel_dest})...")
+    log.log_assert(CV_dict is None, "ERROR: Cross-validation not supported!")
 
     adj_dict = adjacency.compute(circuit, sel_src, sel_dest, edges_popul_name)
 

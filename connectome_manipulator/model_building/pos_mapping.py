@@ -28,6 +28,7 @@ def extract(
     z_scale=None,
     nodes_pop_name=None,
     NN_only=False,
+    CV_dict=None,
     **_,
 ):
     """Extracts a position mapping from 3D atlas space (x/y/z) to 3D flat space (flat-x/flat-y/depth) of a given population of neurons.
@@ -41,10 +42,13 @@ def extract(
         z_scale (float): Scalar value with z scaling factor from a.u. (as in flatmap) to um
         nodes_pop_name (str): Name of SONATA nodes population to extract data from
         NN_only (bool): If selected, only nearest-neighbor interpolation will be used for position mapping (faster); otherwise, linear interpolation is applied, if possible (slower)
+        CV_dict (dict): Cross-validation dictionary - Not supported
 
     Returns:
         dict: Dictionary containing the extracted data elements, i.e., neuron positions in original and flat space
     """
+    log.log_assert(CV_dict is None, "ERROR: Cross-validation not supported!")
+
     # Get neuron positions
     if nodes_pop_name is None:
         log.log_assert(

@@ -27,6 +27,7 @@ def extract(
     nodes_spec=None,
     zero_based_indexing=False,
     gid_column=None,
+    CV_dict=None,
     **_,
 ):
     """Loads pre-computed position mapping of a given nodes population.
@@ -40,10 +41,13 @@ def extract(
         nodes_spec (str/list-like/dict): Selection of neurons to be include in the mapping model
         zero_based_indexing (bool): If selected, zero-based indexing of neuron IDs in the position table file is assumed (as in SONATA); otherwise, one-based indexing is assumed (for backward compatibility)
         gid_column (str): Name of a column in the position table which contains the neuron IDs; if not provideed, the index column will be used
+        CV_dict (dict): Cross-validation dictionary - Not supported
 
     Returns:
         dict: Dictionary containing the extracted data elements, i.e., neuron positions in original and mapped space
     """
+    log.log_assert(CV_dict is None, "ERROR: Cross-validation not supported!")
+
     # Get neuron GIDs
     if nodes_pop_name is None:
         log.log_assert(

@@ -15,7 +15,7 @@ from scipy.stats import norm
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
-from connectome_manipulator.access_functions import get_edges_population, get_node_ids
+from connectome_manipulator.access_functions import get_edges_population, get_node_ids, get_cv_data
 
 MAX_UNIQUE_COUNT = 100  # To be used in discrete distributions
 
@@ -33,6 +33,7 @@ def extract(
     sel_src=None,
     sel_dest=None,
     edges_popul_name=None,
+    CV_dict=None,
     **_,
 ):
     """Extracts statistics (like mean, std, min, max, histogram, ...) for synapse properties of samples of connections between each pair of m-types.
@@ -46,6 +47,7 @@ def extract(
         sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
         sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
         edges_popul_name (str): Name of SONATA egdes population to extract data from
+        CV_dict (dict): Optional cross-validation dictionary, containing "n_folds" (int), "fold_idx" (int), "training_set" (bool) keys; will be automatically provided by the framework if "CV_folds" are specified
 
     Returns:
         dict: Dictionary containing the extracted data elements
@@ -79,6 +81,10 @@ def extract(
 
     node_ids_src = get_node_ids(src_nodes, sel_src)
     node_ids_dest = get_node_ids(tgt_nodes, sel_dest)
+
+    # Cross-validation (optional)
+    node_ids_src, node_ids_dest = get_cv_data([node_ids_src, node_ids_dest], CV_dict)
+
     node_ids = [node_ids_src, node_ids_dest]
 
     m_types = [
@@ -123,7 +129,7 @@ def extract(
             )
 
     log.debug(
-        f"Estimating statistics for {len(syn_props)} properties (plus #synapses/connection) between {len(m_types[0])}x{len(m_types[1])} m-types (min_sample_size_per_group={min_sample_size_per_group}, max_sample_size_per_group={max_sample_size_per_group})"
+        f"Estimating statistics for {len(syn_props)} properties (plus #synapses/connection) between {len(m_types[0])}x{len(m_types[1])} m-types (min_sample_size_per_group={min_sample_size_per_group}, max_sample_size_per_group={max_sample_size_per_group}, CV_dict={CV_dict})"
     )
 
     # Statistics for #syn/conn

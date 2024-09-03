@@ -133,12 +133,24 @@ def manipulate_connectome(
     type=bool,
     help="Force model re-building, in case already existing.",
 )
-def build_model(config, force_reextract, force_rebuild):
+@click.option(
+    "--cv-folds",
+    required=False,
+    default=None,
+    type=int,
+    help="Optional number of cross-validation folds, overwrites value in config file",
+)
+def build_model(config, force_reextract, force_rebuild, cv_folds):
     """Extract and build models from existing connectomes."""
     with open(config, "r") as f:
         config_dict = json.load(f)
 
-    model_building.main(config_dict, show_fig=False, force_recomp=[force_reextract, force_rebuild])
+    model_building.main(
+        config_dict,
+        show_fig=False,
+        force_recomp=[force_reextract, force_rebuild],
+        cv_folds=cv_folds,
+    )
 
 
 @app.command()

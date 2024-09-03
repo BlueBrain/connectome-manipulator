@@ -14,6 +14,7 @@ import libsonata
 from bluepysnap.sonata_constants import Node, DYNAMICS_PREFIX
 from bluepysnap.utils import add_dynamic_prefix
 from bluepysnap.utils import euler2mat, quaternion2mat
+from sklearn.model_selection import KFold
 
 from connectome_manipulator import log
 
@@ -298,3 +299,38 @@ def get_connections(edges, pre_ids, post_ids, with_nsyn=False):
         [([_c.id for _c in _conn[:2]] + list(_conn[2:])) for _conn in it_conns]
     )  # Resolve src/tgt IDs
     return conns
+
+
+def get_cv_data(data_list, cv_dict=None):
+    """Returns training/testing data items of specified cross-validation fold."""
+    if cv_dict is None:  # No CV
+        return data_list
+    else:
+        log.log_assert(
+            isinstance(cv_dict, dict)
+            and "n_folds" in cv_dict
+            and "fold_idx" in cv_dict
+            and "training_set" in cv_dict,
+            'ERROR: Cross-validation "cv_dict" must be a dict containing "n_folds", "fold_idx", and "training_set" keys!',
+        )
+        log.log_assert(
+            cv_dict["n_folds"] > 1 and 0 <= cv_dict["fold_idx"] < cv_dict["n_folds"],
+            "ERROR: Cross-validation index error!",
+        )
+
+        kf = KFold(n_splits=cv_dict["n_folds"], shuffle=True)
+        cv_data_list = []
+        for _data in data_list:
+            sel_idx = [
+                _train_index if cv_dict["training_set"] else _test_index
+                for (_train_index, _test_index) in kf.split(_data)
+            ][cv_dict["fold_idx"]]
+            cv_data_list.append(_data[sel_idx])
+
+        # CV TESTING: Writing CV data splits into data log #
+        # dlog_name = f"CVData{cv_dict.get('n_folds', 0)}-{cv_dict.get('fold_idx', -1) + 1}-Train{cv_dict.get('training_set')}"
+        # cv_data_dict = {f"cv_data{_i}": _data for _i, _data in enumerate(cv_data_list)}
+        # log.data(dlog_name, **cv_data_dict)
+        ##############
+
+        return cv_data_list

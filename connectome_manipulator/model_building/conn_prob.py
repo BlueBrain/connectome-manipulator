@@ -25,6 +25,7 @@ from connectome_manipulator.access_functions import (
     get_edges_population,
     get_node_positions,
     get_connections,
+    get_cv_data,
 )
 
 JET = plt.get_cmap("jet")
@@ -32,7 +33,14 @@ HOT = plt.get_cmap("hot")
 
 
 def extract(
-    circuit, order, sel_src=None, sel_dest=None, sample_size=None, edges_popul_name=None, **kwargs
+    circuit,
+    order,
+    sel_src=None,
+    sel_dest=None,
+    sample_size=None,
+    edges_popul_name=None,
+    CV_dict=None,
+    **kwargs,
 ):
     """Extracts the connection probabilities between samples of neurons.
 
@@ -43,6 +51,7 @@ def extract(
         sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
         sample_size (int): Size of random subsample of data to extract data from
         edges_popul_name (str): Name of SONATA egdes population to extract data from
+        CV_dict (dict): Optional cross-validation dictionary, containing "n_folds" (int), "fold_idx" (int), "training_set" (bool) keys; will be automatically provided by the framework if "CV_folds" are specified
         **kwargs: Additional keyword arguments depending on the model order; see Notes
 
     Returns:
@@ -60,7 +69,7 @@ def extract(
         * Order 5R: :func:`extract_5th_order_reduced`
     """
     log.info(
-        f"Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)..."
+        f"Running order-{order} data extraction (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons, CV_dict={CV_dict})..."
     )
 
     # Select edge population
@@ -100,6 +109,11 @@ def extract(
             [True] * sample_size_dest + [False] * (len(node_ids_dest) - sample_size_dest)
         )
     ]
+
+    # Cross-validation (optional)
+    node_ids_src_sel, node_ids_dest_sel = get_cv_data(
+        [node_ids_src_sel, node_ids_dest_sel], CV_dict
+    )
 
     if not isinstance(order, str):
         order = str(order)

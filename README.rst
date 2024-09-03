@@ -215,9 +215,11 @@ Model building
      Extract and build models from existing connectomes.
 
    Options:
-     --force-reextract  Force re-extraction of data, in case already existing.
-     --force-rebuild    Force model re-building, in case already existing.
-     --help             Show this message and exit.
+     --force-reextract   Force re-extraction of data, in case already existing.
+     --force-rebuild     Force model re-building, in case already existing.
+     --cv-folds INTEGER  Optional number of cross-validation folds, overwrites
+                         value in config file
+     --help              Show this message and exit.
 
 Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
 

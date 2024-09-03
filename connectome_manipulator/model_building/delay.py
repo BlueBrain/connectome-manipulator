@@ -14,7 +14,7 @@ from sklearn.linear_model import LinearRegression
 
 from connectome_manipulator import log
 from connectome_manipulator.model_building import model_types
-from connectome_manipulator.access_functions import get_node_ids, get_edges_population
+from connectome_manipulator.access_functions import get_node_ids, get_edges_population, get_cv_data
 
 
 def extract(
@@ -25,6 +25,7 @@ def extract(
     sel_dest=None,
     sample_size=None,
     edges_popul_name=None,
+    CV_dict=None,
     **_,
 ):
     """Extracts distance-dependent synaptic delays between samples of neurons.
@@ -37,6 +38,7 @@ def extract(
         sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
         sample_size (int): Size of random subsample of data to extract data from
         edges_popul_name (str): Name of SONATA egdes population to extract data from
+        CV_dict (dict): Optional cross-validation dictionary, containing "n_folds" (int), "fold_idx" (int), "training_set" (bool) keys; will be automatically provided by the framework if "CV_folds" are specified
 
     Returns:
         dict: Dictionary containing the extracted data elements
@@ -66,6 +68,11 @@ def extract(
         )
     ]
 
+    # Cross-validation (optional)
+    node_ids_src_sel, node_ids_dest_sel = get_cv_data(
+        [node_ids_src_sel, node_ids_dest_sel], CV_dict
+    )
+
     # Extract distance/delay values
     edges_table = edges.pathway_edges(
         source=node_ids_src_sel,
@@ -80,7 +87,7 @@ def extract(
     )
 
     log.debug(
-        f"Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons)"
+        f"Extracting delays from {edges_table.shape[0]} synapses (sel_src={sel_src}, sel_dest={sel_dest}, sample_size={sample_size} neurons, CV_dict={CV_dict})"
     )
 
     src_pos = src_nodes.positions(

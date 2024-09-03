@@ -248,7 +248,7 @@ def create_model_config_per_pathway(
     return model_config_pathways
 
 
-def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no cover
+def main(model_config_input, show_fig=False, force_recomp=False, cv_folds=None):  # pragma: no cover
     """Main entry point for connectome model building."""
     # Check model building config(s)
     if not isinstance(model_config_input, list):
@@ -266,10 +266,9 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
     for midx, model_config in enumerate(model_config_input):
         if len(model_config_input) > 1:
             print(
-                f'\n>>> BUILDING MODEL {midx + 1}/{len(model_config_input)}: {model_config["model"]["name"]} <<<'
+                f'\n>>> BUILDING MODEL {midx + 1}/{len(model_config_input)}: {model_config["model"]["name"]} <<<',
+                flush=True,
             )
-
-        np.random.seed(model_config.get("seed", 123456))
 
         if np.isscalar(force_recomp):
             force_reextract = force_recomp
@@ -322,46 +321,87 @@ def main(model_config_input, show_fig=False, force_recomp=False):  # pragma: no 
         circuit = Circuit(circuit_config)
         log.info(f"Circuit loaded: {circuit_config}")
 
-        # Extract data (or load from file)
-        data_file = os.path.join(data_dir, model_build_name + ".pickle")
-        if os.path.exists(data_file) and not force_reextract:
-            # Load from file
-            log.info(f"Loading data from {data_file}")
-            with open(data_file, "rb") as f:
-                data_dict = pickle.load(f)
+        # Prepare cross-validation (optional)
+        if cv_folds is None:
+            cv_folds_param = model_config.get("CV_folds")
         else:
-            # Compute & save to file
-            t_start = time.time()
-            data_dict = comp_module.extract(circuit, **comp_kwargs)
-            log.info(f"<TIME ELAPSED (data extraction): {time.time() - t_start:.1f}s>")
-            log.info(f"Writing data to {data_file}")
-            if not os.path.exists(os.path.split(data_file)[0]):
-                os.makedirs(os.path.split(data_file)[0])
-            with open(data_file, "wb") as f:
-                pickle.dump(data_dict, f)
-
-        # Build model (or load from file)
-        model_file = os.path.join(model_dir, model_build_name + ".json")
-        if os.path.exists(model_file) and not force_rebuild:
-            # Load from file
-            log.info(f"Loading model from {model_file}")
-            model = model_types.AbstractModel.model_from_file(model_file)
+            cv_folds_param = cv_folds
+            if "CV_folds" in model_config:
+                log.debug(
+                    f"Overwriting CV_folds ({model_config['CV_folds']}) from configuration file with command line argument --cv-folds={cv_folds}"
+                )
+        if cv_folds_param is not None and cv_folds_param > 1:
+            cv_n = cv_folds_param
+            cv_data = ["train", "test"]
         else:
-            # Compute & save to file
-            t_start = time.time()
-            model = comp_module.build(**data_dict, **comp_kwargs)
-            log.info(f"<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>")
-            log.info(f"Writing model to {model_file}")
-            if not os.path.exists(model_dir):
-                os.makedirs(model_dir)
-            model.save_model(model_dir, model_build_name)
+            cv_n = 1
+            cv_data = ["all"]
 
-            # Save model config dict for reproducibility
-            with open(os.path.join(out_dir, "model_config.json"), "w") as f:
-                json.dump(model_config, f, indent=2)
+        for cv_i in range(cv_n):
+            for cv_dset in cv_data:
 
-        # Visualize data vs. model
-        comp_module.plot(**data_dict, **comp_kwargs, model=model, out_dir=out_dir)
+                if cv_n > 1:
+                    log.info(f'>>> CV {cv_i + 1}/{cv_n} ("{cv_dset}") <<<')
+
+                if cv_dset == "all":
+                    cv_dict = None
+                    cv_dstr = ""
+                    cv_mstr = ""
+                else:
+                    cv_dict = dict(n_folds=cv_n, fold_idx=cv_i, training_set=cv_dset == "train")
+                    cv_dstr = f"__CV{cv_n}-{cv_i+1}-{cv_dset}"
+                    cv_mstr = f"__CV{cv_n}-{cv_i+1}-train"  # Model is always built on training data
+
+                np.random.seed(model_config.get("seed", 123456))
+
+                # Extract data (or load from file)
+                data_file = os.path.join(data_dir, model_build_name + cv_dstr + ".pickle")
+                if os.path.exists(data_file) and not force_reextract:
+                    # Load from file
+                    log.info(f"Loading data from {data_file}")
+                    with open(data_file, "rb") as f:
+                        data_dict = pickle.load(f)
+                else:
+                    # Compute & save to file
+                    t_start = time.time()
+                    data_dict = comp_module.extract(circuit, **comp_kwargs, CV_dict=cv_dict)
+                    log.info(f"<TIME ELAPSED (data extraction): {time.time() - t_start:.1f}s>")
+                    log.info(f"Writing data to {data_file}")
+                    if not os.path.exists(os.path.split(data_file)[0]):
+                        os.makedirs(os.path.split(data_file)[0])
+                    with open(data_file, "wb") as f:
+                        pickle.dump(data_dict, f)
+
+                # Build model (or load from file)
+                model_name = model_build_name + cv_mstr
+                model_file = os.path.join(model_dir, model_name + ".json")
+                if os.path.exists(model_file) and (not force_rebuild or cv_dset == "test"):
+                    # Load from file
+                    log.info(f"Loading model from {model_file}")
+                    model = model_types.AbstractModel.model_from_file(model_file)
+                else:
+                    # Compute & save to file
+                    log.log_assert(
+                        cv_dset != "test",
+                        "ERROR: CV test data cannot be used for building a model!",
+                    )
+                    t_start = time.time()
+                    model = comp_module.build(**data_dict, **comp_kwargs)
+                    log.info(f"<TIME ELAPSED (model building): {time.time() - t_start:.1f}s>")
+                    log.info(f"Writing model to {model_file}")
+                    if not os.path.exists(model_dir):
+                        os.makedirs(model_dir)
+                    model.save_model(model_dir, model_name)
+
+                    # Save model config dict for reproducibility
+                    with open(os.path.join(out_dir, "model_config.json"), "w") as f:
+                        json.dump(model_config, f, indent=2)
+
+                # Visualize data vs. model
+                cv_out_dir = os.path.join(out_dir, cv_dstr.strip("_"))
+                if not os.path.exists(cv_out_dir):
+                    os.makedirs(cv_out_dir)
+                comp_module.plot(**data_dict, **comp_kwargs, model=model, out_dir=cv_out_dir)
 
         if show_fig:
             plt.show()
