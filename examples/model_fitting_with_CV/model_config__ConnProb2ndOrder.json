@@ -1,0 +1,29 @@
+{
+  "working_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/model_fitting_with_CV/model_building",
+  "out_dir": "/gpfs/bbp.cscs.ch/home/pokorny/git/connectome-manipulator/examples/model_fitting_with_CV/model_building",
+  "seed": 7531,
+  "CV_folds": 5,
+  "circuit_config": "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/pokorny/Zenodo/ToyCircuit-S1-6k/circuit_config.json",
+  "model": {
+    "name": "ConnProb2ndOrder",
+    "fct": {
+      "source": "conn_prob",
+      "kwargs": {
+        "order": 2,
+        "model_specs": {
+          "type": "SimpleExponential"
+        },
+        "sel_src": {
+          "synapse_class": "EXC"
+        },
+        "sel_dest": {
+          "synapse_class": "EXC"
+        },
+        "min_count_per_bin": 10,
+        "bin_size_um": 50,
+        "max_range_um": 2000,
+        "sample_size": null
+      }
+    }
+  }
+}
