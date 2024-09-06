@@ -7,7 +7,8 @@ The following example notebooks demonstrate important use cases of the _Connecto
 - <u>Example 3 (basic)</u>: [Rewire connections based on an adjacency matrix](./rewire_adjacency/RewireAdjacencyExample.ipynb)
 - <u>Example 4 (basic)</u>: [Wire empty connectome from scratch](./wire_connectome/WireConnectomeExample.ipynb)
 - <u>Example 5 (basic)</u>: [Model fitting with cross-validation](./model_fitting_with_CV/ModelFittingWithCVExample.ipynb)
-- <u>Example 6 (advanced)</u>: [Interneuron rewiring in SSCx](https://github.com/BlueBrain/sscx-connectome-manipulations)
-- <u>Example 7 (advanced)</u>: [Simplified connectomes in SSCx](https://github.com/BlueBrain/sscx-connectome-manipulations)
+- <u>Example 6 (basic)</u>: [Correlation between physiological synapse parameters](./physiol_param_corr/PhysiolParamCorrExample.ipynb)
+- <u>Example 7 (advanced)</u>: [Interneuron rewiring in SSCx](https://github.com/BlueBrain/sscx-connectome-manipulations)
+- <u>Example 8 (advanced)</u>: [Simplified connectomes in SSCx](https://github.com/BlueBrain/sscx-connectome-manipulations)
 
 Copyright (c) 2024 Blue Brain Project/EPFL
