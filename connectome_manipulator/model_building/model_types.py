@@ -17,7 +17,7 @@ from scipy.interpolate import interpn
 from scipy.optimize import fsolve
 from scipy.sparse import csc_matrix
 from scipy.spatial import distance_matrix
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, norm, gamma, poisson
 
 import connectome_manipulator
 from connectome_manipulator import log
@@ -549,11 +549,15 @@ class ConnPropsModel(AbstractModel):
     NOTE: 'shared_within' flag is used to indicate that same property values are used
           for all synapses within the same connection. Otherwise, property values are
           drawn for all synapses independently from same distribution.
+
+    NOTE: Correlations between properties can be specified using a 'prop_cov' dict with
+          'props' (list of correlated property names) and 'cov' (covariance matrices
+          by pathway)
     """
 
     # Names of model inputs, parameters and data frames which are part of this model
-    param_names = ["src_types", "tgt_types", "prop_stats"]
-    param_defaults = {}
+    param_names = ["src_types", "tgt_types", "prop_stats", "prop_cov"]
+    param_defaults = {"prop_cov": {}}
     data_names = []
     input_names = ["src_type", "tgt_type", "n_syn"]
     # Notes:
@@ -722,10 +726,67 @@ class ConnPropsModel(AbstractModel):
             ),
             "Data bounds error!",
         )
+        log.log_assert(isinstance(self.prop_cov, dict), '"prop_cov" dictionary required!')
+        self.prop_cov = dict_conv(self.prop_cov)  # Convert dict to basic data types
+        if len(self.prop_cov) > 0:
+            log.log_assert(
+                "props" in self.prop_cov and "cov" in self.prop_cov,
+                'Property COV dict must contain "props" and "cov" keys!',
+            )
+            log.log_assert(len(self.prop_cov["props"]) > 0, 'Property COV "props" names missing!')
+            log.log_assert(
+                all(np.isin(self.prop_cov["props"], self.prop_names)),
+                'Property COV "props" name error!',
+            )
+            log.log_assert(
+                N_SYN_PER_CONN_NAME not in self.prop_cov["props"],
+                f'Property COV for "{N_SYN_PER_CONN_NAME}" not supported!',
+            )
+            for src in self.src_types:
+                log.log_assert(
+                    src in self.prop_cov["cov"],
+                    f'Property COV source mtype "{src}" missing!',
+                )
+                for tgt in self.tgt_types:
+                    log.log_assert(
+                        tgt in self.prop_cov["cov"][src],
+                        f'Property COV target mtype "{tgt}" for source "{src}" missing!',
+                    )
+                    log.log_assert(
+                        all(
+                            np.array(np.array(self.prop_cov["cov"][src][tgt]).shape)
+                            == len(self.prop_cov["props"])
+                        ),
+                        "Propert COV matrix size mismatch!",
+                    )
+                    log.log_assert(
+                        np.all(np.diag(self.prop_cov["cov"][src][tgt]) == 1.0),
+                        "Property COV matrices must contain ones in the diagonal!",
+                    )
+                    log.log_assert(
+                        np.array_equal(
+                            self.prop_cov["cov"][src][tgt],
+                            np.array(self.prop_cov["cov"][src][tgt]).T,
+                        ),
+                        "Property COV matrices must be symmetric!",
+                    )
+            self.prop_cov_names = self.prop_cov["props"]
+            self.prop_cov_mat = self.prop_cov["cov"]
+        else:
+            self.prop_cov_names = []
+            self.prop_cov_mat = None
 
     def get_prop_names(self):
         """Return list of connection/synapse property names."""
         return self.prop_names
+
+    def get_prop_cov_names(self):
+        """Return list of correlated property names."""
+        return self.prop_cov_names
+
+    def get_prop_cov_mat(self, src_type, tgt_type):
+        """Return covariance matrix of correlated properties."""
+        return np.array(self.prop_cov_mat[src_type][tgt_type])
 
     def get_src_types(self):
         """Return list source (pre-synaptic) m-types."""
@@ -887,9 +948,103 @@ class ConnPropsModel(AbstractModel):
 
         return drawn_values
 
+    @staticmethod
+    def remap_distribution(values, distr_spec):
+        """Re-map values from standard normal disrtibution to another distributions."""
+        sf_values = 1 - norm.cdf(values)
+        remapped_values = None
+        distr_type = distr_spec.get("type")
+        if distr_type == "normal":
+            distr_mean = distr_spec.get("mean")
+            distr_std = distr_spec.get("std")
+            remapped_values = norm.isf(sf_values, loc=distr_mean, scale=distr_std)
+        elif distr_type == "truncnorm":
+            distr_loc = distr_spec.get("norm_loc")
+            distr_scale = distr_spec.get("norm_scale")
+            distr_min = distr_spec.get("min")
+            distr_max = distr_spec.get("max")
+            log.log_assert(
+                distr_scale > 0.0, 'Truncnorm remapping error: "norm_scale" cannot be zero!'
+            )
+            a = (distr_min - distr_loc) / distr_scale
+            b = (distr_max - distr_loc) / distr_scale
+            remapped_values = truncnorm.isf(sf_values, a=a, b=b, loc=distr_loc, scale=distr_scale)
+        elif distr_type == "gamma":
+            distr_mean = distr_spec.get("mean")
+            distr_std = distr_spec.get("std")
+            log.log_assert(
+                distr_mean > 0.0 and distr_std > 0.0,
+                'Gamma remapping error: "mean" and "std" cannot be zero!',
+            )
+            shape = distr_mean**2 / distr_std**2
+            scale = distr_std**2 / distr_mean
+            remapped_values = gamma.isf(sf_values, a=shape, scale=scale)
+        elif distr_type == "poisson":
+            distr_mean = distr_spec.get("mean")
+            remapped_values = poisson.isf(sf_values, mu=distr_mean)
+        else:
+            log.log_assert(False, f'Remapping not supported for distribution type "{distr_type}"!')
+
+        # Apply upper/lower bounds (optional)
+        lower_bound = distr_spec.get("lower_bound")
+        upper_bound = distr_spec.get("upper_bound")
+        if lower_bound is not None:
+            remapped_values = np.maximum(remapped_values, lower_bound)
+        if upper_bound is not None:
+            remapped_values = np.minimum(remapped_values, upper_bound)
+
+        # Set data type (optional)
+        data_type = distr_spec.get("dtype")
+        if data_type is not None:
+            if data_type == "int":
+                remapped_values = np.round(remapped_values)
+            remapped_values = remapped_values.astype(data_type)
+
+        return remapped_values
+
+    def draw_cov(self, src_type, tgt_type, size=1):
+        """Draw correlated property values of a single connection.
+
+        (As in Chindemi et al. (2022) "A calcium-based plasticity model for
+        predicting long-term potentiation and depression in the neocortex")
+        """
+
+        if self.prop_cov_mat is None:
+            log.warning("No correlated properties!")
+            return np.zeros((size, 0))
+
+        stats_dicts = [self.prop_stats.get(p)[src_type][tgt_type] for p in self.prop_cov_names]
+        shared_within = [_sdict.get("shared_within", True) for _sdict in stats_dicts]
+        log.log_assert(
+            np.all(np.array(shared_within) == shared_within[0]),
+            'Inconsistent "shared_within" value among correlated properties!',
+        )
+        shared_within = shared_within[0]
+
+        # Draw from multivariate Gaussian
+        if shared_within:  # Same property value for all synapses within connection
+            val = np.random.multivariate_normal(
+                np.zeros(len(self.prop_cov_names)), self.prop_cov_mat[src_type][tgt_type], size=1
+            )
+            drawn_values = np.repeat(val, size, axis=0)  # Reuse same value in all synapses
+        else:  # Redraw property values independently for all synapses within connection
+            drawn_values = np.random.multivariate_normal(
+                np.zeros(len(self.prop_cov_names)), self.prop_cov_mat[src_type][tgt_type], size=size
+            )
+
+        # Re-map Gaussian to respective marginal distributions
+        remapped_values = [
+            self.remap_distribution(drawn_values[:, [_i]], _sdict)
+            for _i, _sdict in enumerate(stats_dicts)
+        ]
+
+        return remapped_values
+
     def get_model_output(self, src_type, tgt_type, n_syn=None):  # pylint: disable=arguments-differ
         """Draw property values for one connection between src_type and tgt_type, returning a dataframe [seeded through numpy]."""
-        syn_props = [p for p in self.prop_names if p != N_SYN_PER_CONN_NAME]
+        syn_props = [
+            p for p in self.prop_names if p != N_SYN_PER_CONN_NAME and p not in self.prop_cov_names
+        ]
         if n_syn is None:
             log.log_assert(self.has_nsynconn, f'"{N_SYN_PER_CONN_NAME}" missing')
             n_syn = self.draw(N_SYN_PER_CONN_NAME, src_type, tgt_type, 1)[0]
@@ -899,6 +1054,12 @@ class ConnPropsModel(AbstractModel):
         df = pd.DataFrame([], index=range(n_syn), columns=syn_props)
         for p in syn_props:
             df[p] = self.draw(p, src_type, tgt_type, n_syn)
+
+        if len(self.prop_cov_names) > 0:
+            # Draw correlated property values
+            corr_vals = self.draw_cov(src_type, tgt_type, n_syn)
+            for i, p in enumerate(self.prop_cov_names):
+                df[p] = corr_vals[i]
         return df
 
     def apply(self, **kwargs):
@@ -949,6 +1110,8 @@ class ConnPropsModel(AbstractModel):
                 ]
             )
         )
+        if len(self.prop_cov_names) > 0:
+            model_str = model_str + f"\n  Correlated properties: {', '.join(self.prop_cov_names)}"
         return model_str
 
 
