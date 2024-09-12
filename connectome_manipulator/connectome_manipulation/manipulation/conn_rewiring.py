@@ -842,6 +842,10 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         If possible, synapses will be selected such that no duplicated synapses belong to same connection.
         """
+        if len(self.props_afferent) == 0:
+            # No afferent properties to duplicate (i.e., point neurons)
+            return
+
         conns, nsyns = np.unique(syn_conn_idx, return_counts=True)
         draw_from = np.where(syn_sel_idx_reuse)[0]
         sel_dupl = []
@@ -968,7 +972,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         # Afferent morphology-related synapse properties (for duplicating synapses)
         self.props_afferent = list(filter(lambda nm: "afferent_" in nm, edges_table.columns))
-        log.log_assert(len(self.props_afferent) > 0, 'No "afferent_..." synapse properties!')
+        if len(self.props_afferent) == 0:
+            log.warning('No "afferent_..." synapse properties - point neurons assumed!')
 
         # Synapse class selection (EXC or INH)
         if syn_class == "EXC":  # EXC: >=100
