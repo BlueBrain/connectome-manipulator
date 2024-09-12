@@ -4,6 +4,7 @@ Changelog
 Version 1.0.2
 -------------
 
+- Added new features and examples (cross-validation, synapse parameter correlation)
 - Improved readme and documentation
 
 
