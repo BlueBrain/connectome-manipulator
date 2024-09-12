@@ -43,8 +43,9 @@ class ConnectomeWiring(MorphologyCachingManipulation):
     operation!
     """
 
-    # SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
-    SEC_TYPE_MAP = {nm.AXON: 1, nm.BASAL_DENDRITE: 2, nm.APICAL_DENDRITE: 3}
+    # SONATA section type mapping (as in MorphIO): 1 = soma, 2 = axon, 3 = basal, 4 = apical
+    SEC_SOMA = 1
+    SEC_TYPE_MAP = {nm.AXON: 2, nm.BASAL_DENDRITE: 3, nm.APICAL_DENDRITE: 4}
 
     @profiler.profileit(name="conn_wiring")
     def apply(
@@ -265,7 +266,7 @@ class ConnectomeWiring(MorphologyCachingManipulation):
             off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
 
             # Synapse positions & (mapped) section types, computed from section & offset
-            type_sel = np.full_like(sec_sel, 0)
+            type_sel = np.full_like(sec_sel, SEC_SOMA)
             pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
             for idx in np.flatnonzero(sec_sel >= 0):
                 type_sel[idx] = self.SEC_TYPE_MAP[morph.section(sec_sel[idx]).type]
