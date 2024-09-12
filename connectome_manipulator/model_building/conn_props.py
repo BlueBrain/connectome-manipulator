@@ -53,22 +53,23 @@ def extract(
         dict: Dictionary containing the extracted data elements
 
     Note:
-        The followind statistics will be extracted:
+        The following statistics will be extracted:
 
-        * mean (float): Data mean
-        * std (float): Standard deviation
-        * min (float): Minimum value
-        * max (float): Maximum value
-        * hist (tuple): Histogram with ``hist_bins`` bins; stored as (counts, edges) tuple as returned by :func:`numpy.histogram`
-        * norm_loc (float): Location estimate for truncnorm distributions
-        * norm_scale (float): Scale estimate for truncnorm distributions
-        * val (list-like): List of unique values for discrete distributions
-        * cnt (list-like): List of unique value counts for discrete distributions
-        * p (list-like): List of unique value probabilities for discrete distributions
-        * shared_within (bool): Flag indicating that all synapses within a connection share the same value for a given property; not applicable for #synapses/connection
+        * "mean" (float): Data mean
+        * "std" (float): Standard deviation
+        * "min" (float): Minimum value
+        * "max" (float): Maximum value
+        * "hist" (tuple): Histogram with ``hist_bins`` bins; stored as (counts, edges) tuple as returned by :func:`numpy.histogram`
+        * "norm_loc" (float): Location estimate for truncnorm distributions
+        * "norm_scale" (float): Scale estimate for truncnorm distributions
+        * "val" (list-like): List of unique values for discrete distributions (*)
+        * "cnt" (list-like): List of unique value counts for discrete distributions (*)
+        * "p" (list-like): List of unique value probabilities for discrete distributions (*)
+        * "shared_within" (bool): Flag indicating that all synapses within a connection share the same value for a given property; not applicable for #synapses/connection
 
-        Discrete statistics (i.e., val/cnt/p) are only stored if there are not too many (less or equal MAX_UNIQUE_COUNT=100).
+        (*) Discrete statistics (i.e., "val"/"cnt"/"p") are only stored if there are not too many (less or equal ``MAX_UNIQUE_COUNT=100``).
 
+    Note:
         Statistics for #synapses/connection will always be extracted, even if no properties are selected under ``sel_props`` (i.e., empty list).
     """
     # Select edge population
@@ -308,7 +309,7 @@ def build(
         m_type_class (list): Two-element list of lists of synapse classes (i.e., EXC, INH) belonging to each source and target m-type (assuming that each m-type corresponds to exactly one synapse class), as returned by :func:`extract`
         m_type_layer (list): Two-element list of lists of layers belonging to each source and target m-type (assuming that each m-type corresponds to exactly one cortical layer), as returned by :func:`extract`
         syn_props (list-like): List of synaptic property names stored in ``conn_prop_data``, as returned by :func:`extract`
-        distr_types (dict): Optional dictionary specifying the distribution type (dict value) for each property (dict key); if omitted, a "normal" distribution is assumed (and will raise a warning)
+        distr_types (dict): Optional dictionary specifying the distribution type (dict value) for each property (dict key); if omitted, a "normal" distribution is assumed (and will raise a warning); see Notes for available distribution types
         data_types (dict): Optional dictionary specifying the output data type (dict value; e.g., "int", "float", ...) for each property (dict key) when drawing values from the fitted model
         data_bounds (dict): Optional dictionary specifying the output data bounds (dict value; list-like with two elements for lower/upper bounds) for each property (dict key) when drawing values from the fitted model
         shared_within (dict): Optional dictionary specifying if the same values are shared among synapses belonging to the same connections (boolean dict value) for each property (dict key) when drawing values from the fitted model; can be used to manually overwrite the data-derived value
@@ -317,17 +318,18 @@ def build(
         connectome_manipulator.model_building.model_types.ConnPropsModel: Fitted connection/synapse properties model
 
     Note:
-        The property name "n_syn_per_conn" (defined by model_types.N_SYN_PER_CONN_NAME) can be used to specify distribution types, data types, etc. for the #synapses/connection property.
+        The property name "n_syn_per_conn" (defined by ``model_types.N_SYN_PER_CONN_NAME``) can be used in ``distr_types``, ``data_types``, and ``data_bounds`` dicts to specify distribution types, data types, and bounds for the #synapses/connection property.
 
+    Note:
         The following distribution types are supported:
 
-        * "constant": Constant value
-        * "normal": Gaussian normal distribution
-        * "truncnorm": Truncated normal distribution
-        * "gamma": Gamma distribution
-        * "poisson": Poisson distribution
-        * "ztpoisson": Zero-truncated poisson distribution
-        * "discrete": Discrete distribution
+        * "constant": Constant value (define by "mean")
+        * "normal": Gaussian normal distribution (define by "mean", "std")
+        * "truncnorm": Truncated normal distribution (define by "norm_loc", "norm_scale", "min", "max")
+        * "gamma": Gamma distribution (define by "mean", "std")
+        * "poisson": Poisson distribution (define by "mean")
+        * "ztpoisson": Zero-truncated poisson distribution (define by "mean")
+        * "discrete": Discrete distribution (define by "val", "p")
         * "zero": Empty distribution always returning zero; can be used to model unused parameters
     """
     # Interpolate missing values in lookup tables
