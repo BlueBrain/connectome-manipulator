@@ -24,14 +24,15 @@ Table of contents
    -  `Structural comparison`_
 
 5. `Examples`_
-6. `How to contribute`_
-7. `Citation`_
-8. `Publications that use or mention Connectome-Manipulator`_
+6. `Documentation`_
+7. `How to contribute`_
+8. `Citation`_
+9. `Publications that use or mention Connectome-Manipulator`_
 
    -  `Scientific papers that use Connectome-Manipulator`_
    -  `Posters that use Connectome-Manipulator`_
 
-9. `Funding & Acknowledgment`_
+10. `Funding & Acknowledgment`_
 
 Introduction
 ------------
@@ -245,6 +246,11 @@ Examples
 --------
 
 Examples can be found under `examples/ </examples>`_ in the repository.
+
+Documentation
+-------------
+
+The full documentation (API reference, CONFIG file structure, ...) can be found on `Read the Docs <https://connectome-manipulator.readthedocs.io/en/netneuro-24-0092-rev1>`_.
 
 How to contribute
 -----------------
