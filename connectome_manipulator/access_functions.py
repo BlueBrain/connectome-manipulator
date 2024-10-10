@@ -5,8 +5,6 @@
 
 """Collection of function for flexible nodes/edges access, to be used by model building and manipulation operations"""
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -55,20 +53,6 @@ def get_nodes(nodes, selection=None):
     for attr in sorted(add_dynamic_prefix(population.dynamics_attribute_names)):
         result[attr] = population.get_dynamics_attribute(attr.split(DYNAMICS_PREFIX)[1], selection)
     return result
-
-
-def get_morphology_paths(nodes, selection, morpho_helper, extension="swc"):
-    """Return paths to morphology files corresponding to `selection`.
-
-    Args:
-        nodes: a bluepysnap node set
-        selection (libsonata.Selection): a selection of nodes
-        morpho_helper: a bluepysnap MorphoHelper instance
-        extension (str): expected filetype extension of the morph file.
-    """
-    morpho_dir = morpho_helper.get_morphology_dir(extension)
-    result = get_nodes(nodes, selection)
-    return [Path(morpho_dir, f"{name}.{extension}") for name in result[Node.MORPHOLOGY]]
 
 
 def orientations(nodes, node_sel=None):

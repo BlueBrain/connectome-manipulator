@@ -397,7 +397,7 @@ def build(
             conn_prop_model["p"][sidx, tidx, pidx] = c / np.sum(c)
 
     log.info(
-        f"Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: { {k: level_counts[k] for k in sorted(level_counts.keys())} }"
+        f"Interpolated {missing_list.shape[0]} missing values. Interpolation level counts: {{k: level_counts[k] for k in sorted(level_counts.keys())}}"
     )
 
     # Create model properties dictionary

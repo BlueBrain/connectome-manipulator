@@ -337,7 +337,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
             tgt_morphs = [None] * num_tgt
 
         log.info(
-            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, syn_pos_mode={syn_pos_mode}{', morph_ext=' + morph_ext if syn_pos_mode=='random' else ''}, rewire_mode={rewire_mode})"
+            f"Rewiring afferent {syn_class} connections to {num_tgt} ({amount_pct}%) of {len(tgt_sel)} target neurons in current split (total={num_tgt_total}, sel_src={sel_src}, sel_dest={sel_dest}, keep_indegree={keep_indegree}, gen_method={gen_method}, keep_conns={keep_conns}, reuse_conns={reuse_conns}, syn_pos_mode={syn_pos_mode}{', morph_ext=' + morph_ext if syn_pos_mode == 'random' else ''}, rewire_mode={rewire_mode})"
         )
 
         # Init/reset static variables (function attributes) related to generation methods which need only be initialized once [for better performance]
