@@ -100,7 +100,7 @@ class MorphologyCachingManipulation(Manipulation):
 
         morphologies = []
         for morpho_name in result[Node.MORPHOLOGY]:
-            morphologies.append(collection.get(morpho_name))
+            morphologies.append(collection.load(morpho_name, mutable=True))
         return self._transform(morphologies, tgt_node_sel)
 
     def _transform(self, morphs, node_sel):
