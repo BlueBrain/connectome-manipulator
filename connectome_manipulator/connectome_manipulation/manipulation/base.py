@@ -95,7 +95,7 @@ class MorphologyCachingManipulation(Manipulation):
     def _get_tgt_morphs(self, morph_ext, tgt_node_sel):
         """Access function (incl. transformation!), using specified format (swc/h5/...)"""
         morpho_dir = self.morpho_helper.get_morphology_dir(morph_ext)
-        collection = Collection(morpho_dir, [morph_ext])
+        collection = Collection(morpho_dir, [f".{morph_ext}"])
         result = access_functions.get_nodes(self.nodes[1], tgt_node_sel)
 
         morphologies = []
