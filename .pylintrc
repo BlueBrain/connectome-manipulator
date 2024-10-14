@@ -1,5 +1,5 @@
 [MESSAGES CONTROL]
-disable=fixme,invalid-name,len-as-condition,no-else-return,cyclic-import,import-outside-toplevel,useless-object-inheritance,self-assigning-variable,line-too-long,logging-fstring-interpolation,too-many-locals,too-many-branches,too-many-statements,no-member,unspecified-encoding,too-many-arguments,dangerous-default-value,similarities,too-many-lines,consider-using-f-string,broad-exception-caught,too-many-return-statements,eval-used
+disable=fixme,invalid-name,len-as-condition,no-else-return,cyclic-import,import-outside-toplevel,useless-object-inheritance,self-assigning-variable,line-too-long,logging-fstring-interpolation,too-many-locals,too-many-branches,too-many-statements,no-member,unspecified-encoding,too-many-arguments,dangerous-default-value,similarities,too-many-lines,consider-using-f-string,broad-exception-caught,too-many-return-statements,eval-used,too-many-positional-arguments
 
 [FORMAT]
 # Maximum number of characters on a single line.

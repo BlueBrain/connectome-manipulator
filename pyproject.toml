@@ -9,4 +9,3 @@ include = 'connectome_manipulator\/.*\.py$|tests\/.*\.py$|doc\/source\/conf\.py$
 pythonpath = [
   "."
 ]
-
