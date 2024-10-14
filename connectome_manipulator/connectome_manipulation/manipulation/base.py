@@ -15,7 +15,7 @@ import os.path
 
 from bluepysnap.morph import MorphHelper
 from bluepysnap.sonata_constants import Node
-from morphio.mut import Morphology
+from morphio import Collection
 import numpy as np
 
 from connectome_manipulator import access_functions
@@ -94,12 +94,13 @@ class MorphologyCachingManipulation(Manipulation):
 
     def _get_tgt_morphs(self, morph_ext, tgt_node_sel):
         """Access function (incl. transformation!), using specified format (swc/h5/...)"""
-        morphology_paths = access_functions.get_morphology_paths(
-            self.nodes[1], tgt_node_sel, self.morpho_helper, morph_ext
-        )
+        morpho_dir = self.morpho_helper.get_morphology_dir(morph_ext)
+        collection = Collection(morpho_dir, [f".{morph_ext}"])
+        result = access_functions.get_nodes(self.nodes[1], tgt_node_sel)
+
         morphologies = []
-        for mp in morphology_paths:
-            morphologies.append(Morphology(mp))
+        for morpho_name in result[Node.MORPHOLOGY]:
+            morphologies.append(collection.load(morpho_name, mutable=True))
         return self._transform(morphologies, tgt_node_sel)
 
     def _transform(self, morphs, node_sel):
