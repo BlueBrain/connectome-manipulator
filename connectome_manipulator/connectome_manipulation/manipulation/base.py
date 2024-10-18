@@ -10,6 +10,7 @@ classes must inherit and implement its methods.
 """
 
 from abc import ABCMeta, abstractmethod
+import functools
 import inspect
 import os.path
 
@@ -19,7 +20,7 @@ from morphio import Collection
 import numpy as np
 
 from connectome_manipulator import access_functions
-from connectome_manipulator import log
+from connectome_manipulator import log, profiler
 from connectome_manipulator import utils
 from connectome_manipulator.access_functions import get_enumeration_map
 
@@ -92,16 +93,24 @@ class MorphologyCachingManipulation(Manipulation):
             self.nodes[1].config.get("alternate_morphologies"),
         )
 
+    @profiler.profileit(name="morphology_reading")
     def _get_tgt_morphs(self, morph_ext, tgt_node_sel):
         """Access function (incl. transformation!), using specified format (swc/h5/...)"""
+        result = access_functions.get_nodes(self.nodes[1], tgt_node_sel)
+        return self._transform(
+            self._get_cached_morphs(morph_ext, tuple(result[Node.MORPHOLOGY])),
+            tgt_node_sel,
+        )
+
+    @functools.lru_cache(maxsize=10)
+    def _get_cached_morphs(self, morph_ext, basenames):
+        """Cached access function to get the untransformed morphologies."""
         morpho_dir = self.morpho_helper.get_morphology_dir(morph_ext)
         collection = Collection(morpho_dir, [f".{morph_ext}"])
-        result = access_functions.get_nodes(self.nodes[1], tgt_node_sel)
-
-        morphologies = []
-        for morpho_name in result[Node.MORPHOLOGY]:
-            morphologies.append(collection.load(morpho_name, mutable=True))
-        return self._transform(morphologies, tgt_node_sel)
+        morphologies = [None] * len(basenames)
+        for idx in collection.argsort(basenames):
+            morphologies[idx] = collection.load(basenames[idx], mutable=True)
+        return morphologies
 
     def _transform(self, morphs, node_sel):
         rotations = access_functions.orientations(self.nodes[1], node_sel)
