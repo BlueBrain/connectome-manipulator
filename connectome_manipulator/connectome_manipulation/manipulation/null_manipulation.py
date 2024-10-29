@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
+"""Null manipulation module - does not do anything."""
+
 from connectome_manipulator import log
 from connectome_manipulator.connectome_manipulation.manipulation import Manipulation
 

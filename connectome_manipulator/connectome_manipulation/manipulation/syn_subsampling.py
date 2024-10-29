@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
+"""Synapse subsampling module."""
+
 import numpy as np
 
 from connectome_manipulator import log, profiler

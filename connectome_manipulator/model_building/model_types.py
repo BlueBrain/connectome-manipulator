@@ -1008,7 +1008,6 @@ class ConnPropsModel(AbstractModel):
         (As in Chindemi et al. (2022) "A calcium-based plasticity model for
         predicting long-term potentiation and depression in the neocortex")
         """
-
         if self.prop_cov_mat is None:
             log.warning("No correlated properties!")
             return np.zeros((size, 0))

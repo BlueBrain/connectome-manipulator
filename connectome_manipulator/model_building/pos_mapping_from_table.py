@@ -147,7 +147,6 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     Note:
         Only mappings to 2D or 3D space are supported for visualization.
     """
-
     nrn_pos_model = model.apply(gids=nrn_ids)
 
     # Cell positions in 3D original vs. mapped space

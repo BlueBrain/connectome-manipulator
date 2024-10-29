@@ -43,8 +43,7 @@ def extract(circuit, sel_src=None, sel_dest=None, edges_popul_name=None, CV_dict
 
 
 def build(adj_mat, src_node_ids, tgt_node_ids, inverted=False, **_):
-    """Builds a (deterministic) connection probability model of type ``ConnProbAdjModel`` from an adjacency matrix
-    (i.e., returning probabilities 0.0 or 1.0 only).
+    """Builds a (deterministic) connection probability model of type ``ConnProbAdjModel`` from an adjacency matrix (i.e., returning probabilities 0.0 or 1.0 only).
 
     Args:
         adj_mat (scipy.sparse.csc_matrix): Sparse adjacency matrix with boolean entries (i.e., True...connection, False...no connection)

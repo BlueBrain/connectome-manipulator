@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
+"""Connectome (re)wiring module (general-purpose)."""
+
 import libsonata
 import neurom as nm
 import numpy as np

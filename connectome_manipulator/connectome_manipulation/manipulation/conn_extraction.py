@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
+"""Connectome extraction module."""
+
 import os
 
 import json
