@@ -21,6 +21,7 @@ from connectome_manipulator.connectome_manipulation.converters import EdgeWriter
 
 
 # SONATA section type mapping (as in MorphIO): 1 = soma, 2 = axon, 3 = basal, 4 = apical
+SEC_SOMA = 1
 SEC_TYPE_MAP = {nm.AXON: 2, nm.BASAL_DENDRITE: 3, nm.APICAL_DENDRITE: 4}
 
 
@@ -157,7 +158,7 @@ def test_apply(manipulation):
             ["afferent_section_id", "afferent_section_pos", "afferent_section_type"]
         ]
         if sec_id == 0:  # Soma section
-            assert sec_pos == 0.0 and sec_type == 0, "ERROR: Soma section error!"
+            assert sec_pos == 0.0 and sec_type == SEC_SOMA, "ERROR: Soma section error!"
             assert np.all(
                 np.isclose(
                     syn_pos.to_numpy(), nodes[1].positions(res.iloc[i]["@target_node"]).to_numpy()
