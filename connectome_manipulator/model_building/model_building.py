@@ -348,7 +348,11 @@ def main(model_config_input, show_fig=False, force_recomp=False, cv_folds=None):
                     cv_dstr = ""
                     cv_mstr = ""
                 else:
-                    cv_dict = dict(n_folds=cv_n, fold_idx=cv_i, training_set=cv_dset == "train")
+                    cv_dict = {
+                        "n_folds": cv_n,
+                        "fold_idx": cv_i,
+                        "training_set": cv_dset == "train",
+                    }
                     cv_dstr = f"__CV{cv_n}-{cv_i+1}-{cv_dset}"
                     cv_mstr = f"__CV{cv_n}-{cv_i+1}-train"  # Model is always built on training data
 
