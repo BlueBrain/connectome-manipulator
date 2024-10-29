@@ -905,7 +905,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
 
         # Synapse positions & (mapped) section types, computed from section & offset
-        type_sel = np.full_like(sec_sel, SEC_SOMA)
+        type_sel = np.full_like(sec_sel, self.SEC_SOMA)
         pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
         for idx in np.flatnonzero(sec_sel >= 0):
             type_sel[idx] = self.SEC_TYPE_MAP[morph.section(sec_sel[idx]).type]
