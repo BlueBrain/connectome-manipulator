@@ -250,7 +250,7 @@ Examples can be found under `examples/ </examples>`_ in the repository.
 Documentation
 -------------
 
-The full documentation (API reference, CONFIG file structure, ...) can be found on `Read the Docs <https://connectome-manipulator.readthedocs.io/en/netneuro-24-0092-rev1>`_.
+The full documentation (API reference, CONFIG file structure, ...) can be found on `Read the Docs <https://connectome-manipulator.readthedocs.io>`_.
 
 How to contribute
 -----------------

@@ -6,6 +6,7 @@ Version 1.0.2
 
 - Added new features and examples (cross-validation, synapse parameter correlation)
 - Changed afferent section types in accordance with MorphIO (1: soma, 2: axon, 3: basal dendrite, 4: apical dendrite)
+- Use of MorphIO collections
 - Improved readme and documentation
 
 
