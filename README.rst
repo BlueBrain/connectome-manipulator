@@ -24,14 +24,15 @@ Table of contents
    -  `Structural comparison`_
 
 5. `Examples`_
-6. `How to contribute`_
-7. `Citation`_
-8. `Publications that use or mention Connectome-Manipulator`_
+6. `Documentation`_
+7. `How to contribute`_
+8. `Citation`_
+9. `Publications that use or mention Connectome-Manipulator`_
 
    -  `Scientific papers that use Connectome-Manipulator`_
    -  `Posters that use Connectome-Manipulator`_
 
-9. `Funding & Acknowledgment`_
+10. `Funding & Acknowledgment`_
 
 Introduction
 ------------
@@ -62,6 +63,11 @@ All dependencies declared in ``setup.py`` and are available from PyPI, including
 
 Recommended Python version: v3.10.8
 
+❗ Compatibility notes
+~~~~~~~~~~~~~~~~~~~~~~
+
+The software famework is intended to be used on Linux/MacOS-based systems! Specifically, some dependencies, like ``libsonata``, are currently not compatible with Microsoft Windows OS.
+
 Framework overview
 ------------------
 
@@ -73,11 +79,11 @@ consists of the following main components:
 
 -  | **Connectome manipulator**
    | As specified in the config, applies one or a sequence of manipulations to a given SONATA connectome, and writes the manipulated connectome to a new SONATA edges file. All manipulations are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `connectome_manipulation/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/connectome_manipulation/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `connectome_manipulation/README.md <connectome_manipulator/connectome_manipulation/README.md>`_
 
 -  | **Model building**
    | As specified in the config, builds a model from a given connectome and writes the model to a file to be loaded and used by specific manipulations requiring a model (e.g., model-based rewiring based on connection probability model). All models are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `model_building/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/model_building/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `model_building/README.md <connectome_manipulator/model_building/README.md>`_
 
       Notes:
 
@@ -87,7 +93,9 @@ consists of the following main components:
 
 -  | **Structural comparator**
    | As specified in the config, performs a structural comparison of the original and manipulated connectomes. Different structural parameters to compare (connection probability, synapses per connection, ...) are separately implemented in sub-modules and can be easily extended.
-   | Details can be found in the corresponding README file in the repository: `connectome_comparison/README.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/connectome_comparison/README.md>`_
+   | Details can be found in the corresponding README file in the repository: `connectome_comparison/README.md <connectome_manipulator/connectome_comparison/README.md>`_
+
+The structure of the respective configuration files can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
 
 ℹ️ More details can be also found in the accompanying publication (esp.
 *Supplementary tables*), see `Citation`_.
@@ -180,6 +188,24 @@ Please note that this feature will require at least 4 MPI ranks. Dask will use 2
 
 When processing with ``parallel-manipulator``, one may pass the flag ``--target-payload`` to determine how big the individual workload for each process should be. The default value of 20e9 was determined empirically to run on the whole mouse brain with 75 million neurons. We recommend to use this value as a starting point and scale it up or down to achieve the desired runtime characteristics.
 
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
+
+❗ Notes on error handling
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Errors may occur for many different reasons and are not always easy to track. Most common errors are that an allocation gets "killed", either due to a time limit or due to an out-of-memory error. Here we provide a few hints on how to avoid or track errors that may occur:
+
+-  Use the "verbose" mode (``-v`` flag) which will produce a lot of log output.
+-  Look into the log files: there is usually one master log file and individual log files for all data splits, all of which can be found in the ``/logs`` subfolder of the output circuit folder.
+-  Use a small connectome to start with.
+-  Use a simple operation to start with, such as ``null_manipulation`` (see examples).
+-  Run serially to start with, before switching to parallel processing.
+-  Start with a single data split.
+-  But: In case of memory errors, use more than a single data splits, even when running serially (!), which will reduce the memory consumption as individual splits will be processed one after the other.
+-  When running in parallel, use ``--tasks-per-node`` in the SLURM configuration to define how many tasks (=splits) will be executed on a single node; reducing this number may reduce the risk of out-of-memory errors.
+-  In general: Increasing memory allocation and/or allocation time may help.
+-  For high performance: Allocate many nodes and use parallel processing together with a relatively large number of data splits depending on the network size (i.e., aim for a few hundered post-synaptic neurons per data split).
+
 Model building
 ~~~~~~~~~~~~~~
 
@@ -190,9 +216,13 @@ Model building
      Extract and build models from existing connectomes.
 
    Options:
-     --force-reextract  Force re-extraction of data, in case already existing.
-     --force-rebuild    Force model re-building, in case already existing.
-     --help             Show this message and exit.
+     --force-reextract   Force re-extraction of data, in case already existing.
+     --force-rebuild     Force model re-building, in case already existing.
+     --cv-folds INTEGER  Optional number of cross-validation folds, overwrites
+                         value in config file
+     --help              Show this message and exit.
+
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
 
 Structural comparison
 ~~~~~~~~~~~~~~~~~~~~~
@@ -210,15 +240,22 @@ Structural comparison
                            in case already existing.
      --help                Show this message and exit.
 
+Details on the CONFIG file structure can be found under `doc/source/config_file_structure.rst <doc/source/config_file_structure.rst>`_
+
 Examples
 --------
 
-Examples can be found under `examples/ <https://github.com/BlueBrain/connectome-manipulator/tree/main/examples>`_ in the repository.
+Examples can be found under `examples/ </examples>`_ in the repository.
+
+Documentation
+-------------
+
+The full documentation (API reference, CONFIG file structure, ...) can be found on `Read the Docs <https://connectome-manipulator.readthedocs.io/en/netneuro-24-0092-rev1>`_.
 
 How to contribute
 -----------------
 
-Contribution guidelines can be found in `CONTRIBUTING.md <https://github.com/BlueBrain/connectome-manipulator/blob/main/CONTRIBUTING.md>`_ in the repository.
+Contribution guidelines can be found in `CONTRIBUTING.md <CONTRIBUTING.md>`_ in the repository.
 
 Citation
 --------
@@ -244,11 +281,11 @@ Publications that use or mention Connectome-Manipulator
 Scientific papers that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. (2022) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.** bioRxiv 2022.08.11.503144. DOI: `10.1101/2022.08.11.503144 <https://doi.org/10.1101/2022.08.11.503144>`_
+-  Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. (2024) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.** eLife, 13:RP99688. DOI: `10.7554/eLife.99688.1 <https://doi.org/10.7554/eLife.99688.1>`_
 
--  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2023) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry.** Part II: Physiology and Experimentation. bioRxiv 2023.05.17.541168. DOI: `10.1101/2023.05.17.541168 <https://doi.org/10.1101/2023.05.17.541168>`_
+-  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2023) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part II: Physiology and Experimentation.** bioRxiv, 2023.05.17.541168. DOI: `10.1101/2023.05.17.541168 <https://doi.org/10.1101/2023.05.17.541168>`_
 
--  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Efficiency and reliability in biological neural network architectures.** bioRxiv 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
+-  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Efficiency and reliability in biological neural network architectures.** bioRxiv, 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
 
 Posters that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

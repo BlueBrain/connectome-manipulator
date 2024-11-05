@@ -3,36 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: conn_rewiring
-
-Description: Rewiring of existing connectome, based on a given model of connection probability (which can
-optionally be scaled by a global probability scaling factor p_scale; p_scale=1.0 by default)
-Optionally, existing connections (#synapses/connection, synapse physiology) can be preserved or reused
-in new connections. Otherwise, existing synapses (and connections) may be deleted or new ones created,
-based on the selected generation method ("sample" or "randomize").
-
-Additional options: Preserving indegrees, reuse existing synapse positions, only adding connections,
-                    only deleting connections
-
-Connection/synapse generation methods (gen_method):
- "sample" ... Reuse or generate synapse positions & sample (non-morphology-related; w/o delay) property
-              values independently from existing synapses
- "randomize" ... Reuse or generate synapse positions & randomize (non-morphology-related; w/o delay)
-                 property values based on pathway-specific model distributions
-
-Estimation run (optional): By setting estimation_run=True (False by default), an early stopping
- criterion is applied to just estimate the resulting number of connections (on average, i.e.,
- independent on random seed) based on the given connection probability model (and scaling).
- No actual connectome will be generated and such a run will not produce any output file.
-
-Optimizing #connections: By setting opt_nconn=True (False by default), the number of ingoing connections
- for each post-neuron will be optimized to match its expected number of connections on average. This
- is done by repeating the random generation up to OPT_NCONN_MAX_ITER times and keeping the instance
- which has #connestions exactly matching or closest to the average.
-
-NOTES: Input edges_table assumed to be sorted by @target_node.
-       Output edges_table will again be sorted by @target_node (But not by [@target_node, @source_node]!!).
-"""
+"""Connectome (re)wiring module (general-purpose)."""
 
 import libsonata
 import neurom as nm
@@ -54,17 +25,17 @@ OPT_NCONN_MAX_ITER = 1000
 
 
 class ConnectomeRewiring(MorphologyCachingManipulation):
-    """Rewiring of existing connectome, based on a given model of connection probability.
+    """Connectome manipulation class for (re)wiring a connectome:
 
-    This can optionally be scaled by a global probability scaling factor p_scale; p_scale=1.0 by default)
-    Optionally, existing connections may be preserved or reused. Otherwise, existing synapses may be deleted
-    or new ones created, based on the selected generation method ("sample" or "randomize").
-    Additional options: Preserving indegrees, reuse existing synapse positions, only adding connections,
-                        only deleting connections
+    Rewires an existing connectome, or wires an empty connectome fom scratch, based on
+    a given model of connection probability. Different aspects of connectivity can be
+    preserved during rewiring.
+    The manipulation can be applied through the :func:`apply` method.
     """
 
-    # SONATA section type mapping: 0 = soma, 1 = axon, 2 = basal, 3 = apical
-    SEC_TYPE_MAP = {nm.AXON: 1, nm.BASAL_DENDRITE: 2, nm.APICAL_DENDRITE: 3}
+    # SONATA section type mapping (as in MorphIO): 1 = soma, 2 = axon, 3 = basal, 4 = apical
+    SEC_SOMA = 1
+    SEC_TYPE_MAP = {nm.AXON: 2, nm.BASAL_DENDRITE: 3, nm.APICAL_DENDRITE: 4}
 
     def __init__(self, nodes, writer, split_index=0, split_total=1):
         """Construct ConnectomeRewiring Manipulation and declare state vars..."""
@@ -100,11 +71,40 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         syn_pos_model_spec=None,
         morph_ext="swc",
     ):
-        """Rewiring (interchange) of connections between pairs of neurons based on given conn. prob. model (re-using ingoing connections and optionally, creating/deleting synapses).
+        """Applies a (re)wiring of connections between pairs of neurons based on a given connectivity model.
 
-        => Model specs: A dict with model type/attributes or a dict with "file" key pointing to a model file can be passed.
-        => Position model file (pos_map_file) can be passed as model file (.json) or voxel data file (.nrrd);
-           one or two files for src/tgt nodes may be provided
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            syn_class (str): Selection of synapse class ("EXC" or "INH"), i.e., outgoing connections from either excitatory or inhibitory neuron types will be rewired at a time
+            prob_model_spec (dict): Connection probability model specification; a file can be specified by ``{"file": "path/file.json"}``
+            delay_model_spec (dict): Delay model specification; a file can be specified by ``{"file": "path/file.json"}``
+            sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+            sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+            pos_map_file (str/list-like): Optional position mapping file pointing to a position mapping model (.json) or voxel data map (.nrrd); one or two files for source/target node populations may be provided
+            keep_indegree (bool): If selected, the in-degree (number of incoming connections) of each rewired post-synaptic neuron is preserved
+            reuse_conns (bool): If selected, existing (incoming) connections may be reused to form new connections during rewiring; specifically, synapses per connection, synapse positions, as well as synapse physiology are preserved, and only new pre-synaptic neurons are assigned to such connections
+            gen_method (str): Method used for generating new synapses; can be "sample" (samples physiological property values independently from existing synapses) or "randomize" (draws physiological property values from model distributions; requires ``props_model_spec``); no ``gen_method`` required in case both ``keep_indegree`` and ``reuse_conns`` are selected
+            amount_pct (float): Percentage of randomly sampled target (post-synaptic) neurons that will be wired
+            props_model_spec (dict): Physiological properties model specification; must be provided for ``gen_method`` "randomize"; a file can be specified by ``{"file": "path/file.json"}``
+            nsynconn_model_spec (dict): Model specifications for #synapses/connection; not required if #synapses/connection are part of ``props_model_spec``, but will override if still provided; a file can be specified by ``{"file": "path/file.json"}``
+            estimation_run (bool): If selected, runs rewiring with early stopping, i.e., w/o generating an output connectome; an estimate of the average number of incoming connections for each post-synaptic neuron will be written to a data log file
+            p_scale (float): Optional global probability scaling factor
+            opt_nconn (bool): If selected, the number of ingoing connections for each post-neuron will be optimized to match its expected number of connections on average. This is done by repeating the random generation process up to ``OPT_NCONN_MAX_ITER=1000`` times and keeping the instance which has the exact or closest match
+            pathway_specs (dict): Optional model specifications for efficiently setting model coefficients by pathway; will be automatically provided by the manipulator framework in case a .parquet file (containing a coefficient table for all pathways) is specified under "model_pathways" in the manipulation configuration file; only works with specific types of models
+            keep_conns (bool): If selected, an existing connection is kept exactly as it is in case the same connection should be established during rewiring; otherwise, such a connection would be established by reusing another existing one (if ``reuse_conns`` selected) or by generating new synapses forming that connection
+            rewire_mode (str): Optional selection of specific rewiring modes, such as "add_only" (only new connections can be added, all existing ones will be kept) or "delete_only" (only existing connections can be deleted, no new ones will be added); otherwise, there are no restrictions on rewiring, i.e., new connections may be added and existing ones deleted
+            syn_pos_mode (str): Selection of synapse position mode for generating new synapses, such as "reuse" (reuses all existing synapse positions on the post-synaptic dendrites), "reuse_strict" (reuses only synapse positions on the post-synaptic dendrites that are incoming from the selected source neurons), "random" (randomly places new synapses on the actual dendritic morphologies; slower since access to morphologies is required), or "external" (synapse positions provided externally through ``syn_pos_model_spec``)
+            syn_pos_model_spec (dict): External synapse position model specification of type ``PropsTableModel``; only required if ``syn_pos_mode`` "external" is selected; a file can be specified by ``{"file": "path/file.json"}``
+            morph_ext (str): Morphology file extension, e.g., "swc", "asc", "h5"; only used if ``syn_pos_mode`` "random" is selected
+
+        Note:
+            Input/output edges (synapse) tables are accessed through the ``writer`` object:
+
+            * Loading input edges: ``edges_table = self.writer.to_pandas()``
+            * Writing output edges: ``self.writer.from_pandas(edges_table_manip)``
+
+            The input edges table is assumed to be sorted by ""@target_node", and the
+            output edges table will again be sorted by "@target_node".
         """
         # pylint: disable=arguments-differ
         edges_table = self.writer.to_pandas()
@@ -845,6 +845,10 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         If possible, synapses will be selected such that no duplicated synapses belong to same connection.
         """
+        if len(self.props_afferent) == 0:
+            # No afferent properties to duplicate (i.e., point neurons)
+            return
+
         conns, nsyns = np.unique(syn_conn_idx, return_counts=True)
         draw_from = np.where(syn_sel_idx_reuse)[0]
         sel_dupl = []
@@ -903,7 +907,7 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
         off_sel[sec_sel == -1] = 0.0  # Soma offsets must be zero
 
         # Synapse positions & (mapped) section types, computed from section & offset
-        type_sel = np.full_like(sec_sel, 0)
+        type_sel = np.full_like(sec_sel, self.SEC_SOMA)
         pos_sel = np.tile(morph.soma.center.astype(float), (len(sec_sel), 1))
         for idx in np.flatnonzero(sec_sel >= 0):
             type_sel[idx] = self.SEC_TYPE_MAP[morph.section(sec_sel[idx]).type]
@@ -971,7 +975,8 @@ class ConnectomeRewiring(MorphologyCachingManipulation):
 
         # Afferent morphology-related synapse properties (for duplicating synapses)
         self.props_afferent = list(filter(lambda nm: "afferent_" in nm, edges_table.columns))
-        log.log_assert(len(self.props_afferent) > 0, 'No "afferent_..." synapse properties!')
+        if len(self.props_afferent) == 0:
+            log.warning('No "afferent_..." synapse properties - point neurons assumed!')
 
         # Synapse class selection (EXC or INH)
         if syn_class == "EXC":  # EXC: >=100

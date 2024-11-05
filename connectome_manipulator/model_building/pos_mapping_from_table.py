@@ -3,13 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for position mapping model creation, consisting of three basic functions:
-
-- extract(...): Loads positions of a given nodes population based on some alternative
-                coordinate system from a pre-computed position table (pandas DataFrame)
-- build(...): Build flat space position mapping (LUT) model of type "PosMapModel" from the data
-- plot(...): Visualizes data vs. model output
-"""
+"""Module for building position mapping models based on pre-computed position tables"""
 
 import os
 
@@ -33,9 +27,27 @@ def extract(
     nodes_spec=None,
     zero_based_indexing=False,
     gid_column=None,
+    CV_dict=None,
     **_,
 ):
-    """Loads pre-computed position mapping of a given nodes population."""
+    """Loads pre-computed position mapping of a given nodes population.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        pos_file (str): Position table file name of format .feather, containing a pandas DataFrame
+        coord_names (list-like): List of mapped coordinate names which must be present as columns in the DataFrame
+        coord_scale (list-like): List of scaling factors for all mapped coordinates
+        nodes_pop_name (str): Name of SONATA nodes population to extract data from
+        nodes_spec (str/list-like/dict): Selection of neurons to be include in the mapping model
+        zero_based_indexing (bool): If selected, zero-based indexing of neuron IDs in the position table file is assumed (as in SONATA); otherwise, one-based indexing is assumed (for backward compatibility)
+        gid_column (str): Name of a column in the position table which contains the neuron IDs; if not provideed, the index column will be used
+        CV_dict (dict): Cross-validation dictionary - Not supported
+
+    Returns:
+        dict: Dictionary containing the extracted data elements, i.e., neuron positions in original and mapped space
+    """
+    log.log_assert(CV_dict is None, "ERROR: Cross-validation not supported!")
+
     # Get neuron GIDs
     if nodes_pop_name is None:
         log.log_assert(
@@ -94,7 +106,17 @@ def extract(
 
 
 def build(nrn_ids, coord_names, map_pos, model_coord_names=None, **_):
-    """Build position mapping model."""
+    """Builds a position mapping model from data.
+
+    Args:
+        nrn_ids (list-like): List of mapped neuron IDs, as returned by :func:`extract`
+        coord_names (list-like): List of coordinate names of the mapped neuron positions table
+        map_pos (numpy.ndarray): Mapped neuron positions table of size <#neurons x #coordinates>, as returned by :func:`extract`
+        model_coord_names (list-like): Optional list of coordinate names that should be used in the resulting model
+
+    Returns:
+        connectome_manipulator.model_building.model_types.PosMapModel: Resulting position mapping model
+    """
     if model_coord_names is None:
         model_coord_names = coord_names  # Same model coord names as input coord names
     else:
@@ -113,7 +135,18 @@ def build(nrn_ids, coord_names, map_pos, model_coord_names=None, **_):
 
 
 def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
-    """Visualize data vs. model."""
+    """Visualizes neuron positions in original space vs. mapped space from model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        nrn_ids (list-like): List of mapped neuron IDs, as returned by :func:`extract`
+        nrn_pos (numpy.ndarray): Table of original neuron positions in 3D atlas space of size <#neurons x 3>, as returned by :func:`extract`
+        nrn_lay (list-like): List of layer property values for all mapped neurons, as returned by :func:`extract`
+        model (connectome_manipulator.model_building.model_types.PosMapModel): Resulting position mapping model, as returned by :func:`build`
+
+    Note:
+        Only mappings to 2D or 3D space are supported for visualization.
+    """
     nrn_pos_model = model.apply(gids=nrn_ids)
 
     # Cell positions in 3D original vs. mapped space
@@ -178,7 +211,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     log.info(f"Saving {out_fn}...")
     plt.savefig(out_fn)
 
-    # Cell distances in atlas vs. flat space
+    # Cell distances in atlas vs. mapped space
     max_plot = 10000
     if len(nrn_ids) > max_plot:
         log.debug("Using subsampling for distance plots!")
@@ -203,21 +236,21 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     plt.grid(True)
     plt.xlabel("Distance in original space (data) [$\\mu$m]")
     plt.ylabel("Distance in mapped space (model)")
-    plt.title(f"Cell distances in atlas vs. flat space [N={len(nrn_ids)}cells]")
+    plt.title(f"Cell distances in atlas vs. mapped space [N={len(nrn_ids)}cells]")
     plt.tight_layout()
 
     out_fn = os.path.abspath(os.path.join(out_dir, "data_vs_model_distances.png"))
     log.info(f"Saving {out_fn}...")
     plt.savefig(out_fn)
 
-    # Nearest neighbors in atlas vs. flat space
+    # Nearest neighbors in atlas vs. mapped space
     NN_mat_data = np.argsort(dist_mat_data, axis=1)
     NN_mat_model = np.argsort(dist_mat_model, axis=1)
 
     num_NN_list = list(range(1, 30, 1))
     NN_match = np.full(len(num_NN_list), np.nan)
 
-    log.debug("Computing nearest neighbors in atlas vs. flat space...")
+    log.debug("Computing nearest neighbors in atlas vs. mapped space...")
     pbar = progressbar.ProgressBar()
     for nidx in pbar(range(len(num_NN_list))):
         num_NN = num_NN_list[nidx]
@@ -235,7 +268,7 @@ def plot(out_dir, nrn_ids, nrn_pos, nrn_lay, model, **_):  # pragma: no cover
     plt.ylim((0, 1))
     plt.xlabel("#Nearest neighbors")
     plt.ylabel("Mean match")
-    plt.title(f"Nearest neighbors in atlas vs. flat space [N={len(nrn_ids)}cells]")
+    plt.title(f"Nearest neighbors in atlas vs. mapped space [N={len(nrn_ids)}cells]")
 
     out_fn = os.path.abspath(os.path.join(out_dir, "data_vs_model_neighbors.png"))
     log.info(f"Saving {out_fn}...")

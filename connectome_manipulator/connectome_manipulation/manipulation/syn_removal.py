@@ -3,13 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: syn_removal
-
-Description: Remove percentage of randomly selected synapses according to certain
-cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn)
-and rescaling g_syns to keep sum of g_syns per connection constant (unless there is
-no synapse per connection left).
-"""
+"""Synapse removal module."""
 
 import numpy as np
 
@@ -21,12 +15,13 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 
 class SynapseRemoval(Manipulation):
-    """Manipulation name: syn_removal
+    """Connectome manipulation class for removing synapses:
 
-    Description: Remove percentage of randomly selected synapses according to certain
-    cell selection criteria, optionally keeping connections (i.e., at least 1 syn/conn)
-    and rescaling g_syns to keep sum of g_syns per connection constant (unless there is
-    no synapse per connection left).
+    Removes a percentage of randomly selected synapses according to certain cell
+    selection criteria, optionally keeping connections (i.e., at least 1 syn/conn)
+    and rescaling g_syns to keep sum of g_syns per connection constant (unless there
+    is no synapse per connection left).
+    The manipulation can be applied through the :func:`apply` method.
     """
 
     @profiler.profileit(name="syn_removal")
@@ -40,7 +35,23 @@ class SynapseRemoval(Manipulation):
         rescale_gsyn=False,
         **kwargs,
     ):
-        """Remove percentage of randomly selected synapses according to certain cell selection criteria."""
+        """Applies a removal of synapses according to certain cell selection criteria.
+
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+            sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+            amount_pct (float): Percentage of randomly sampled synapses to be removed
+            keep_conns (bool): If selected, won't remove entire connections but will keep (at least) one synapse per connection
+            rescale_gsyn (bool): If selected, rescales g_syn (synaptic "conductance" property) so that the sum of g_syns per connections before and after the manipulation is kept the same (unless the entire connection has been removed)
+            **kwargs: Additional keyword arguments - Not used
+
+        Note:
+            Input/output edges (synapse) tables are accessed through the ``writer`` object:
+
+            * Loading input edges: ``edges_table = self.writer.to_pandas()``
+            * Writing output edges: ``self.writer.from_pandas(edges_table_manip)``
+        """
         # pylint: disable=arguments-differ
         log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
 

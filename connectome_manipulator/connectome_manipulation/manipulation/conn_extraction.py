@@ -3,13 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: conn_extract
-
-Description: Extraction of a cell target, i.e., keeping only connections within that target.
-
-Note 1: Nodes table is kept unchanged!
-Note 2: If no cell target is given, an empty connectome is returned!
-"""
+"""Connectome extraction module."""
 
 import os
 
@@ -21,19 +15,29 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 
 class ConnectomeExtraction(Manipulation):
-    """Extraction Manipulation of a cell target, i.e., keeping only connections within that target.
+    """Connectome manipulation class for extracting connections:
 
-    Note 1: Nodes table is kept unchanged!
-    Note 2: If no cell target is given, an empty connectome is returned!
+    Extracts a subset of connections within a cell target, i.e., keeps
+    only connections within that target and removed all other connections
+    from the connectome. The manipulation can be applied through the :func:`apply`
+    method. The nodes (neuron) table is always kept unchanged!
     """
 
     @profiler.profileit(name="conn_extraction")
     def apply(self, split_ids, target_name=None, node_sets_file=None, **kwargs):
-        """Extraction of a cell target as given by target_name
+        """Applies an extraction of connections within a given cell target.
 
-        Extraction keeping only connections within that target (empty connectome if no target_name provided).
-        Optionally, a node sets file containing 'node_id' entries can be provided in case
-        the cell target is not part of the circuit's intrinsic node sets.
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            target_name (str): Cell target name (as defined in SONATA node sets file) to extract connectome from, i.e, keeping only connections within that target; an empty connectome will be returned if no `target_name` is provided
+            node_sets_file (str): Optional file path to alternative SONATA node sets file (.json) containing `node_id` entries; can be provided in case the cell target is not part of the circuit's intrinsic node sets.
+            **kwargs: Additional keyword arguments - Not used
+
+        Note:
+            Input/output edges (synapse) tables are accessed through the ``writer`` object:
+
+            * Loading input edges: ``edges_table = self.writer.to_pandas()``
+            * Writing output edges: ``self.writer.from_pandas(edges_table_manip)``
         """
         # pylint: disable=arguments-differ
         edges_table = self.writer.to_pandas()

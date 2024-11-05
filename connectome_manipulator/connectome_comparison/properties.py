@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Connectome comparison name: properties
+"""Module for comparing connectomes based on synapse properties:
 
-Description: Structural comparison of two connectomes in terms of synapse properties per pathway, as specified by the config.
-             For each connectome, the underlying properties maps are computed by the compute() function and will be saved to
-             a data file first. The individual synapse properties maps, together with a difference map between the two connectomes,
-             are then plotted by means of the plot() function.
+Structural comparison of two connectomes in terms of synapse properties per pathway,
+as specified by the config. For each connectome, the underlying properties maps are
+computed by the :func:`compute` function and will be saved to a data file first.
+The individual synapse properties maps, together with a difference map between the
+two connectomes, are then plotted by means of the :func:`plot` function.
 """
 
 import matplotlib.pyplot as plt
@@ -29,7 +30,31 @@ def compute(
     edges_popul_name=None,
     **_,
 ):
-    """Compute mean/std/... values of all synapse properties grouped by given cell property."""
+    """Computes a matrix of synapse property values between groups of neurons of a given circuit's connectome.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        fct (str): Function to apply, e.g., "np.mean", "np.std"
+        group_by (str): Neuron property name based on which to group connections, e.g., "synapse_class", "layer", or "mtype"; if omitted, the overall average is computed
+        sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+        sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+        per_conn (bool): If selected, ``fct`` is applied to the average property value per connection (i.e., average value of all synapses belonging to a connection); otherwise, ``fct`` is applied to the synapses of all connections altogether
+        skip_empty_groups (bool): If selected, only group property values that exist within the given source/target selection are kept; otherwise, all group property values, even if not present in the given source/target selection, will be included
+        edges_popul_name (str): Name of SONATA egdes population to extract data from
+
+    Returns:
+        dict: Dictionary containing the computed data elements; see Notes
+
+    Note:
+        The returned dictionary contains the data elements that can be selected for plotting through the structural comparison configuration file, together with a common dictionary containing additional information. Each data element is a dictionary with "data" (numpy.ndarray of size <source-group-size x target-group-size>), "name" (str), and "unit" (str) items. Names of these data elements correspond to the synapse properties that are present in the given SONATA edges population. Usual properties may include for example:
+
+        * "conductance": Peak conductance
+        * "decay_time": Decay time constant
+        * "depression_time": Time constant for recovery from depression
+        * "facilitation_time": Time constant for recovery from facilitation
+        * "u_syn": Utilization of synaptic efficacy
+        * ...
+    """
     # Select edge population
     edges = get_edges_population(circuit, edges_popul_name)
 
@@ -125,7 +150,17 @@ def compute(
 def plot(
     res_dict, common_dict, fig_title=None, vmin=None, vmax=None, isdiff=False, group_by=None, **_
 ):  # pragma:no cover
-    """Connectivity (matrix) plotting."""
+    """Plots a properties matrix or a difference matrix.
+
+    Args:
+        res_dict (dict): Results dictionary, containing selected data for plotting; must contain a "data" item with a properties matrix of type numpy.ndarray of size  <#source-group-values x #target-group-values>, as well as "name" and "unit" items containing strings.
+        common_dict (dict): Common dictionary, containing additional information; must contain "src_group_values" and "tgt_group_values" items containing lists of source/target values of the grouped property, matching the size of the properties matrix in ``res_dict``
+        fig_title (str): Optional figure title
+        vmin (float): Minimum plot range
+        vmax (float): Maximum plot range
+        isdiff (bool): Flag indicating that ``res_dict`` contains a difference matrix; in this case, a symmetric plot range is required and a divergent colormap will be used
+        group_by (str): Neuron property name based on which to group connections, e.g., "synapse_class", "layer", or "mtype"; if omitted, the overall average is computed
+    """
     if isdiff:  # Difference plot
         assert -1 * vmin == vmax, "ERROR: Symmetric plot range required!"
         cmap = "PiYG"  # Symmetric (diverging) colormap

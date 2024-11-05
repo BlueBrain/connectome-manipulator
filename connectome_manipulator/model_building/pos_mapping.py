@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Module for building position mapping model, consisting of three basic functions:
-
-- extract(...): Extracts position mapping from atlas space to flat space of a given nodes population
-- build(...): Build flat space position mapping (LUT) model of type "PosMapModel" from the data
-- plot(...): Visualizes data vs. model output
-"""
+"""Module for building position mapping models based on a flatmap"""
 
 import os
 
@@ -33,9 +28,27 @@ def extract(
     z_scale=None,
     nodes_pop_name=None,
     NN_only=False,
+    CV_dict=None,
     **_,
 ):
-    """Extract position mapping from atlas space to flat space (2 files required: 1. xy mapping, 2. z (=depth) mapping) of a given nodes population."""
+    """Extracts a position mapping from 3D atlas space (x/y/z) to 3D flat space (flat-x/flat-y/depth) of a given population of neurons.
+
+    Args:
+        circuit (bluepysnap.Circuit): Input circuit
+        flatmap_path (str): Base path to a flatmap
+        xy_file (str): Filename of x/y mapping file as part of the flatmap
+        z_file (str): Filename of z (= cortical depth) mapping file as part of the flatmap
+        xy_scale (list-like): Two-element list with x/y scaling factors from a.u. (as in flatmap) to um
+        z_scale (float): Scalar value with z scaling factor from a.u. (as in flatmap) to um
+        nodes_pop_name (str): Name of SONATA nodes population to extract data from
+        NN_only (bool): If selected, only nearest-neighbor interpolation will be used for position mapping (faster); otherwise, linear interpolation is applied, if possible (slower)
+        CV_dict (dict): Cross-validation dictionary - Not supported
+
+    Returns:
+        dict: Dictionary containing the extracted data elements, i.e., neuron positions in original and flat space
+    """
+    log.log_assert(CV_dict is None, "ERROR: Cross-validation not supported!")
+
     # Get neuron positions
     if nodes_pop_name is None:
         log.log_assert(
@@ -150,7 +163,15 @@ def extract(
 
 
 def build(nrn_ids, flat_pos, **_):
-    """Build flat space position mapping model."""
+    """Builds a flat space position mapping model from data.
+
+    Args:
+        nrn_ids (list-like): List of mapped neuron IDs, as returned by :func:`extract`
+        flat_pos (numpy.ndarray): Table of mapped neuron positions in 3D flat space of size <#neurons x 3>, as returned by :func:`extract`
+
+    Returns:
+        connectome_manipulator.model_building.model_types.PosMapModel: Resulting position mapping model
+    """
     flat_pos_table = pd.DataFrame(flat_pos, index=nrn_ids, columns=["x", "y", "z"])
     log.log_assert(np.all(np.isfinite(flat_pos_table)), "ERROR: Position error!")
 
@@ -162,7 +183,15 @@ def build(nrn_ids, flat_pos, **_):
 
 
 def plot(out_dir, nrn_ids, nrn_lay, nrn_pos, model, **_):  # pragma: no cover
-    """Visualize data vs. model."""
+    """Visualizes neuron positions in original space vs. mapped space from model output.
+
+    Args:
+        out_dir (str): Path to output directory where the results figures will be stored
+        nrn_ids (list-like): List of mapped neuron IDs, as returned by :func:`extract`
+        nrn_lay (list-like): List of layer property values for all mapped neurons, as returned by :func:`extract`
+        nrn_pos (numpy.ndarray): Table of original neuron positions in 3D atlas space of size <#neurons x 3>, as returned by :func:`extract`
+        model (connectome_manipulator.model_building.model_types.PosMapModel): Resulting position mapping model, as returned by :func:`build`
+    """
     nrn_pos_model = model.apply(gids=nrn_ids)
 
     # 3D cell positions in atlas vs. flat space

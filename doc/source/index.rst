@@ -16,6 +16,8 @@
    Model building overview (on GitHub) <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/model_building/README.md>
    Structural comparisons overview (on GitHub) <https://github.com/BlueBrain/connectome-manipulator/blob/main/connectome_manipulator/connectome_comparison/README.md>
    Examples (on GitHub) <https://github.com/BlueBrain/connectome-manipulator/tree/main/examples>
+   config_file_structure
+   api
 
 .. Path substitutions
 .. |banner| image:: ../../BPP-Connectome-Manipulator-Banner.jpg

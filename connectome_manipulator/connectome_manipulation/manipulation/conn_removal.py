@@ -3,16 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024 Blue Brain Project/EPFL
 
-"""Manipulation name: conn_removal
-
-Description: Remove percentage of randomly selected connections (i.e., all synapses per connection)
-according to certain cell and syn/conn selection criteria.
-
-Optionally, a connection mask can be provided, in which case only connections within
-that mask will be considered for removal (in addition to the other selecion criteria).
-Such connection mask (.npz file) must be given as sparse adjacency matrix in CSC format,
-exactly matching the size of the selected src/dest neurons and indexed in increasing order.
-"""
+"""Connection removal module."""
 
 import os
 
@@ -25,15 +16,14 @@ from connectome_manipulator.connectome_manipulation.manipulation import Manipula
 
 
 class ConnectomeRemoval(Manipulation):
-    """Manipulation name: conn_removal
+    """Connectome manipulation class for removing connections:
 
-    Description: Remove percentage of randomly selected connections (i.e., all synapses per connection)
-    according to certain cell and syn/conn selection criteria.
+    Removes a percentage of randomly selected connections (i.e., all synapses per
+    connection) according to certain cell and #synapses/connection selection criteria.
+    The manipulation can be applied through the :func:`apply` method.
 
     Optionally, a connection mask can be provided, in which case only connections within
     that mask will be considered for removal (in addition to the other selecion criteria).
-    Such connection mask (.npz file) must be given as sparse adjacency matrix in CSC format,
-    exactly matching the size of the selected src/dest neurons and indexed in increasing order.
     """
 
     @profiler.profileit(name="conn_removal")
@@ -48,7 +38,24 @@ class ConnectomeRemoval(Manipulation):
         conn_mask_file=None,
         **kwargs,
     ):
-        """Remove percentage of randomly selected connections (i.e., all synapses per connection) according to certain cell and syn/conn selection criteria."""
+        """Applies a removal of randomly selected connections according to certain selection criteria.
+
+        Args:
+            split_ids (list-like): List of neuron IDs that are part of the current data split; will be automatically provided by the manipulator framework
+            sel_src (str/list-like/dict): Source (pre-synaptic) neuron selection
+            sel_dest (str/list-like/dict): Target (post-synaptic) neuron selection
+            amount_pct (float): Percentage of randomly sampled connections to be removed
+            min_syn_per_conn (int): Minimum #synapses/connection for connections to be considered for removal
+            max_syn_per_conn (int): Maximum #synapses/connection for connections to be considered for removal
+            conn_mask_file (str): Optional connection mask file (.npz) containing a sparse adjacency matrix in scipy.sparse.csc_matrix format, exactly matching the size of the selected source/target neuron selections and indexed in increasing order; only connections within that mask will be considered for removal
+            **kwargs: Additional keyword arguments - Not used
+
+        Note:
+            Input/output edges (synapse) tables are accessed through the ``writer`` object:
+
+            * Loading input edges: ``edges_table = self.writer.to_pandas()``
+            * Writing output edges: ``self.writer.from_pandas(edges_table_manip)``
+        """
         # pylint: disable=arguments-differ
         log.log_assert(0.0 <= amount_pct <= 100.0, "amount_pct out of range!")
 

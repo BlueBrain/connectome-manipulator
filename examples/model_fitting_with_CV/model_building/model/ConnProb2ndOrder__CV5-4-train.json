@@ -1,0 +1,11 @@
+{
+  "scale": 0.12758134424718165,
+  "exponent": 0.00822205446373142,
+  "data_keys": [],
+  "model": "ConnProb2ndOrderExpModel",
+  "__version_info__": {
+    "connectome_manipulator": "1.0.2",
+    "python": "3.10.8 (main, Mar  3 2023, 08:18:43) [GCC 12.2.0]",
+    "pandas": "2.0.2"
+  }
+}
