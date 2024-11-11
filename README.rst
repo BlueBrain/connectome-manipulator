@@ -283,9 +283,9 @@ Scientific papers that use Connectome-Manipulator
 
 -  Michael W. Reimann, Sirio Bolaños-Puchet, Jean-Denis Courcol, Daniela Egas Santander, et al. (2024) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part I: Anatomy.** eLife, 13:RP99688. DOI: `10.7554/eLife.99688.1 <https://doi.org/10.7554/eLife.99688.1>`_
 
--  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2023) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part II: Physiology and Experimentation.** bioRxiv, 2023.05.17.541168. DOI: `10.1101/2023.05.17.541168 <https://doi.org/10.1101/2023.05.17.541168>`_
+-  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2024) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part II: Physiology and Experimentation.** eLife, 13:RP99693. DOI: `10.7554/eLife.99693.1 <https://doi.org/10.7554/eLife.99693.1>`_
 
--  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Efficiency and reliability in biological neural network architectures.** bioRxiv, 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
+-  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Heterogeneous and higher-order cortical connectivity undergirds efficient, robust and reliable neural codes.** bioRxiv, 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
 
 Posters that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -297,6 +297,10 @@ Posters that use Connectome-Manipulator
 -  Christoph Pokorny, Omar Awile, Sirio Bolaños-Puchet, András Ecker, Daniela Egas Santander, James B. Isbister, Matthias Wolf, Henry Markram, and Michael W. Reimann. **A connectome manipulation framework for the systematic and reproducible study of the structure-function relationship through simulations.** Bernstein Conference, 2023, Berlin.
 
 -  Christoph Pokorny, Omar Awile, James B. Isbister, Kerem Kurban, Matthias Wolf, and Michael W. Reimann. **A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.** FENS Forum, 2024, Vienna.
+
+-  Christoph Pokorny, Omar Awile, James B. Isbister, Kerem Kurban, Matthias Wolf, and Michael W. Reimann. **A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.** Bernstein Conference, 2024, Frankfurt.
+
+-  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. **Efficiency and reliability in biological neural network architectures.** Annual meeting of the Society for Neuroscience, 2024, Chicago.
 
 Funding & Acknowledgment
 ------------------------
