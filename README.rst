@@ -262,17 +262,17 @@ Citation
 
 If you use this software, we kindly ask you to cite the following publication:
 
-Christoph Pokorny, Omar Awile, James B. Isbister, Kerem Kurban, Matthias Wolf, and Michael W. Reimann (2024). **A connectome manipulation framework for the systematic and reproducible study of structure-function relationships through simulations.** bioRxiv 2024.05.24.593860. DOI: `10.1101/2024.05.24.593860 <https://doi.org/10.1101/2024.05.24.593860>`_
+Christoph Pokorny, Omar Awile, James B. Isbister, Kerem Kurban, Matthias Wolf, and Michael W. Reimann (2024). **A connectome manipulation framework for the systematic and reproducible study of structure–function relationships through simulations.** Network Neuroscience. DOI: `10.1162/netn_a_00429 <https://doi.org/10.1162/netn_a_00429>`_
 
 ::
 
    @article{pokorny2024connectome,
      author = {Pokorny, Christoph and Awile, Omar and Isbister, James B and Kurban, Kerem and Wolf, Matthias and Reimann, Michael W},
      title = {A connectome manipulation framework for the systematic and reproducible study of structure--function relationships through simulations},
-     journal = {bioRxiv},
+     journal = {Network Neuroscience},
      year = {2024},
-     publisher={Cold Spring Harbor Laboratory},
-     doi = {10.1101/2024.05.24.593860}
+     publisher={MIT Press},
+     doi = {10.1162/netn_a_00429}
    }
 
 Publications that use or mention Connectome-Manipulator
