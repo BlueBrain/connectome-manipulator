@@ -312,8 +312,8 @@ Copyright (c) 2024 Blue Brain Project/EPFL
 .. |license| image:: https://img.shields.io/badge/License-Apache_2.0-blue.svg
    :target: https://opensource.org/licenses/Apache-2.0
    :alt: License
-.. |doi| image:: http://img.shields.io/badge/DOI-10.1101/2024.05.24.593860-B31B1B.svg
-   :target: https://doi.org/10.1101/2024.05.24.593860
+.. |doi| image:: http://img.shields.io/badge/DOI-10.1162/netn__a__00429-B31B1B.svg
+   :target: https://doi.org/10.1162/netn_a_00429
    :alt: DOI
 .. |tox| image:: https://github.com/BlueBrain/connectome-manipulator/actions/workflows/run-tox.yml/badge.svg
    :target: https://github.com/BlueBrain/connectome-manipulator/actions/workflows/run-tox.yml
