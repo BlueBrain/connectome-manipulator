@@ -285,7 +285,7 @@ Scientific papers that use Connectome-Manipulator
 
 -  James B. Isbister, András Ecker, Christoph Pokorny, Sirio Bolaños-Puchet, Daniela Egas Santander, et al. (2024) **Modeling and Simulation of Neocortical Micro- and Mesocircuitry. Part II: Physiology and Experimentation.** eLife, 13:RP99693. DOI: `10.7554/eLife.99693.1 <https://doi.org/10.7554/eLife.99693.1>`_
 
--  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2024) **Heterogeneous and higher-order cortical connectivity undergirds efficient, robust and reliable neural codes.** bioRxiv, 2024.03.15.585196. DOI: `10.1101/2024.03.15.585196 <https://doi.org/10.1101/2024.03.15.585196>`_
+-  Daniela Egas Santander, Christoph Pokorny, András Ecker, Jānis Lazovskis, Matteo Santoro, Jason P. Smith, Kathryn Hess, Ran Levi, and Michael W. Reimann. (2025) **Heterogeneous and higher-order cortical connectivity undergirds efficient, robust and reliable neural codes.** iScience, 28:111585. DOI: `10.1016/j.isci.2024.111585 <https://doi.org/10.1016/j.isci.2024.111585>`_
 
 Posters that use Connectome-Manipulator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
